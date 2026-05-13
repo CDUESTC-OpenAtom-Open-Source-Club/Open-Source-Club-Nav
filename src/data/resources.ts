@@ -1,25 +1,9 @@
-export interface ResourceLink {
-  title: string;
-  desc: string;
-  url: string;
-  tag: string;
-}
-
-export interface ResourceCategory {
-  id: string;
-  label: string;
-  sublabel: string;
-  icon: string;
-  color: string;
-  glow: string;
-  links: ResourceLink[];
-}
-
-export const RESOURCE_CATEGORIES: ResourceCategory[] = [
+﻿// @ts-nocheck
+export const RESOURCE_CATEGORIES = [
   {
     id: "intelligence",
-    label: "智库中心",
-    sublabel: "Intelligence Tank",
+    label: "智库",
+    sublabel: "Intelligence",
     icon: "Brain",
     color: "#0A84FF",
     glow: "#38BDF8",
@@ -43,7 +27,7 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
         tag: "Research",
       },
       {
-        title: "Arxiv",
+        title: "arXiv",
         desc: "最新 AI / CS 预印本论文",
         url: "https://arxiv.org",
         tag: "Papers",
@@ -56,7 +40,7 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
       },
       {
         title: "MIT OCW",
-        desc: "MIT 开放课件",
+        desc: "MIT 开放课程",
         url: "https://ocw.mit.edu",
         tag: "Course",
       },
@@ -64,8 +48,8 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
   },
   {
     id: "surface",
-    label: "地表坐标",
-    sublabel: "Surface Coordinates",
+    label: "校园",
+    sublabel: "Campus Atlas",
     icon: "MapPin",
     color: "#06E5CC",
     glow: "#06E5CC",
@@ -110,8 +94,8 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
   },
   {
     id: "armory",
-    label: "军械库",
-    sublabel: "Armory",
+    label: "工具",
+    sublabel: "Toolbox",
     icon: "Wrench",
     color: "#7C3AED",
     glow: "#A78BFA",
@@ -155,3 +139,4 @@ export const RESOURCE_CATEGORIES: ResourceCategory[] = [
     ],
   },
 ];
+

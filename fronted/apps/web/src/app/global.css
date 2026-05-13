@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  input, textarea, select, button {
+    @apply outline-none focus:outline-none;
+  }
+}
+
+@layer base {
+  [data-ui-touch="true"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition:
+      filter 0.18s ease,
+      background-color 0.18s ease,
+      border-color 0.18s ease,
+      box-shadow 0.18s ease,
+      outline-color 0.18s ease;
+  }
+
+  @media (hover: hover) {
+    [data-ui-touch="true"]:hover {
+      filter: brightness(1.015);
+    }
+  }
+
+  [data-ui-touch="true"]:active {
+    filter: brightness(0.985) saturate(1.01);
+  }
+
+  [data-ui-touch="true"]:focus-visible {
+    outline: 2px solid #bfdbfe;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    [data-ui-touch="true"] {
+      transition: none;
+    }
+  }
+}

@@ -43,3 +43,10 @@ next-env.d.ts
 # AI agent instructions
 AGENTS.md
 CLAUDE.md
+
+
+
+fronted/apps/web/node_modules/
+
+
+*/node_modules/

@@ -1,0 +1,315 @@
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at requireEditorOrSuper (src\app\api\admin\links\route.ts:14:26)
+    at GET (src\app\api\admin\links\route.ts:24:22)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at GET (src\app\api\admin\stats\route.ts:6:26)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at requireEditorOrSuper (src\app\api\admin\links\route.ts:14:26)
+    at GET (src\app\api\admin\links\route.ts:24:22)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at GET (src\app\api\admin\stats\route.ts:6:26)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at requireEditorOrSuper (src\app\api\admin\links\route.ts:14:26)
+    at GET (src\app\api\admin\links\route.ts:24:22)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at GET (src\app\api\admin\stats\route.ts:6:26)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at requireEditorOrSuper (src\app\api\admin\links\route.ts:14:26)
+    at GET (src\app\api\admin\links\route.ts:45:22)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at GET (src\app\api\admin\stats\route.ts:6:26)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at requireEditorOrSuper (src\app\api\admin\links\route.ts:14:26)
+    at GET (src\app\api\admin\links\route.ts:45:22)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}
+⨯ AggregateError: 
+    at ensureAdminTables (src\lib\admin-db.ts:9:14)
+    at GET (src\app\api\admin\stats\route.ts:6:26)
+   7 |   if (initialized) return;
+   8 |
+>  9 |   await pool.query(`
+     |              ^
+  10 |     CREATE TABLE IF NOT EXISTS admin_users (
+  11 |       id INT AUTO_INCREMENT PRIMARY KEY,
+  12 |       username VARCHAR(64) NOT NULL UNIQUE, {
+  code: 'ECONNREFUSED',
+  fatal: true,
+  [errors]: [
+    Error: connect ECONNREFUSED ::1:3306
+        at <unknown> (Error: connect ECONNREFUSED ::1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '::1',
+      port: 3306
+    },
+    Error: connect ECONNREFUSED 127.0.0.1:3306
+        at <unknown> (Error: connect ECONNREFUSED 127.0.0.1:3306) {
+      errno: -4078,
+      code: 'ECONNREFUSED',
+      syscall: 'connect',
+      address: '127.0.0.1',
+      port: 3306
+    }
+  ]
+}

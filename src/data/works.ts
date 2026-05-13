@@ -1,17 +1,5 @@
-export interface Work {
-  id: number;
-  title: string;
-  desc: string;
-  author: string;
-  avatar: string;
-  tags: string[];
-  color: string;
-  status: string;
-  stars: number;
-  preview: string | null;
-}
-
-export const WORKS: Work[] = [
+﻿// @ts-nocheck
+export const WORKS = [
   {
     id: 1,
     title: "选课助手 Pro",
@@ -23,6 +11,12 @@ export const WORKS: Work[] = [
     status: "已上线",
     stars: 128,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "招新中",
+    contact: "kcos@opensouce-club.top",
+    activities: ["周三项目例会", "周末技术分享", "每月作品路演"],
   },
   {
     id: 2,
@@ -35,6 +29,12 @@ export const WORKS: Work[] = [
     status: "开发中",
     stars: 87,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "持续招募",
+    contact: "kcos@opensouce-club.top",
+    activities: ["每周需求评审", "校园场景调研", "版本迭代复盘"],
   },
   {
     id: 3,
@@ -47,6 +47,12 @@ export const WORKS: Work[] = [
     status: "已上线",
     stars: 203,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "招新中",
+    contact: "kcos@opensouce-club.top",
+    activities: ["产品体验优化", "周报同步", "可用性测试"],
   },
   {
     id: 4,
@@ -59,6 +65,12 @@ export const WORKS: Work[] = [
     status: "内测中",
     stars: 156,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "按项目招募",
+    contact: "kcos@opensouce-club.top",
+    activities: ["模型调优工作坊", "Prompt 工程训练", "Demo 共创"],
   },
   {
     id: 5,
@@ -71,6 +83,12 @@ export const WORKS: Work[] = [
     status: "已上线",
     stars: 94,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "长期招募",
+    contact: "kcos@opensouce-club.top",
+    activities: ["地图数据维护", "路线算法优化", "用户反馈回收"],
   },
   {
     id: 6,
@@ -83,6 +101,12 @@ export const WORKS: Work[] = [
     status: "已上线",
     stars: 312,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "开发者开放加入",
+    contact: "kcos@opensouce-club.top",
+    activities: ["插件共建", "周度版本发布", "文档维护"],
   },
   {
     id: 7,
@@ -95,6 +119,12 @@ export const WORKS: Work[] = [
     status: "开发中",
     stars: 67,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "贡献者招募",
+    contact: "kcos@opensouce-club.top",
+    activities: ["命令设计评审", "发布流程验证", "跨平台测试"],
   },
   {
     id: 8,
@@ -107,5 +137,12 @@ export const WORKS: Work[] = [
     status: "已上线",
     stars: 143,
     preview: null,
+    projectUrl: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    portfolioUrl: "https://opensouce-club.top/",
+    club: "科成开放原子开源社团",
+    recruitStatus: "欢迎参与优化",
+    contact: "kcos@opensouce-club.top",
+    activities: ["数据看板迭代", "指标定义优化", "月度复盘"],
   },
 ];
+

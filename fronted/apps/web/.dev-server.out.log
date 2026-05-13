@@ -1,0 +1,58 @@
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4000[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://10.128.185.20:[1m4000[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.137.1:[1m4000[22m/[39m
+🚧 Dev server started
+[2m15:29:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:29:46[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:29:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:29:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:29:47[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css, /src/app/page.jsx?noLayout.jsx[22m
+[2m15:29:47[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/app/page.jsx[22m
+🚧 Dev server started
+[2m15:30:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:30:15[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:30:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:30:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:30:16[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css, /src/app/page.jsx?noLayout.jsx[22m
+[2m15:30:16[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/app/page.jsx[22m
+🚧 Dev server started
+[2m15:45:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m15:45:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m15:45:05[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m15:45:05[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/components/WorksCarousel.jsx[22m
+🚧 Dev server started
+[2m15:48:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:48:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:48:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:48:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:48:55[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css, /src/app/page.jsx?noLayout.jsx[22m
+[2m15:48:55[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/app/page.jsx[22m
+🚧 Dev server started
+[2m15:49:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:49:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:49:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css[22m
+[2m15:49:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx?noLayout.jsx[22m
+[2m15:49:27[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/app/page.jsx, /src/app/global.css, /src/app/page.jsx?noLayout.jsx[22m
+[2m15:49:27[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/app/page.jsx[22m
+🚧 Dev server started
+[2m16:04:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:04:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:04:22[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:04:22[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/components/WorksCarousel.jsx[22m
+🚧 Dev server started
+[2m16:08:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:08:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:08:39[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:08:39[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/components/WorksCarousel.jsx[22m
+🚧 Dev server started
+[2m16:11:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:11:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:11:38[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:11:38[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/components/WorksCarousel.jsx[22m
+🚧 Dev server started
+[2m16:11:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:11:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:11:54[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/WorksCarousel.jsx, /src/app/global.css[22m
+[2m16:11:54[22m [36m[1m[vite][22m[39m [34m[2m(ssr)[22m[39m [32mpage reload [39m[2msrc/components/WorksCarousel.jsx[22m
+🚧 Dev server started
+[vite] Detected change in .env. Exiting for restart...

@@ -2,6 +2,8 @@
 // 使用 MySQL 数据库存储，未配置时降级为默认数据
 
 import pool from "@/lib/db";
+import { getAdminSessionFromCookies } from "@/lib/admin-auth";
+import { ensureAdminTables } from "@/lib/admin-db";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 
@@ -14,6 +16,18 @@ interface FriendLink {
   active: number;
   created_at: string;
   updated_at: string;
+}
+
+async function requireEditorOrSuper() {
+  await ensureAdminTables();
+  const session = await getAdminSessionFromCookies();
+  if (!session) {
+    return Response.json({ error: "未登录" }, { status: 401 });
+  }
+  if (session.role !== "editor" && session.role !== "super") {
+    return Response.json({ error: "无权限" }, { status: 403 });
+  }
+  return null;
 }
 
 // 降级默认数据
@@ -60,6 +74,8 @@ export async function GET() {
 
 // POST /api/links - 新增友链
 export async function POST(request: Request) {
+  const denied = await requireEditorOrSuper();
+  if (denied) return denied;
   try {
     const body = await request.json();
     const { title, url, description, sort } = body;
@@ -85,6 +101,8 @@ export async function POST(request: Request) {
 
 // PUT /api/links - 更新友链
 export async function PUT(request: Request) {
+  const denied = await requireEditorOrSuper();
+  if (denied) return denied;
   try {
     const body = await request.json();
     const { id, title, url, description, sort, active } = body;
@@ -124,6 +142,8 @@ export async function PUT(request: Request) {
 
 // DELETE /api/links?id=1 - 删除友链（软删除）
 export async function DELETE(request: Request) {
+  const denied = await requireEditorOrSuper();
+  if (denied) return denied;
   try {
     const { searchParams } = new URL(request.url);
     const id = Number(searchParams.get("id"));

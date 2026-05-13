@@ -53,3 +53,34 @@ INSERT INTO works (type, title, description, author_name, author_avatar, tags, c
 ('MANUAL', 'HexBoard', 'æç®€å…­è¾¹å½¢ç¬”è®°æ¿ Â· Markdown Â· æœ¬åœ°ä¼˜å…ˆ', 'Zhao Yu', 'ZY', '["Electron","SQLite","ProseMirror"]', '#10B981', 'å·²ä¸Šçº¿', 312, 1, 6),
 ('MANUAL', 'StarLink CLI', 'Git å·¥ä½œæµå·¥å…· Â· è‡ªåŠ¨åŒ–æäº¤è§„èŒƒ', 'Sun Lei', 'SL', '["Rust","CLI","Shell"]', '#38BDF8', 'å¼€å‘ä¸­', 67, 1, 7),
 ('MANUAL', 'å¼€æºè´¡çŒ®çœ‹æ¿', 'ç¤¾å›¢æˆå‘˜è´¡çŒ®å¯è§†åŒ– Â· GitHub Stats', 'Huang Xin', 'HX', '["D3.js","GitHub API","Vercel"]', '#EC4899', 'å·²ä¸Šçº¿', 143, 1, 8);
+
+-- ¹ÜÀíºóÌ¨ÓÃ»§
+CREATE TABLE IF NOT EXISTS admin_users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(64) NOT NULL UNIQUE COMMENT 'µÇÂ¼ÓÃ»§Ãû',
+  password_hash VARCHAR(255) NOT NULL COMMENT 'ÃÜÂë¹şÏ£',
+  role ENUM('super', 'editor') NOT NULL DEFAULT 'editor' COMMENT '½ÇÉ«',
+  created_by INT NULL COMMENT '´´½¨ÈË ID',
+  last_login_at DATETIME NULL COMMENT '×î½üµÇÂ¼Ê±¼ä',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ºóÌ¨ÓÃ»§';
+
+-- Ã¿ÈÕÍ³¼Æ
+CREATE TABLE IF NOT EXISTS admin_daily_stats (
+  stat_date DATE PRIMARY KEY COMMENT 'Í³¼ÆÈÕÆÚ',
+  page_views INT NOT NULL DEFAULT 0 COMMENT '¿ÍÁ÷Á¿(PV)',
+  unique_visitors INT NOT NULL DEFAULT 0 COMMENT '¿ÍÁ÷Á¿(UV)',
+  link_clicks INT NOT NULL DEFAULT 0 COMMENT 'Á´½Óµã»÷Á¿',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ºóÌ¨Ã¿ÈÕÍ³¼Æ';
+
+-- Ã¿ÈÕ·Ã¿ÍÈ¥ÖØÃ÷Ï¸
+CREATE TABLE IF NOT EXISTS admin_daily_visits (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  stat_date DATE NOT NULL COMMENT 'Í³¼ÆÈÕÆÚ',
+  visitor_id VARCHAR(64) NOT NULL COMMENT '·Ã¿Í ID',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_stat_visitor (stat_date, visitor_id),
+  INDEX idx_stat_date (stat_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Ã¿ÈÕ·Ã¿ÍÈ¥ÖØ';
