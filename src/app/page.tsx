@@ -6,6 +6,7 @@ import HUDHeader from "../components/HUDHeader";
 import LeftPanel from "../components/LeftPanel";
 import CentralHub from "../components/CentralHub";
 import RightPanel from "../components/RightPanel";
+import GitHubAvatarLookup from "../components/GitHubAvatarLookup";
 
 const STORAGE_KEY = "kcos_booted";
 const THEME_MODE_STORAGE_KEY = "kcos_theme_mode";
@@ -159,6 +160,7 @@ const CLUB_POINTS_REWARD_NOTE =
 const DEV_TEAM_MEMBERS = [
   {
     name: "V09201030",
+    githubUsername: "V09201030",
     role: "项目经理",
     simpleIntro: "发起与统筹，负责项目推进和团队协同",
     avatar: "/avatars/v09201030.svg",
@@ -175,6 +177,7 @@ const DEV_TEAM_MEMBERS = [
   },
   {
     name: "LRXZH",
+    githubUsername: "LRXZH",
     role: "美术设计师",
     simpleIntro: "负责视觉风格、页面规范与设计资源产出",
     avatar: "/avatars/lrxzh.jpg",
@@ -191,6 +194,7 @@ const DEV_TEAM_MEMBERS = [
   },
   {
     name: "Tippydes",
+    githubUsername: "Tippydes",
     role: "前端开发",
     simpleIntro: "实现页面与交互，完成双端适配与联调",
     avatar: "/avatars/tippydes.png",
@@ -207,6 +211,7 @@ const DEV_TEAM_MEMBERS = [
   },
   {
     name: "Nerdlet369",
+    githubUsername: "Nerdlet369",
     role: "后端开发",
     simpleIntro: "负责 API、服务逻辑与数据库设计维护",
     avatar: "/avatars/nerdlet369.jpg",
@@ -223,6 +228,7 @@ const DEV_TEAM_MEMBERS = [
   },
   {
     name: "Dirinkbottle",
+    githubUsername: "Dirinkbottle",
     role: "后端开发",
     simpleIntro: "负责 API、服务逻辑与数据库设计维护",
     avatar: "/avatars/dirinkbottle.jpg",
@@ -238,7 +244,8 @@ const DEV_TEAM_MEMBERS = [
     blog: "https://opensouce-club.top/",
   },
   {
-    name: "李枨",
+    name: "muzimu217",
+    githubUsername: "muzimu217",
     role: "团队管理员",
     simpleIntro: "负责仓库权限、协作规范与流程治理",
     avatar: "/avatars/lichang.jpg",
@@ -1187,14 +1194,15 @@ export default function HomePage() {
                   <div className="about-member-grid">
                     {DEV_TEAM_MEMBERS.map((member) => (
                       <div key={member.name} className="about-member-card">
-                        <img
+                        <GitHubAvatarLookup
                           className="about-member-avatar-img"
-                          src={
+                          username={member.githubUsername}
+                          fallbackSrc={
                             member.avatar ||
                             `${member.githubProfile.replace(/\/$/, "")}.png?size=96`
                           }
                           alt={`${member.name} 头像`}
-                          loading="lazy"
+                          size={96}
                         />
                         <div className="about-member-name">{member.name}</div>
                         <div className="about-member-role">{member.role}</div>
