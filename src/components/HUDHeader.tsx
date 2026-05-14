@@ -2,7 +2,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Wifi, Clock, Radio } from "lucide-react";
-import clubLogo from "../assets/club-logo-user.jpg";
 
 const TYPEWRITER_MESSAGES = [
   "KCOS 科成开放原子开源社团 · 探索、共创、分享",
@@ -109,27 +108,77 @@ export default function HUDHeader({
   themeMode = "auto",
   onThemeModeChange = () => {},
 }) {
-  const [utcTime, setUtcTime] = useState("");
   const [localTime, setLocalTime] = useState("");
-  const [runDays, setRunDays] = useState(0);
+  const [startedAtText, setStartedAtText] = useState("--:--:--");
+  const [uptimeText, setUptimeText] = useState("--");
+  const [uptimeBaseSec, setUptimeBaseSec] = useState(0);
+  const [uptimeAnchorMs, setUptimeAnchorMs] = useState(0);
   const [typeText, setTypeText] = useState("");
   const [msgIdx, setMsgIdx] = useState(0);
   const [charIdx, setCharIdx] = useState(0);
   const [deleting, setDeleting] = useState(false);
   const [ping, setPing] = useState(12);
 
+  const formatDateTime = (value) =>
+    new Date(value).toLocaleString("zh-CN", {
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+
+  const formatDuration = (totalSec) => {
+    const safeSec = Math.max(0, Math.floor(totalSec));
+    const days = Math.floor(safeSec / 86400);
+    const hours = Math.floor((safeSec % 86400) / 3600);
+    const minutes = Math.floor((safeSec % 3600) / 60);
+    const seconds = safeSec % 60;
+    if (days > 0) {
+      return `${days}天 ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    }
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  };
+
   useEffect(() => {
     const tick = () => {
       const now = new Date();
-      setUtcTime(now.toUTCString().split(" ").slice(4, 5)[0]);
       setLocalTime(now.toLocaleTimeString("zh-CN", { hour12: false }));
-      const start = new Date("2024-09-01");
-      setRunDays(Math.floor((now - start) / 86400000));
+      if (uptimeAnchorMs > 0) {
+        const elapsedSec = uptimeBaseSec + Math.floor((Date.now() - uptimeAnchorMs) / 1000);
+        setUptimeText(formatDuration(elapsedSec));
+      }
     };
+
+    const syncSystemTime = async () => {
+      try {
+        const res = await fetch("/api/system", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const nextUptime = Number(data?.uptimeSec || 0);
+        const nextStartedAt = String(data?.startedAt || "");
+        setUptimeBaseSec(nextUptime);
+        setUptimeAnchorMs(Date.now());
+        if (nextStartedAt) {
+          setStartedAtText(formatDateTime(nextStartedAt));
+          setUptimeText(formatDuration(nextUptime));
+        }
+      } catch {
+        // 首页头部时间读取失败时保留本地时间显示，不阻塞主界面。
+      }
+    };
+
     tick();
+    syncSystemTime();
     const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
+    const refreshId = setInterval(syncSystemTime, 60000);
+    return () => {
+      clearInterval(id);
+      clearInterval(refreshId);
+    };
+  }, [uptimeAnchorMs, uptimeBaseSec]);
 
   useEffect(() => {
     if (compact) return undefined;
@@ -207,7 +256,7 @@ export default function HUDHeader({
           }}
         >
           <img
-            src={clubLogo}
+            src="/club-logo-user.jpg"
             alt="科成开放原子开源社团 Logo"
             style={{
               width: "100%",
@@ -328,11 +377,10 @@ export default function HUDHeader({
                 style={{
                   fontSize: 9,
                   color: isDarkMode ? "#94A3B8" : "#64748B",
-                  fontFamily: '"Courier New", monospace',
                   textAlign: "right",
                 }}
               >
-                UTC {utcTime}
+                电脑当前时间
               </div>
             </div>
             <div
@@ -353,7 +401,7 @@ export default function HUDHeader({
                     fontFamily: '"Courier New", monospace',
                   }}
                 >
-                  {ping}ms
+                  {uptimeText}
                 </span>
               </div>
               <div
@@ -363,7 +411,7 @@ export default function HUDHeader({
                   letterSpacing: 0.5,
                 }}
               >
-                运行 {runDays} 天
+                启动于 {startedAtText}
               </div>
             </div>
           </div>
@@ -372,9 +420,9 @@ export default function HUDHeader({
         <div
           style={{
             marginLeft: "auto",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
+            display: "grid",
+            gap: 2,
+            justifyItems: "end",
             color: isDarkMode ? "#94A3B8" : "#64748B",
             fontSize: 10,
             fontFamily: '"Courier New", monospace',
@@ -386,9 +434,11 @@ export default function HUDHeader({
             themeMode={themeMode}
             onThemeModeChange={onThemeModeChange}
           />
-          <span>{localTime}</span>
-          <span style={{ color: isDarkMode ? "#475569" : "#CBD5E1" }}>·</span>
-          <span style={{ color: "#10B981", fontWeight: 700 }}>{ping}ms</span>
+          <span>电脑 {localTime}</span>
+          <span>启动 {startedAtText}</span>
+          <span style={{ color: "#10B981", fontWeight: 700 }}>
+            运行 {uptimeText}
+          </span>
         </div>
       )}
 

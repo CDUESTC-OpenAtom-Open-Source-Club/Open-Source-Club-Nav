@@ -4,8 +4,10 @@ import { hashPassword } from "@/lib/admin-auth";
 let initialized = false;
 
 export async function ensureAdminTables(): Promise<void> {
+  // 同一进程内只初始化一次，避免每个后台请求都重复建表。
   if (initialized) return;
 
+  // 后台功能依赖的表统一在这里兜底创建，方便本地首次启动。
   await pool.query(`
     CREATE TABLE IF NOT EXISTS admin_users (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -71,6 +73,7 @@ export async function ensureAdminTables(): Promise<void> {
 }
 
 export async function ensureBootstrapSuperUser(): Promise<void> {
+  // 超级管理员只在 admin_users 为空时自动注入一次。
   await ensureAdminTables();
   const [rows] = await pool.query("SELECT COUNT(*) AS count FROM admin_users");
   const count = Number((rows as Array<{ count: number }>)[0]?.count || 0);

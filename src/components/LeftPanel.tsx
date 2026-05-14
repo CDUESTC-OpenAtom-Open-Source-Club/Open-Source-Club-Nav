@@ -1,5 +1,6 @@
 ﻿// @ts-nocheck
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
   Brain,
@@ -516,9 +517,43 @@ export default function LeftPanel({
             </a>
           ))}
         </div>
+
+        <div style={{ marginTop: 10, paddingTop: 9, borderTop: "1px dashed #DBEAFE" }}>
+          <Link
+            href="/games"
+            style={{
+              display: "block",
+              textDecoration: "none",
+              border: "1px dashed #BFDBFE",
+              borderRadius: 10,
+              background: "linear-gradient(180deg, #F8FBFF 0%, #EFF6FF 100%)",
+              padding: "8px 9px",
+              textAlign: "center",
+              color: "#94A3B8",
+              fontSize: 10,
+              letterSpacing: 1.2,
+              transition: "all 0.18s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "#0A84FF";
+              e.currentTarget.style.borderColor = "#93C5FD";
+              e.currentTarget.style.transform = "translateY(-1px)";
+              e.currentTarget.style.boxShadow = "0 8px 18px rgba(37,99,235,0.10)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "#94A3B8";
+              e.currentTarget.style.borderColor = "#BFDBFE";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            解压小游戏
+          </Link>
+        </div>
       </div>
     </aside>
   );
 }
+
 
 

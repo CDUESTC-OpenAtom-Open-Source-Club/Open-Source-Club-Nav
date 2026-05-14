@@ -1,5 +1,5 @@
-// MySQL 数据库连接
-// 使用 mysql2 连接池，支持 Promise
+﻿// MySQL 数据库连接
+// 使用 mysql2 的 Promise 连接池
 
 import mysql from "mysql2/promise";
 

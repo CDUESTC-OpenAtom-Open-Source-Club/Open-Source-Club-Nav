@@ -1,6 +1,3 @@
-// 友情链接 API
-// 使用 MySQL 数据库存储，未配置时降级为默认数据
-
 import pool from "@/lib/db";
 import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import { ensureAdminTables } from "@/lib/admin-db";
@@ -19,6 +16,7 @@ interface FriendLink {
 }
 
 async function requireEditorOrSuper() {
+  // 前台 links 接口的写操作也复用后台登录权限。
   await ensureAdminTables();
   const session = await getAdminSessionFromCookies();
   if (!session) {
@@ -30,7 +28,7 @@ async function requireEditorOrSuper() {
   return null;
 }
 
-// 降级默认数据
+// 数据库不可用时，前台仍可展示这组默认友链。
 const FALLBACK_LINKS: FriendLink[] = [
   {
     id: 1,
@@ -54,9 +52,8 @@ const FALLBACK_LINKS: FriendLink[] = [
   },
 ];
 
-// GET /api/links - 获取所有有效友链
 export async function GET() {
-  // 模拟数据模式：直接返回默认数据
+  // mock 模式下直接返回默认友链。
   if (USE_MOCK) {
     return Response.json({ links: FALLBACK_LINKS, source: "mock" });
   }
@@ -72,10 +69,10 @@ export async function GET() {
   }
 }
 
-// POST /api/links - 新增友链
 export async function POST(request: Request) {
   const denied = await requireEditorOrSuper();
   if (denied) return denied;
+
   try {
     const body = await request.json();
     const { title, url, description, sort } = body;
@@ -99,10 +96,10 @@ export async function POST(request: Request) {
   }
 }
 
-// PUT /api/links - 更新友链
 export async function PUT(request: Request) {
   const denied = await requireEditorOrSuper();
   if (denied) return denied;
+
   try {
     const body = await request.json();
     const { id, title, url, description, sort, active } = body;
@@ -111,6 +108,7 @@ export async function PUT(request: Request) {
       return Response.json({ error: "id 为必填项" }, { status: 400 });
     }
 
+    // 仅更新传入字段，避免把前端未编辑的值覆盖为空。
     const fields: string[] = [];
     const values: (string | number)[] = [];
 
@@ -121,7 +119,7 @@ export async function PUT(request: Request) {
     if (active !== undefined) { fields.push("active = ?"); values.push(active ? 1 : 0); }
 
     if (fields.length === 0) {
-      return Response.json({ error: "无更新字段" }, { status: 400 });
+      return Response.json({ error: "没有可更新字段" }, { status: 400 });
     }
 
     values.push(id);
@@ -140,10 +138,10 @@ export async function PUT(request: Request) {
   }
 }
 
-// DELETE /api/links?id=1 - 删除友链（软删除）
 export async function DELETE(request: Request) {
   const denied = await requireEditorOrSuper();
   if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = Number(searchParams.get("id"));
@@ -152,6 +150,7 @@ export async function DELETE(request: Request) {
       return Response.json({ error: "id 为必填项" }, { status: 400 });
     }
 
+    // 这里保留软删除，方便后台后续恢复或排查历史数据。
     const [result] = await pool.query(
       "UPDATE friend_links SET active = 0 WHERE id = ?",
       [id]

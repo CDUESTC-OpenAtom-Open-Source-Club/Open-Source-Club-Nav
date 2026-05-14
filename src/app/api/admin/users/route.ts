@@ -7,6 +7,7 @@ function forbidden() {
 }
 
 export async function GET() {
+  // 用户管理仅允许超级管理员访问。
   await ensureBootstrapSuperUser();
   const session = await getAdminSessionFromCookies();
   if (!session) return Response.json({ error: "未登录" }, { status: 401 });

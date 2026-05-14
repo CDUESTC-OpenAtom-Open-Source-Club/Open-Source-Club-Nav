@@ -1,14 +1,46 @@
+﻿import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import pool from "@/lib/db";
-import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import { ensureAdminTables } from "@/lib/admin-db";
 
+const USE_MOCK = process.env.USE_MOCK_DATA === "true";
+
 export async function GET() {
+  // mock 模式下返回固定趋势和热门分类，方便后台图表调试。
+  if (USE_MOCK) {
+    const today = {
+      stat_date: new Date().toISOString().slice(0, 10),
+      page_views: 1280,
+      unique_visitors: 426,
+      link_clicks: 318,
+    };
+    const trend7 = Array.from({ length: 7 }).map((_, index) => ({
+      stat_date: new Date(Date.now() - (6 - index) * 86400000).toISOString().slice(0, 10),
+      link_clicks: [26, 32, 28, 41, 36, 52, 49][index],
+    }));
+    const days = trend7.map((item, index) => ({
+      stat_date: item.stat_date,
+      page_views: [980, 1040, 1012, 1188, 1210, 1302, 1280][index],
+      unique_visitors: [318, 336, 322, 374, 388, 420, 426][index],
+      link_clicks: item.link_clicks,
+    })).reverse();
+    const popularCategories = [
+      { category: "github.com", clicks: 52 },
+      { category: "openatom.cn", clicks: 37 },
+      { category: "nextjs.org", clicks: 26 },
+      { category: "react.dev", clicks: 22 },
+      { category: "nodejs.org", clicks: 18 },
+    ];
+
+    return Response.json({ today, days, trend7, popularCategories });
+  }
+
   await ensureAdminTables();
   const session = await getAdminSessionFromCookies();
   if (!session) {
     return Response.json({ error: "未登录" }, { status: 401 });
   }
 
+  // 后台统计默认读取最近 30 天，并在页面上拆成 today / trend7 / popular 三部分使用。
   const [rows] = await pool.query(
     `SELECT stat_date, page_views, unique_visitors, link_clicks
      FROM admin_daily_stats
@@ -31,6 +63,7 @@ export async function GET() {
 
   const trend7 = list.slice(0, 7).reverse();
 
+  // 热门分类这里复用了后台日志中的 URL 信息，再按域名聚合成分类热度。
   const [popularRows] = await pool.query(
     `SELECT
        COALESCE(JSON_UNQUOTE(JSON_EXTRACT(detail, '$.url')), '') AS url_value,
@@ -62,3 +95,4 @@ export async function GET() {
 
   return Response.json({ today, days: list, trend7, popularCategories });
 }
+

@@ -8,6 +8,8 @@ export async function GET() {
   const memTotal = os.totalmem();
   const memFree = os.freemem();
   const load = os.loadavg();
+
+  // 系统面板直接取当前 Node 进程所在机器的信息，方便快速排查运行状态。
   return Response.json({
     uptimeSec: Math.floor(process.uptime()),
     node: process.version,
@@ -22,4 +24,3 @@ export async function GET() {
     loadavg: load.map((x) => Number(x.toFixed(2))),
   });
 }
-

@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { WORKS } from "../data/works";
+import TechBackground from "./TechBackground";
 
 const getExternalHref = (url) =>
   typeof url === "string" && /^https?:\/\//i.test(url) ? url : null;
@@ -601,9 +602,10 @@ function InsightCard({ icon: Icon, label, value, tint }) {
   );
 }
 
-function PacmanMiniGame({ compact = false }) {
+export function PacmanMiniGame({ compact = false, standalone = false }) {
   const [game, setGame] = useState(() => createPacmanRound());
   const [best, setBest] = useState(0);
+  const panelRef = useRef(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -633,6 +635,12 @@ function PacmanMiniGame({ compact = false }) {
     });
   };
 
+  const focusPanel = () => {
+    if (panelRef.current && typeof panelRef.current.focus === "function") {
+      panelRef.current.focus();
+    }
+  };
+
   useEffect(() => {
     const keyToDir = {
       ArrowUp: "up",
@@ -656,8 +664,11 @@ function PacmanMiniGame({ compact = false }) {
       setDirection(dir);
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    const node = panelRef.current;
+    if (!node) return undefined;
+
+    node.addEventListener("keydown", onKeyDown);
+    return () => node.removeEventListener("keydown", onKeyDown);
   }, []);
 
   useEffect(() => {
@@ -898,26 +909,50 @@ function PacmanMiniGame({ compact = false }) {
       : { x: 1, y: 1 };
   const safeTick = Number.isFinite(game.tick) ? game.tick : 0;
   const cellsX = boardRows[0].length;
+  const cellsY = boardRows.length;
   const pacDir = PACMAN_DIR[game.dir] || PACMAN_DIR.left;
   const mouthGap = safeTick % 8 < 4 ? 70 : 28;
   const frightenedBlink =
     game.frightenedTicks > 0 && game.frightenedTicks < 18 && safeTick % 4 < 2;
+  const panelWidth = standalone ? "min(100%, 520px)" : compact ? 196 : 230;
+  const boardHeight = standalone
+    ? "min(62vw, 440px)"
+    : compact
+      ? 146
+      : 168;
+  const handleBoardPointer = (x, y) => {
+    const dx = x - safePac.x;
+    const dy = y - safePac.y;
+    if (Math.abs(dx) <= 0 && Math.abs(dy) <= 0) return;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      setDirection(dx > 0 ? "right" : "left");
+    } else {
+      setDirection(dy > 0 ? "down" : "up");
+    }
+    focusPanel();
+  };
 
   return (
     <div
+      ref={panelRef}
+      tabIndex={0}
+      aria-label="Pac-Man hidden game panel"
       style={{
-        position: "absolute",
-        left: compact ? 10 : 20,
-        top: compact ? 8 : 10,
+        position: standalone ? "relative" : "absolute",
+        left: standalone ? undefined : compact ? 10 : 20,
+        top: standalone ? undefined : compact ? 8 : 10,
         zIndex: 16,
-        width: compact ? 196 : 230,
-        borderRadius: 16,
+        width: panelWidth,
+        maxWidth: "100%",
+        borderRadius: standalone ? 24 : 16,
         border: "1px solid #D6E7F7",
         background: "rgba(255,255,255,0.9)",
         backdropFilter: "blur(8px)",
-        padding: compact ? 9 : 12,
+        padding: standalone ? 16 : compact ? 9 : 12,
         display: "grid",
-        gap: 8,
+        gap: standalone ? 12 : 8,
+        boxShadow: standalone ? "0 24px 60px rgba(15,23,42,0.12)" : "none",
+        outline: "none",
       }}
     >
       <div
@@ -943,12 +978,13 @@ function PacmanMiniGame({ compact = false }) {
         style={{
           borderRadius: 8,
           border: "1px solid #D6E7F7",
-          padding: 5,
+          padding: standalone ? 8 : 5,
           background: "#0F172A",
           display: "grid",
           gridTemplateColumns: `repeat(${cellsX}, 1fr)`,
           gap: 1,
-          height: compact ? 146 : 168,
+          height: boardHeight,
+          aspectRatio: `${cellsX} / ${cellsY}`,
           position: "relative",
         }}
       >
@@ -963,6 +999,9 @@ function PacmanMiniGame({ compact = false }) {
             return (
               <div
                 key={`${x}-${y}`}
+                onClick={() => handleBoardPointer(x, y)}
+                onMouseDown={() => focusPanel()}
+                data-ui-touch="true"
                 style={{
                   borderRadius: 2,
                   background:
@@ -973,6 +1012,7 @@ function PacmanMiniGame({ compact = false }) {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
+                  cursor: cell === "#" ? "not-allowed" : "pointer",
                 }}
               >
                 {cell === "." && !isPac && !isGhost ? (
@@ -1003,8 +1043,8 @@ function PacmanMiniGame({ compact = false }) {
                 {isPac ? (
                   <span
                     style={{
-                      width: 11,
-                      height: 11,
+                      width: standalone ? 16 : 11,
+                      height: standalone ? 16 : 11,
                       borderRadius: "50%",
                       background: `conic-gradient(from ${pacDir.angle + mouthGap / 2}deg, transparent 0deg ${mouthGap}deg, #FACC15 ${mouthGap}deg 360deg)`,
                       boxShadow: "0 0 7px rgba(250,204,21,0.7)",
@@ -1016,8 +1056,8 @@ function PacmanMiniGame({ compact = false }) {
                 {isGhost ? (
                   <span
                     style={{
-                      width: 11,
-                      height: 11,
+                      width: standalone ? 16 : 11,
+                      height: standalone ? 16 : 11,
                       borderRadius: "50% 50% 35% 35%",
                       background: ghostFrightened
                         ? frightenedBlink
@@ -1065,7 +1105,7 @@ function PacmanMiniGame({ compact = false }) {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 4,
+          gap: standalone ? 8 : 4,
         }}
       >
         <button
@@ -1076,10 +1116,10 @@ function PacmanMiniGame({ compact = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.up.label}
@@ -1092,10 +1132,10 @@ function PacmanMiniGame({ compact = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.left.label}
@@ -1108,10 +1148,10 @@ function PacmanMiniGame({ compact = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.right.label}
@@ -1124,15 +1164,35 @@ function PacmanMiniGame({ compact = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.down.label}
         </button>
       </div>
+
+      {standalone ? (
+        <div
+          style={{
+            border: "1px solid #E2E8F0",
+            borderRadius: 14,
+            background: "#FFFFFF",
+            padding: "10px 12px",
+            display: "grid",
+            gap: 6,
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
+            操作方式
+          </div>
+          <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>
+            点击棋盘上吃豆人周围的位置可改变移动方向；键盘支持方向键；触屏设备可直接点按下方方向键。
+          </div>
+        </div>
+      ) : null}
 
       <div
         style={{
@@ -1716,6 +1776,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
           }}
           aria-label="Member works carousel"
         >
+          <TechBackground />
+
           <div
             style={{
               position: "absolute",
@@ -1724,8 +1786,6 @@ export default function WorksCarousel({ isDarkMode = false }) {
               pointerEvents: "none",
             }}
           />
-
-          <PacmanMiniGame compact={isTablet} />
 
           <div
             style={{

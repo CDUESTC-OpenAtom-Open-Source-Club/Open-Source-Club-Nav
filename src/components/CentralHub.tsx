@@ -79,6 +79,7 @@ const MINI_GAME_BACKGROUND_URL =
   "https://opengameart.org/sites/default/files/back_3.png";
 
 function getLinkMeta(url) {
+  // 统一解析资源链接，顺便判断是站内跳转还是外链打开。
   if (!url || url === "#") {
     return { label: "Campus Resource", href: "#", isExternal: false };
   }
@@ -96,6 +97,7 @@ function getLinkMeta(url) {
 }
 
 function HologramPanel({ category, onClose, isDarkMode }) {
+  // 资源分类点开后，中心区域会切到这个覆盖层展示详细链接。
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const lastTapRef = useRef({ index: null, ts: 0 });
@@ -128,6 +130,7 @@ function HologramPanel({ category, onClose, isDarkMode }) {
   };
 
   const handleMobileCardAction = (e, link, index) => {
+    // 移动端单击只聚焦卡片，双击才真正打开，避免误触跳走。
     if (!isMobile) return;
 
     e.preventDefault();
@@ -487,7 +490,7 @@ function HologramPanel({ category, onClose, isDarkMode }) {
   );
 }
 
-function MiniTapGame({ isDarkMode = false }) {
+export function MiniTapGame({ isDarkMode = false }) {
   const GRID_SIZE = 4;
   const WIN_TILE = 2048;
   const BEST_KEY = "kcos_2048_best";
@@ -972,6 +975,7 @@ export default function CentralHub({
   onClosePanel,
   isDarkMode = false,
 }) {
+  // 中心区域负责两种主状态：默认主页态，以及 activeCategory 打开的分类详情态。
   const [viewportMode, setViewportMode] = useState("desktop");
 
   useEffect(() => {
@@ -1038,6 +1042,7 @@ export default function CentralHub({
       />
 
       {activeCategory && (
+        // 选中分类后用覆盖层替换主页内容，视觉上更像“进入一个子空间”。
         <HologramPanel
           category={activeCategory}
           onClose={onClosePanel}
@@ -1046,6 +1051,7 @@ export default function CentralHub({
       )}
 
       {!activeCategory && (
+        // 未选中分类时，展示首页默认中枢内容。
         <>
           <div
             style={{

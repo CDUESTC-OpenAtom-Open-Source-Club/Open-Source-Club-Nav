@@ -14,6 +14,7 @@ export const ADMIN_SESSION_COOKIE = "kcos_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
 function getAuthSecret(): string {
+  // 本地开发允许使用默认密钥，生产环境应通过环境变量覆盖。
   return process.env.ADMIN_AUTH_SECRET || "kcos-admin-dev-secret-change-me";
 }
 
@@ -32,6 +33,7 @@ function base64UrlDecode(input: string): Buffer {
 }
 
 export function hashPassword(password: string): string {
+  // 后台密码使用 scrypt + salt 存储，避免明文落库。
   const salt = randomBytes(16).toString("hex");
   const digest = scryptSync(password, salt, 64).toString("hex");
   return `scrypt:${salt}:${digest}`;
@@ -48,6 +50,7 @@ export function verifyPassword(password: string, passwordHash: string): boolean 
 }
 
 export function createSessionToken(session: Omit<AdminSession, "exp">): string {
+  // Session token 采用“payload + HMAC 签名”结构，避免服务端额外存会话表。
   const exp = Math.floor(Date.now() / 1000) + ADMIN_SESSION_TTL_SECONDS;
   const payload: AdminSession = { ...session, exp };
   const body = base64UrlEncode(JSON.stringify(payload));
@@ -83,6 +86,7 @@ export function verifySessionToken(token?: string | null): AdminSession | null {
 }
 
 export async function setAdminSessionCookie(token: string): Promise<void> {
+  // 后台登录态统一落到 httpOnly Cookie，前端脚本不可直接读取。
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
@@ -105,6 +109,7 @@ export async function clearAdminSessionCookie(): Promise<void> {
 }
 
 export async function getAdminSessionFromCookies(): Promise<AdminSession | null> {
+  // 开发阶段默认允许 bypass，方便在无数据库时进入后台联调。
   if (process.env.ADMIN_BYPASS_LOGIN !== "false") {
     return {
       userId: 0,

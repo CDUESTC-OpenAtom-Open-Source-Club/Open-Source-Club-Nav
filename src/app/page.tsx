@@ -10,6 +10,8 @@ import RightPanel from "../components/RightPanel";
 const STORAGE_KEY = "kcos_booted";
 const THEME_MODE_STORAGE_KEY = "kcos_theme_mode";
 const VALID_THEME_MODES = new Set(["light", "dark", "auto"]);
+
+// 这一页同时承担首页门户、关于弹层和主题控制，所以顶部常量会比较多。
 const ORG_DEPARTMENTS = [
   {
     name: "项目部",
@@ -269,12 +271,13 @@ const ABOUT_SECTION_NAV = [
 const FOOTER_QUICK_LINKS = [
   { label: "社团官网", href: "https://opensouce-club.top/" },
   {
-    label: "GitHub项目仓库",
+    label: "GitHub",
     href: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
   },
 ];
 
 export default function HomePage() {
+  // 这里的状态分三类：启动流程、首页交互、关于弹层/主题/设备适配。
   const [booted, setBooted] = useState(false);
   const [fadeIn, setFadeIn] = useState(false);
   const [activeCategory, setActiveCategory] = useState(null);
@@ -292,6 +295,7 @@ export default function HomePage() {
   const adminTapGuardRef = useRef({ count: 0, timer: null });
 
   useEffect(() => {
+    // 启动页只在用户第一次进入时展示，之后直接进入首页。
     const hasBooted =
       typeof window !== "undefined" && localStorage.getItem(STORAGE_KEY);
     if (hasBooted) {
@@ -309,6 +313,7 @@ export default function HomePage() {
   }, []);
 
   const handleMouseMove = useCallback((e) => {
+    // 首页大背景和中心区域会读这个位移量做轻微视差。
     const x = (e.clientX / window.innerWidth - 0.5) * 20;
     const y = (e.clientY / window.innerHeight - 0.5) * 20;
     setParallax({ x, y });
@@ -319,6 +324,7 @@ export default function HomePage() {
   }, []);
 
   const scrollToAboutSection = useCallback((sectionId) => {
+    // 关于弹层内部不是路由切换，而是滚动到对应 section。
     const root = aboutScrollRef.current;
     const target = aboutSectionRefs.current[sectionId];
     if (!root || !target) return;
@@ -330,6 +336,7 @@ export default function HomePage() {
   }, []);
 
   const handleAdminEntryTap = useCallback(() => {
+    // 移动端隐藏后台入口：连续点击指定次数后跳转登录页。
     const state = adminTapGuardRef.current;
     state.count += 1;
     if (state.timer) window.clearTimeout(state.timer);
@@ -363,6 +370,7 @@ export default function HomePage() {
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
+    // auto 模式按本地时间切换明暗主题，避免强制跟随系统。
     if (themeMode === "light") {
       setIsDarkMode(false);
       return undefined;
@@ -385,6 +393,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
+    // 首页大量布局依赖断点状态，这里统一同步到 React state。
     const syncViewport = () => {
       const width = window.innerWidth;
       setIsPhoneViewport(width <= 768);
@@ -402,6 +411,7 @@ export default function HomePage() {
   useEffect(() => {
     if (typeof window === "undefined" || !isMobileViewport) return undefined;
 
+    // 移动端用“双击确认”防误触，特别是资源卡片和可跳转区域。
     const resetArmedState = () => {
       const current = mobileTapGuardRef.current;
       if (current.element instanceof HTMLElement) {
@@ -471,6 +481,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!aboutOpen) return undefined;
 
+    // 关于弹层通过监听滚动位置，高亮当前所在章节。
     setActiveAboutSection("mission");
     const root = aboutScrollRef.current;
     if (!root) return undefined;
@@ -1536,6 +1547,7 @@ export default function HomePage() {
     </div>
   );
 }
+
 
 
 
