@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+.playwright-mcp/
 
 # next.js
 /.next/
@@ -35,8 +36,11 @@ temp_*.txt
 *.tmp
 *.bak
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — ignore all but keep the example template
+.env
+.env.local
+.env.*.local
+!.env.example
 
 # vercel
 .vercel
@@ -49,4 +53,3 @@ next-env.d.ts
 AGENTS.md
 CLAUDE.md
 */node_modules/
-

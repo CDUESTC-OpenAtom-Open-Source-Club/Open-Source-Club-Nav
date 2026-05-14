@@ -26,7 +26,7 @@
 - 渲染交互与视觉表现
 
 ### 2. 组件层
-位于 `src/components/`。
+位于 `src/components/home/`。
 
 职责：
 - 承担首页和后台的可复用 UI 结构
@@ -68,7 +68,7 @@
 - `db.ts`
 - `admin-auth.ts`
 - `admin-db.ts`
-- `schema.sql`
+- `database/schema.sql`
 
 ### 5. 静态数据层
 位于 `src/data/` 和部分 route 内。
@@ -93,7 +93,7 @@
 
 ## mock 与真实数据切换
 
-开关：`.env.local`
+开关：`.env`
 
 ```env
 USE_MOCK_DATA=true

@@ -2,7 +2,7 @@
 export const GITHUB_ORG =
   process.env.NEXT_PUBLIC_GITHUB_ORG ||
   process.env.GITHUB_ORG ||
-  "cdcas-uestc";
+  "CDUESTC-OpenAtom-Open-Source-Club";
 
 export const EVENT_TYPE_LABELS = {
   PushEvent: "PUSH",

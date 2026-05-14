@@ -1,12 +1,12 @@
 ﻿"use client";
 
 import Link from "next/link";
-import { PacmanMiniGame } from "../../components/WorksCarousel";
+import { PacmanMiniGame } from "@/components/home/WorksCarousel";
 import {
   pacmanLeaderboardFields,
   pacmanLeaderboardStoragePlans,
   pacmanMockLeaderboard,
-} from "../../data/pacmanLeaderboard";
+} from "@/data/pacmanLeaderboard";
 
 const boardCardStyle = {
   border: "1px solid #E2E8F0",

@@ -1,10 +1,10 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, X, Zap } from "lucide-react";
 import GlobeCanvas from "./GlobeCanvas";
 import WorksCarousel from "./WorksCarousel";
-import { RESOURCE_CATEGORIES } from "../data/resources";
+import { RESOURCE_CATEGORIES } from "@/data/resources";
 
 const TAG_COLORS = {
   Learning: { bg: "#EFF6FF", text: "#2563EB", border: "#BFDBFE" },
@@ -484,6 +484,14 @@ function HologramPanel({ category, onClose, isDarkMode }) {
         @keyframes panelIn {
           from { opacity: 0; transform: scale(0.98) translateY(8px); }
           to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes fadeInLeft {
+          from { opacity: 0; transform: translateX(-20px); }
+          to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeInRight {
+          from { opacity: 0; transform: translateX(20px); }
+          to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
     </div>
@@ -977,12 +985,14 @@ export default function CentralHub({
 }) {
   // 中心区域负责两种主状态：默认主页态，以及 activeCategory 打开的分类详情态。
   const [viewportMode, setViewportMode] = useState("desktop");
+  const [isShortViewport, setIsShortViewport] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
     const syncViewportMode = () => {
       const width = window.innerWidth;
+      setIsShortViewport(window.innerHeight <= 820);
       if (width <= 768) {
         setViewportMode("mobile");
       } else if (width <= 1200) {
@@ -999,6 +1009,7 @@ export default function CentralHub({
 
   const isMobileViewport = viewportMode === "mobile";
   const isTabletViewport = viewportMode === "tablet";
+  const isDenseViewport = isShortViewport && !isMobileViewport;
   const dashboardWidth = isMobileViewport
     ? "96%"
     : isTabletViewport
@@ -1009,13 +1020,23 @@ export default function CentralHub({
     : isTabletViewport
       ? "86%"
       : "80%";
-  const globeSize = isMobileViewport ? 170 : isTabletViewport ? 188 : 206;
+  const globeSize = isMobileViewport
+    ? 170
+    : isDenseViewport
+      ? isTabletViewport
+        ? 146
+        : 132
+      : isTabletViewport
+        ? 188
+        : 206;
   const infoCardMinWidth = isMobileViewport ? 104 : isTabletViewport ? 136 : 120;
   const overviewCardMinWidth = isMobileViewport
     ? 132
-    : isTabletViewport
-      ? 150
-      : 160;
+      : isTabletViewport
+        ? 150
+        : 160;
+  const homeStackGap = isDenseViewport ? 5 : 10;
+  const homeTopPadding = isMobileViewport ? 10 : isDenseViewport ? 6 : 14;
 
   return (
     <main
@@ -1059,14 +1080,15 @@ export default function CentralHub({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              paddingTop: isMobileViewport ? 10 : 14,
-              gap: 10,
+              paddingTop: homeTopPadding,
+              gap: homeStackGap,
               position: "relative",
             }}
           >
-            <div
-              style={{
-                display: "inline-flex",
+            {!isDenseViewport && (
+              <div
+                style={{
+                  display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
                 background: isDarkMode
@@ -1078,31 +1100,110 @@ export default function CentralHub({
                 fontSize: 10,
                 color: "#64748B",
                 backdropFilter: "blur(8px)",
-              }}
-            >
-              <Zap size={10} color="#0A84FF" />
-              <span>选择分类打开资源面板</span>
-              <span
-                style={{
-                  width: 1,
-                  height: 10,
-                  background: "#E5E7EB",
-                  display: "inline-block",
-                  verticalAlign: "middle",
                 }}
-              />
-              <span style={{ color: "#0A84FF", fontWeight: 500 }}>
-                KCOS.CLUB
-              </span>
-            </div>
+              >
+                <Zap size={10} color="#0A84FF" />
+                <span>选择分类打开资源面板</span>
+                <span
+                  style={{
+                    width: 1,
+                    height: 10,
+                    background: "#E5E7EB",
+                    display: "inline-block",
+                    verticalAlign: "middle",
+                  }}
+                />
+                <span style={{ color: "#0A84FF", fontWeight: 500 }}>
+                  KCOS.CLUB
+                </span>
+              </div>
+            )}
 
             <div
               style={{
+                position: "relative",
                 transform: `translate(${parallax.x * 0.6}px, ${parallax.y * 0.4}px)`,
                 transition: "transform 0.15s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
+              {/* 左侧 HUD 面板 */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: "-320px",
+                  display: viewportMode === "desktop" ? "flex" : "none",
+                  flexDirection: "column",
+                  gap: 16,
+                  zIndex: 2,
+                }}
+              >
+                {CLUB_OVERVIEW_ITEMS.slice(0, 2).map((item, idx) => (
+                  <div
+                    key={item.title}
+                    style={{
+                      width: 220,
+                      padding: "16px 18px",
+                      borderRadius: 16,
+                      background: isDarkMode ? "rgba(15, 23, 42, 0.35)" : "rgba(255, 255, 255, 0.4)",
+                      backdropFilter: "blur(20px)",
+                      WebkitBackdropFilter: "blur(20px)",
+                      border: isDarkMode ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.5)",
+                      boxShadow: "0 15px 35px rgba(0,0,0,0.12)",
+                      animation: `fadeInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 0.15}s both`,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, boxShadow: `0 0 8px ${item.color}` }} />
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: isDarkMode ? "#94A3B8" : "#64748B", lineHeight: 1.5 }}>
+                      {item.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               <GlobeCanvas size={globeSize} />
+
+              {/* 右侧 HUD 面板 */}
+              <div
+                style={{
+                  position: "absolute",
+                  right: "-320px",
+                  display: viewportMode === "desktop" ? "flex" : "none",
+                  flexDirection: "column",
+                  gap: 16,
+                  zIndex: 2,
+                }}
+              >
+                {CLUB_OVERVIEW_ITEMS.slice(2, 4).map((item, idx) => (
+                  <div
+                    key={item.title}
+                    style={{
+                      width: 220,
+                      padding: "16px 18px",
+                      borderRadius: 16,
+                      background: isDarkMode ? "rgba(15, 23, 42, 0.35)" : "rgba(255, 255, 255, 0.4)",
+                      backdropFilter: "blur(20px)",
+                      WebkitBackdropFilter: "blur(20px)",
+                      border: isDarkMode ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.5)",
+                      boxShadow: "0 15px 35px rgba(0,0,0,0.12)",
+                      animation: `fadeInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 0.15}s both`,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, boxShadow: `0 0 8px ${item.color}` }} />
+                      {item.title}
+                    </div>
+                    <div style={{ fontSize: 11, color: isDarkMode ? "#94A3B8" : "#64748B", lineHeight: 1.5 }}>
+                      {item.value}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div style={{ textAlign: "center", marginTop: -12 }}>
@@ -1186,7 +1287,7 @@ export default function CentralHub({
                 display: "grid",
                 gridTemplateColumns: `repeat(auto-fit, minmax(${infoCardMinWidth}px, 1fr))`,
                 gap: 8,
-                marginTop: 2,
+                marginTop: isDenseViewport ? 0 : 2,
               }}
             >
               {HOME_INFO_CARDS.map((item) => (
@@ -1199,11 +1300,11 @@ export default function CentralHub({
                       ? "rgba(15,23,42,0.88)"
                       : "rgba(255,255,255,0.86)",
                     backdropFilter: "blur(6px)",
-                    padding: "7px 8px",
+                    padding: isDenseViewport ? "5px 8px" : "7px 8px",
                     display: "flex",
                     flexDirection: "column",
-                    gap: 2,
-                    minHeight: 56,
+                    gap: isDenseViewport ? 1 : 2,
+                    minHeight: isDenseViewport ? 44 : 56,
                   }}
                 >
                   <div
@@ -1253,96 +1354,7 @@ export default function CentralHub({
               ))}
             </div>
 
-            <div
-              style={{
-                width: dashboardWidth,
-                border: `1px solid ${isDarkMode ? "#334155" : "#E2E8F0"}`,
-                borderRadius: 12,
-                background: isDarkMode
-                  ? "rgba(15,23,42,0.86)"
-                  : "rgba(255,255,255,0.88)",
-                backdropFilter: "blur(6px)",
-                padding: "8px 9px",
-                display: "grid",
-                gap: 7,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 10,
-                    color: "#0A84FF",
-                    letterSpacing: 1.2,
-                    fontWeight: 700,
-                    fontFamily: '"Courier New", monospace',
-                  }}
-                >
-                  CLUB OVERVIEW
-                </span>
-                <span style={{ fontSize: 9, color: "#94A3B8" }}>
-                  社团信息总览
-                </span>
-              </div>
 
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(auto-fit, minmax(${overviewCardMinWidth}px, 1fr))`,
-                  gap: 7,
-                }}
-              >
-                {CLUB_OVERVIEW_ITEMS.map((item) => (
-                  <div
-                    key={item.title}
-                    style={{
-                      border: `1px solid ${item.color}30`,
-                      borderRadius: 10,
-                      background: isDarkMode ? "#0F172A" : "#FFFFFF",
-                      padding: "7px 8px",
-                      display: "grid",
-                      gap: 3,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: item.color,
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 5,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 5,
-                          height: 5,
-                          borderRadius: "50%",
-                          background: item.color,
-                        }}
-                      />
-                      {item.title}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: isDarkMode ? "#CBD5E1" : "#475569",
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {item.value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
 
           <div
@@ -1360,5 +1372,3 @@ export default function CentralHub({
     </main>
   );
 }
-
-

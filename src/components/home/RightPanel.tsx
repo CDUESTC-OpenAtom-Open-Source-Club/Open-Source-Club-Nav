@@ -14,8 +14,7 @@ import {
   EVENT_TYPE_LABELS,
   GITHUB_ORG,
   MOCK_ACTIVITY,
-  fetchOrgActivity,
-} from "../data/githubActivity";
+} from "@/data/githubActivity";
 
 const EVENT_ICONS = {
   PushEvent: GitCommit,
@@ -228,11 +227,15 @@ export default function RightPanel({ isDarkMode = false }) {
     fetchAbortRef.current = controller;
 
     try {
-      const items = await fetchOrgActivity({
-        org: GITHUB_ORG,
-        perPage: 12,
+      const response = await fetch("/api/activities", {
+        method: "GET",
         signal: controller.signal,
       });
+      if (!response.ok) {
+        throw new Error(`activities ${response.status}`);
+      }
+      const payload = await response.json();
+      const items = Array.isArray(payload?.activities) ? payload.activities : [];
 
       if (controller.signal.aborted) {
         return;
@@ -240,8 +243,12 @@ export default function RightPanel({ isDarkMode = false }) {
 
       if (Array.isArray(items) && items.length > 0) {
         setActivity(items);
-        setSource("github");
-        setNotice(`已连接组织 ${GITHUB_ORG} 的公开事件流`);
+        setSource(payload?.source === "github" ? "github" : "mock");
+        setNotice(
+          payload?.source === "github"
+            ? `已连接组织 ${GITHUB_ORG} 的公开事件流`
+            : "当前使用本地示例动态",
+        );
       } else {
         setActivity(MOCK_ACTIVITY);
         setSource("mock");
@@ -513,5 +520,3 @@ export default function RightPanel({ isDarkMode = false }) {
     </aside>
   );
 }
-
-

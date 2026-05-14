@@ -1,16 +1,18 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import StartupSplash from "../components/StartupSplash";
-import HUDHeader from "../components/HUDHeader";
-import LeftPanel from "../components/LeftPanel";
-import CentralHub from "../components/CentralHub";
-import RightPanel from "../components/RightPanel";
-import GitHubAvatarLookup from "../components/GitHubAvatarLookup";
+import {
+  CentralHub,
+  HUDHeader,
+  LeftPanel,
+  RightPanel,
+  StartupSplash,
+} from "@/components/home";
 
 const STORAGE_KEY = "kcos_booted";
 const THEME_MODE_STORAGE_KEY = "kcos_theme_mode";
 const VALID_THEME_MODES = new Set(["light", "dark", "auto"]);
+const GITHUB_USER_API = "/api/github-users";
 
 // 这一页同时承担首页门户、关于弹层和主题控制，所以顶部常量会比较多。
 const ORG_DEPARTMENTS = [
@@ -160,10 +162,9 @@ const CLUB_POINTS_REWARD_NOTE =
 const DEV_TEAM_MEMBERS = [
   {
     name: "V09201030",
-    githubUsername: "V09201030",
     role: "项目经理",
     simpleIntro: "发起与统筹，负责项目推进和团队协同",
-    avatar: "/avatars/v09201030.svg",
+    githubLogin: "V09201030",
     responsibilities: [
       "整体项目进度管理与风险把控",
       "跨角色沟通协调（前后端/设计）",
@@ -171,16 +172,13 @@ const DEV_TEAM_MEMBERS = [
     ],
     skills: "项目管理、文档协作",
     deliverables: "进度周报、会议纪要、项目里程碑文档",
-    github: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
-    githubProfile: "https://github.com/CDUESTC-OpenAtom-Club",
-    blog: "https://opensouce-club.top/",
+    githubProfile: "https://github.com/V09201030",
   },
   {
     name: "LRXZH",
-    githubUsername: "LRXZH",
     role: "美术设计师",
     simpleIntro: "负责视觉风格、页面规范与设计资源产出",
-    avatar: "/avatars/lrxzh.jpg",
+    githubLogin: "LRXZH",
     responsibilities: [
       "网站整体视觉风格与 UI 设计",
       "页面布局、图标/Logo 设计",
@@ -188,16 +186,13 @@ const DEV_TEAM_MEMBERS = [
     ],
     skills: "Figma、UI/UX 设计",
     deliverables: "完整设计稿、图标资源、视觉规范文档",
-    github: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
-    githubProfile: "https://github.com/CDUESTC-OpenAtom-Club",
-    blog: "https://opensouce-club.top/",
+    githubProfile: "https://github.com/LRXZH",
   },
   {
     name: "Tippydes",
-    githubUsername: "Tippydes",
     role: "前端开发",
     simpleIntro: "实现页面与交互，完成双端适配与联调",
-    avatar: "/avatars/tippydes.png",
+    githubLogin: "Tippydes",
     responsibilities: [
       "页面实现（HTML/CSS/JS）",
       "交互效果与响应式适配",
@@ -205,16 +200,13 @@ const DEV_TEAM_MEMBERS = [
     ],
     skills: "原生 HTML/CSS/JS、浏览器调试",
     deliverables: "可运行的前端页面、交互效果实现",
-    github: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
-    githubProfile: "https://github.com/CDUESTC-OpenAtom-Club",
-    blog: "https://opensouce-club.top/",
+    githubProfile: "https://github.com/Tippydes",
   },
   {
     name: "Nerdlet369",
-    githubUsername: "Nerdlet369",
     role: "后端开发",
     simpleIntro: "负责 API、服务逻辑与数据库设计维护",
-    avatar: "/avatars/nerdlet369.jpg",
+    githubLogin: "Nerdlet369",
     responsibilities: [
       "API 接口设计与开发",
       "后台服务与业务逻辑实现",
@@ -222,16 +214,13 @@ const DEV_TEAM_MEMBERS = [
     ],
     skills: "Go 语言、MySQL、API 文档工具",
     deliverables: "可调用的后端接口、数据库设计文档",
-    github: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
-    githubProfile: "https://github.com/CDUESTC-OpenAtom-Club",
-    blog: "https://opensouce-club.top/",
+    githubProfile: "https://github.com/Nerdlet369",
   },
   {
     name: "Dirinkbottle",
-    githubUsername: "Dirinkbottle",
     role: "后端开发",
     simpleIntro: "负责 API、服务逻辑与数据库设计维护",
-    avatar: "/avatars/dirinkbottle.jpg",
+    githubLogin: "Dirinkbottle",
     responsibilities: [
       "API 接口设计与开发",
       "后台服务与业务逻辑实现",
@@ -239,16 +228,13 @@ const DEV_TEAM_MEMBERS = [
     ],
     skills: "Go 语言、MySQL、API 文档工具",
     deliverables: "可调用的后端接口、数据库设计文档",
-    github: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
-    githubProfile: "https://github.com/CDUESTC-OpenAtom-Club",
-    blog: "https://opensouce-club.top/",
+    githubProfile: "https://github.com/Dirinkbottle",
   },
   {
     name: "muzimu217",
-    githubUsername: "muzimu217",
-    role: "团队管理员",
+    role: "项目指导",
     simpleIntro: "负责仓库权限、协作规范与流程治理",
-    avatar: "/avatars/lichang.jpg",
+    githubLogin: "muzimu217",
     responsibilities: [
       "GitHub 仓库权限管理",
       "项目组织成员权限配置",
@@ -256,13 +242,11 @@ const DEV_TEAM_MEMBERS = [
     ],
     skills: "GitHub、Git 版本控制",
     deliverables: "配置好的项目仓库、成员权限管理",
-    github: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
-    githubProfile: "https://github.com/CDUESTC-OpenAtom-Club",
-    blog: "https://opensouce-club.top/",
+    githubProfile: "https://github.com/muzimu217",
   },
 ];
-const ABOUT_PREFACE_TEXT =
-  "科成星球项目组由浅巷墨黎、李头成立于 2025-03-10，目前正在撰写内容。";
+const DEV_TEAM_GITHUB_LOGINS = DEV_TEAM_MEMBERS.map((member) => member.githubLogin);
+
 const ABOUT_ACKNOWLEDGEMENT_TEXT =
   "除了项目组成员之外，许多校友也为项目提供了诸多帮助，在此一并致谢。";
 const ABOUT_SECTION_NAV = [
@@ -279,7 +263,7 @@ const FOOTER_QUICK_LINKS = [
   { label: "社团官网", href: "https://opensouce-club.top/" },
   {
     label: "GitHub",
-    href: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Blog",
+    href: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Nav",
   },
 ];
 
@@ -296,6 +280,7 @@ export default function HomePage() {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isTabletViewport, setIsTabletViewport] = useState(false);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
+  const [githubUserProfiles, setGithubUserProfiles] = useState({});
   const aboutScrollRef = useRef(null);
   const aboutSectionRefs = useRef({});
   const mobileTapGuardRef = useRef({ element: null, ts: 0, timer: null });
@@ -360,6 +345,33 @@ export default function HomePage() {
       window.location.href = "/admin/login";
     }
   }, []);
+
+  useEffect(() => {
+    if (!aboutOpen) return undefined;
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({
+      logins: DEV_TEAM_GITHUB_LOGINS.join(","),
+    });
+
+    fetch(`${GITHUB_USER_API}?${params.toString()}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (!controller.signal.aborted && payload?.users) {
+          setGithubUserProfiles(payload.users);
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          console.warn("[about] GitHub 用户头像拉取失败：", error);
+        }
+      });
+
+    return () => controller.abort();
+  }, [aboutOpen]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -572,15 +584,14 @@ export default function HomePage() {
               flexShrink: 0,
               padding: "5px 12px",
               borderRadius: 999,
-              border: `1px solid ${
-                activeCategory === item.id
-                  ? isDarkMode
-                    ? "#38BDF840"
-                    : "#0A84FF40"
-                  : isDarkMode
-                    ? "#334155"
-                    : "#E5E7EB"
-              }`,
+              border: `1px solid ${activeCategory === item.id
+                ? isDarkMode
+                  ? "#38BDF840"
+                  : "#0A84FF40"
+                : isDarkMode
+                  ? "#334155"
+                  : "#E5E7EB"
+                }`,
               background:
                 activeCategory === item.id
                   ? isDarkMode
@@ -721,9 +732,9 @@ export default function HomePage() {
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#0A84FF")}
               onMouseLeave={(e) =>
-                (e.currentTarget.style.color = isDarkMode
-                  ? "#CBD5E1"
-                  : "#94A3B8")
+              (e.currentTarget.style.color = isDarkMode
+                ? "#CBD5E1"
+                : "#94A3B8")
               }
             >
               {item.label}
@@ -967,15 +978,7 @@ export default function HomePage() {
                     <span>01</span>
                     <span>社团使命</span>
                   </div>
-                  <div className="about-card" style={{ marginTop: 8 }}>
-                    <div
-                      className="about-card-title"
-                      style={{ marginBottom: 3 }}
-                    >
-                      写在开头
-                    </div>
-                    <div className="about-card-text">{ABOUT_PREFACE_TEXT}</div>
-                  </div>
+
                   <div className="about-section-text">
                     科成开放原子开源社团以“真实项目 + 开源协作 +
                     长期成长”为核心路径，致力于打造开放、专业、可持续的校园技术社区。{" "}
@@ -1192,44 +1195,40 @@ export default function HomePage() {
                     <span>开发组人员</span>
                   </div>
                   <div className="about-member-grid">
-                    {DEV_TEAM_MEMBERS.map((member) => (
-                      <div key={member.name} className="about-member-card">
-                        <GitHubAvatarLookup
-                          className="about-member-avatar-img"
-                          username={member.githubUsername}
-                          fallbackSrc={
-                            member.avatar ||
-                            `${member.githubProfile.replace(/\/$/, "")}.png?size=96`
-                          }
-                          alt={`${member.name} 头像`}
-                          size={96}
-                        />
-                        <div className="about-member-name">{member.name}</div>
-                        <div className="about-member-role">{member.role}</div>
-                        <div className="about-member-simple">
-                          {member.simpleIntro}
-                        </div>
+                    {DEV_TEAM_MEMBERS.map((member) => {
+                      const githubUser = githubUserProfiles[member.githubLogin];
+                      const githubHref = githubUser?.htmlUrl || member.githubProfile;
+                      const avatarUrl =
+                        githubUser?.avatarUrl ||
+                        `https://github.com/${member.githubLogin}.png?size=160`;
 
-                        <div className="about-member-links">
-                          <a
-                            href={member.githubProfile}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="about-member-link"
-                          >
-                            GitHub
-                          </a>
-                          <a
-                            href={member.blog}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="about-member-link"
-                          >
-                            主页
-                          </a>
+                      return (
+                        <div key={member.name} className="about-member-card">
+                          <img
+                            className="about-member-avatar-img"
+                            src={avatarUrl}
+                            alt={`${member.name} GitHub 头像`}
+                            loading="lazy"
+                          />
+                          <div className="about-member-name">{member.name}</div>
+                          <div className="about-member-role">{member.role}</div>
+                          <div className="about-member-simple">
+                            {member.simpleIntro}
+                          </div>
+
+                          <div className="about-member-links">
+                            <a
+                              href={githubHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="about-member-link"
+                            >
+                              GitHub
+                            </a>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </section>
 
@@ -1555,11 +1554,6 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-
-
-
 
 
 

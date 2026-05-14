@@ -8,18 +8,18 @@
 - 这个改动会影响页面、接口、还是数据库
 
 查看环境变量：
-- 根目录 `.env.local`
+- 根目录 `.env`
 - 重点关注 `USE_MOCK_DATA` 和 `ADMIN_BYPASS_LOGIN`
 
 ## 常见开发任务入口
 
 ### 1. 改首页内容或视觉
 优先查看：
-- `src/app/page.tsx`
-- `src/components/CentralHub.tsx`
-- `src/components/LeftPanel.tsx`
-- `src/components/RightPanel.tsx`
-- `src/components/WorksCarousel.tsx`
+- `src/app/(site)/page.tsx`
+- `src/components/home/CentralHub.tsx`
+- `src/components/home/LeftPanel.tsx`
+- `src/components/home/RightPanel.tsx`
+- `src/components/home/WorksCarousel.tsx`
 - `src/app/globals.css`
 
 适合处理：
@@ -30,8 +30,8 @@
 
 ### 2. 改后台页面
 优先查看：
-- `src/app/admin/page.tsx`
-- `src/app/admin/login/page.tsx`
+- `src/app/(admin)/admin/page.tsx`
+- `src/app/(admin)/admin/login/page.tsx`
 - `src/app/globals.css`
 
 适合处理：
@@ -61,7 +61,7 @@
 ### 5. 改数据库
 优先查看：
 - `src/lib/db.ts`
-- `src/lib/schema.sql`
+- `database/schema.sql`
 - `scripts/db-init.ts`
 
 ## 推荐开发流程
@@ -98,16 +98,16 @@
 
 ### 数据库改动
 - 本地库是否已初始化
-- 表结构改动是否同步到 `schema.sql`
+- 表结构改动是否同步到 `database/schema.sql`
 - 相关脚本是否需要更新
 
 ## 已知维护难点
 
 ### 大文件
 以下文件改动前建议先通读：
-- `src/app/page.tsx`
-- `src/app/admin/page.tsx`
-- `src/components/CentralHub.tsx`
+- `src/app/(site)/page.tsx`
+- `src/app/(admin)/admin/page.tsx`
+- `src/components/home/CentralHub.tsx`
 
 ### 样式耦合
 - 后台和首页共享 `globals.css`
@@ -121,7 +121,7 @@
 
 ### 后台点击没反应
 优先检查：
-- `src/app/admin/page.tsx` 是否仍是单页切换逻辑
+- `src/app/(admin)/admin/page.tsx` 是否仍是单页切换逻辑
 - 是否有覆盖层挡住按钮
 - API 是否报 401/500
 
@@ -139,7 +139,7 @@
 ### 切到真实数据后加载失败
 优先检查：
 - MySQL 是否启动
-- `.env.local` 数据库配置是否正确
+- `.env` 数据库配置是否正确
 - GitHub Token 是否有效
 
 ## 建议的后续整理方向

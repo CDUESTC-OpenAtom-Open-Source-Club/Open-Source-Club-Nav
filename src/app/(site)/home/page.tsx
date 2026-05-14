@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useEffect } from "react";
-import categories from "../../constants/categories";
-import { actionConfig } from "../../constants/activities";
+import categories from "@/constants/categories";
+import { actionConfig } from "@/constants/activities";
 import {
   ChevronLeft,
   ChevronRight,
@@ -54,12 +54,6 @@ export default function Home() {
   const statList = "md:grid md:grid-cols-2 gap-3 mt-1 flex flex-col w-fit";
   const statPill = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-gray-700 shadow-sm w-fit";
   const statDot = "w-2 h-2 rounded-full flex-shrink-0";
-  const statItems = [
-    { color: "#3B82F6", label: "42 members" },
-    { color: "#06B6D4", label: "18 projects" },
-    { color: "#F59E0B", label: "1.2k stars" },
-    { color: "#10B981", label: "year-round activity" },
-  ];
 
 
   // 卡片 3：分类标签导航区（左下）
@@ -104,6 +98,8 @@ export default function Home() {
     PUSH: GitCommitHorizontal,
     ISSUE: CircleAlert,
     PR: GitPullRequest,
+    INIT: GitBranch,
+    RELEASE: GitFork,
   };
 
   // 预定义类型消除报错
@@ -120,8 +116,21 @@ export default function Home() {
   }
   type ActionType = keyof typeof actionIcons;
 
+  // GitHub 事件类型 → 简化动作标签映射
+  const TYPE_TO_ACTION: Record<string, string> = {
+    PushEvent: "PUSH",
+    PullRequestEvent: "PR",
+    IssuesEvent: "ISSUE",
+    ForkEvent: "FORK",
+    CreateEvent: "INIT",
+    ReleaseEvent: "RELEASE",
+  };
+
   // 成员动态数据，从 /api/activities 拉取
   const [activities, setActivities] = useState<Activity[]>([]);
+
+  // 社团概览统计，从 /api/org-stats 拉取
+  const [orgStats, setOrgStats] = useState({ members: 0, projects: 0, stars: 0, source: "mock" });
 
   useEffect(() => {
     fetch("/api/activities")
@@ -129,8 +138,30 @@ export default function Home() {
         if (!res.ok) throw new Error(`请求失败 ${res.status}`);
         return res.json();
       })
-      .then((data) => setActivities(data.activities ?? []))
+      .then((data) => {
+        const items = (data.activities ?? []).map((item: any) => ({
+          id: item.id,
+          action: TYPE_TO_ACTION[item.type] ?? item.type?.replace("Event", "") ?? "EVENT",
+          desc: item.message ?? "",
+          user: item.actor?.login ?? "unknown",
+          userInitials: item.actor?.avatar ?? "??",
+          userColor: item.color ?? "#64748B",
+          repo: (item.repo ?? "").split("/")[1] ?? item.repo ?? "",
+          branch: item.branch ?? null,
+          time: item.time ?? "",
+        }));
+        setActivities(items);
+      })
       .catch((err) => console.error("[activities] 获取失败：", err));
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/org-stats")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data) setOrgStats(data);
+      })
+      .catch(() => {});
   }, []);
 
   return (
@@ -206,12 +237,22 @@ export default function Home() {
               </div>
               {/* 统计胶囊列：从上到下垂直排列 */}
               <div className={statList}>
-                {statItems.map((stat) => (
-                  <span key={stat.label} className={statPill}>
-                    <span className={statDot} style={{ backgroundColor: stat.color }} />
-                    {stat.label}
-                  </span>
-                ))}
+                <span className={statPill}>
+                  <span className={statDot} style={{ backgroundColor: "#3B82F6" }} />
+                  {orgStats.members} members
+                </span>
+                <span className={statPill}>
+                  <span className={statDot} style={{ backgroundColor: "#06B6D4" }} />
+                  {orgStats.projects} projects
+                </span>
+                <span className={statPill}>
+                  <span className={statDot} style={{ backgroundColor: "#F59E0B" }} />
+                  {orgStats.stars >= 1000 ? (orgStats.stars / 1000).toFixed(1) + "k" : orgStats.stars} stars
+                </span>
+                <span className={statPill}>
+                  <span className={statDot} style={{ backgroundColor: "#10B981" }} />
+                  {orgStats.source === "github" ? "live from GitHub" : "year-round activity"}
+                </span>
               </div>
             </div>
           </div>
@@ -343,6 +384,5 @@ export default function Home() {
     </main>
   );
 }
-
 
 

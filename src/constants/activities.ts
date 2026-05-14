@@ -96,6 +96,18 @@ export const actionConfig = {
     badgeBg: "#E6FAF8",
     badgeText: "#30D5C8",
   },
+  INIT: {
+    iconBg: "#F3F0FF",
+    iconColor: "#7C3AED",
+    badgeBg: "#F3F0FF",
+    badgeText: "#7C3AED",
+  },
+  RELEASE: {
+    iconBg: "#ECFDF5",
+    iconColor: "#10B981",
+    badgeBg: "#ECFDF5",
+    badgeText: "#10B981",
+  },
 };
 
 

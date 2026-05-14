@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Wifi, Clock, Radio } from "lucide-react";
+import { Clock, Radio } from "lucide-react";
 
 const TYPEWRITER_MESSAGES = [
   "KCOS 科成开放原子开源社团 · 探索、共创、分享",
@@ -13,43 +13,12 @@ const TYPEWRITER_MESSAGES = [
 const HEADER_HEIGHT = "clamp(50px, 6vh, 56px)";
 const HEADER_PADDING_X = "clamp(12px, 1.3vw, 20px)";
 const LEFT_BLOCK_MIN_WIDTH = "clamp(156px, 18vw, 190px)";
-const RIGHT_BLOCK_MIN_WIDTH = "clamp(320px, 36vw, 430px)";
+const RIGHT_BLOCK_MIN_WIDTH = "clamp(210px, 24vw, 280px)";
 const THEME_MODES = [
   { key: "light", label: "白天" },
   { key: "dark", label: "黑夜" },
   { key: "auto", label: "自动" },
 ];
-
-function WaveformBar({ animate, isDarkMode }) {
-  const heights = useRef([4, 6, 10, 7, 12, 9, 8, 10, 6, 7]);
-  const [bars, setBars] = useState(heights.current);
-
-  useEffect(() => {
-    if (!animate) return undefined;
-    const id = setInterval(() => {
-      setBars(heights.current.map(() => 4 + Math.random() * 9));
-    }, 200);
-    return () => clearInterval(id);
-  }, [animate]);
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 2, height: 20 }}>
-      {bars.map((h, i) => (
-        <div
-          key={i}
-          style={{
-            width: 2,
-            height: h,
-            background: isDarkMode ? "#60A5FA" : "#0A84FF",
-            borderRadius: 2,
-            transition: "height 0.1s ease",
-            opacity: 0.8,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
 
 function ThemeModeSwitch({
   compact,
@@ -108,27 +77,13 @@ export default function HUDHeader({
   themeMode = "auto",
   onThemeModeChange = () => {},
 }) {
-  const [localTime, setLocalTime] = useState("");
-  const [startedAtText, setStartedAtText] = useState("--:--:--");
   const [uptimeText, setUptimeText] = useState("--");
-  const [uptimeBaseSec, setUptimeBaseSec] = useState(0);
-  const [uptimeAnchorMs, setUptimeAnchorMs] = useState(0);
+  const uptimeBaseSecRef = useRef(0);
+  const uptimeAnchorMsRef = useRef(0);
   const [typeText, setTypeText] = useState("");
   const [msgIdx, setMsgIdx] = useState(0);
   const [charIdx, setCharIdx] = useState(0);
   const [deleting, setDeleting] = useState(false);
-  const [ping, setPing] = useState(12);
-
-  const formatDateTime = (value) =>
-    new Date(value).toLocaleString("zh-CN", {
-      hour12: false,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
 
   const formatDuration = (totalSec) => {
     const safeSec = Math.max(0, Math.floor(totalSec));
@@ -136,18 +91,13 @@ export default function HUDHeader({
     const hours = Math.floor((safeSec % 86400) / 3600);
     const minutes = Math.floor((safeSec % 3600) / 60);
     const seconds = safeSec % 60;
-    if (days > 0) {
-      return `${days}天 ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-    }
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    return `${days}天 ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   };
 
   useEffect(() => {
     const tick = () => {
-      const now = new Date();
-      setLocalTime(now.toLocaleTimeString("zh-CN", { hour12: false }));
-      if (uptimeAnchorMs > 0) {
-        const elapsedSec = uptimeBaseSec + Math.floor((Date.now() - uptimeAnchorMs) / 1000);
+      if (uptimeAnchorMsRef.current > 0) {
+        const elapsedSec = uptimeBaseSecRef.current + Math.floor((Date.now() - uptimeAnchorMsRef.current) / 1000);
         setUptimeText(formatDuration(elapsedSec));
       }
     };
@@ -158,15 +108,11 @@ export default function HUDHeader({
         if (!res.ok) return;
         const data = await res.json();
         const nextUptime = Number(data?.uptimeSec || 0);
-        const nextStartedAt = String(data?.startedAt || "");
-        setUptimeBaseSec(nextUptime);
-        setUptimeAnchorMs(Date.now());
-        if (nextStartedAt) {
-          setStartedAtText(formatDateTime(nextStartedAt));
-          setUptimeText(formatDuration(nextUptime));
-        }
+        uptimeBaseSecRef.current = nextUptime;
+        uptimeAnchorMsRef.current = Date.now();
+        setUptimeText(formatDuration(nextUptime));
       } catch {
-        // 首页头部时间读取失败时保留本地时间显示，不阻塞主界面。
+        // 首页头部运行时长读取失败时保留现有显示，不阻塞主界面。
       }
     };
 
@@ -178,7 +124,7 @@ export default function HUDHeader({
       clearInterval(id);
       clearInterval(refreshId);
     };
-  }, [uptimeAnchorMs, uptimeBaseSec]);
+  }, []);
 
   useEffect(() => {
     if (compact) return undefined;
@@ -205,13 +151,6 @@ export default function HUDHeader({
     }
     return () => clearTimeout(id);
   }, [charIdx, compact, deleting, msgIdx]);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setPing(10 + Math.floor(Math.random() * 18));
-    }, 2000);
-    return () => clearInterval(id);
-  }, []);
 
   return (
     <header
@@ -256,7 +195,7 @@ export default function HUDHeader({
           }}
         >
           <img
-            src="/club-logo-user.jpg"
+            src="/images/brand/club-logo-user.jpg"
             alt="科成开放原子开源社团 Logo"
             style={{
               width: "100%",
@@ -344,14 +283,6 @@ export default function HUDHeader({
               themeMode={themeMode}
               onThemeModeChange={onThemeModeChange}
             />
-            <WaveformBar animate={true} isDarkMode={isDarkMode} />
-            <div
-              style={{
-                width: 1,
-                height: 20,
-                background: isDarkMode ? "#334155" : "#E5E7EB",
-              }}
-            />
             <div style={{ textAlign: "right" }}>
               <div
                 style={{
@@ -361,38 +292,7 @@ export default function HUDHeader({
                   justifyContent: "flex-end",
                 }}
               >
-                <Clock size={10} color={isDarkMode ? "#94A3B8" : "#64748B"} />
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: isDarkMode ? "#F8FAFC" : "#0F172A",
-                    fontFamily: '"Courier New", monospace',
-                  }}
-                >
-                  {localTime}
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: 9,
-                  color: isDarkMode ? "#94A3B8" : "#64748B",
-                  textAlign: "right",
-                }}
-              >
-                电脑当前时间
-              </div>
-            </div>
-            <div
-              style={{
-                width: 1,
-                height: 20,
-                background: isDarkMode ? "#334155" : "#E5E7EB",
-              }}
-            />
-            <div style={{ textAlign: "right" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <Wifi size={10} color="#10B981" />
+                <Clock size={10} color="#10B981" />
                 <span
                   style={{
                     fontSize: 11,
@@ -408,10 +308,11 @@ export default function HUDHeader({
                 style={{
                   fontSize: 9,
                   color: isDarkMode ? "#94A3B8" : "#64748B",
+                  textAlign: "right",
                   letterSpacing: 0.5,
                 }}
               >
-                启动于 {startedAtText}
+                项目运行时长
               </div>
             </div>
           </div>
@@ -434,10 +335,9 @@ export default function HUDHeader({
             themeMode={themeMode}
             onThemeModeChange={onThemeModeChange}
           />
-          <span>电脑 {localTime}</span>
-          <span>启动 {startedAtText}</span>
+          <span>项目运行时长</span>
           <span style={{ color: "#10B981", fontWeight: 700 }}>
-            运行 {uptimeText}
+            {uptimeText}
           </span>
         </div>
       )}
@@ -451,5 +351,3 @@ export default function HUDHeader({
     </header>
   );
 }
-
-

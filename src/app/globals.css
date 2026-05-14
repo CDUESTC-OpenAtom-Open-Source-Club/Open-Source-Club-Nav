@@ -106,7 +106,7 @@
   background:
     linear-gradient(90deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.22) 48%, rgba(255, 255, 255, 0.74) 100%),
     linear-gradient(180deg, rgba(231, 241, 251, 0.12), rgba(214, 228, 244, 0.28)),
-    url("/admin-login-city.jpg");
+    url("/images/backgrounds/admin-login-city.jpg");
   background-size: cover;
   background-position: clamp(14%, 20vw, 28%) center;
   transform: translateZ(0);
