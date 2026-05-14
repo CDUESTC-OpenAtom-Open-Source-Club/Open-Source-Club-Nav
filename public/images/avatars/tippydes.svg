@@ -1,0 +1,58 @@
+<svg width="960" height="960" viewBox="0 0 960 960" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Tippydes avatar">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f4f8ff"/>
+      <stop offset="100%" stop-color="#e6edff"/>
+    </linearGradient>
+    <linearGradient id="hair" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#d6dcff"/>
+      <stop offset="100%" stop-color="#9ca6ff"/>
+    </linearGradient>
+    <linearGradient id="hat" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6d79ff"/>
+      <stop offset="100%" stop-color="#4a56d6"/>
+    </linearGradient>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffe9dc"/>
+      <stop offset="100%" stop-color="#ffd7c4"/>
+    </linearGradient>
+    <linearGradient id="eye" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#39c2ff"/>
+      <stop offset="100%" stop-color="#2555d4"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="960" height="960" rx="60" fill="url(#bg)"/>
+
+  <path d="M210 380 C220 240, 350 160, 490 170 C640 180, 750 270, 735 420 C724 540, 635 630, 488 640 C340 646, 205 550, 210 380 Z" fill="url(#hair)"/>
+  <path d="M255 410 C258 318, 338 248, 480 248 C620 248, 700 318, 705 410 C712 506, 650 580, 480 610 C315 582, 250 505, 255 410 Z" fill="url(#skin)"/>
+
+  <path d="M312 334 C350 294, 416 278, 470 294 C408 326, 365 370, 333 428 C307 426, 292 393, 312 334 Z" fill="url(#hair)"/>
+  <path d="M492 268 C576 240, 664 265, 732 320 C674 327, 620 355, 568 404 C520 448, 462 463, 414 444 C396 396, 430 324, 492 268 Z" fill="url(#hair)"/>
+
+  <ellipse cx="405" cy="423" rx="62" ry="58" fill="#ffffff"/>
+  <ellipse cx="405" cy="425" rx="34" ry="36" fill="url(#eye)"/>
+  <circle cx="417" cy="413" r="9" fill="#fff"/>
+  <circle cx="395" cy="438" r="5" fill="#b9e8ff"/>
+  <path d="M356 383 C381 356, 430 354, 460 380" stroke="#f39b70" stroke-width="7" fill="none" stroke-linecap="round"/>
+
+  <path d="M540 420 C570 392, 604 390, 633 414" stroke="#6f7bc7" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <circle cx="590" cy="422" r="8" fill="#6f7bc7"/>
+
+  <path d="M444 520 C474 534, 510 534, 538 520" stroke="#d08382" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <circle cx="355" cy="476" r="20" fill="#ffbdb8" opacity="0.5"/>
+  <circle cx="596" cy="474" r="20" fill="#ffbdb8" opacity="0.35"/>
+
+  <path d="M332 674 C387 636, 579 636, 634 674 C620 752, 561 810, 481 825 C401 810, 346 753, 332 674 Z" fill="#f8fcff"/>
+  <path d="M374 656 C417 626, 547 626, 589 656 L543 701 C516 687, 446 687, 420 701 Z" fill="#5874df"/>
+  <path d="M420 702 L480 742 L543 702" stroke="#d2ddff" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="481" cy="742" r="12" fill="#d2ddff"/>
+
+  <path d="M514 201 C566 148, 661 154, 721 196 L686 251 C628 233, 565 233, 511 254 Z" fill="url(#hat)"/>
+  <path d="M530 198 C575 167, 655 168, 704 202" stroke="#e8eeff" stroke-width="8" fill="none" stroke-linecap="round"/>
+  <ellipse cx="686" cy="231" rx="16" ry="16" fill="#5ec6ff"/>
+  <ellipse cx="686" cy="231" rx="8" ry="8" fill="#b9ecff"/>
+
+  <path d="M616 226 L742 273 L648 312 Z" fill="#e8eeff"/>
+  <path d="M635 240 L716 271" stroke="#99b3ff" stroke-width="5" stroke-linecap="round"/>
+</svg>
