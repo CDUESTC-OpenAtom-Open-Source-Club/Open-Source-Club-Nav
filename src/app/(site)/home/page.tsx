@@ -1,7 +1,13 @@
 "use client"
 import React, { useState, useEffect } from "react";
 import categories from "@/constants/categories";
-import { actionConfig } from "@/constants/activities";
+import {
+  EVENT_TYPE_LABELS,
+  type ActivitySource,
+  type GitHubActivity,
+  type GitHubActivityResponse,
+  type GitHubActivityType,
+} from "@/data/githubActivity";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,6 +16,11 @@ import {
   GitCommitHorizontal,
   CircleAlert,
   GitPullRequest,
+  MessageSquareText,
+  Plus,
+  Star,
+  Tag,
+  Trash2,
 } from "lucide-react";
 
 /**
@@ -91,46 +102,42 @@ export default function Home() {
   const activityUserName = "text-[10px] text-gray-500";
   const activityRepo = "text-[10px] text-gray-400";
   const activityBranch = "flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md bg-gray-100 text-gray-500";
+  const activityDetails = "flex flex-wrap gap-1 mt-1";
+  const activityDetailPill = "text-[10px] px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-500 border border-slate-200";
+  const activityMetaPill = "flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-md font-medium";
 
   // 动作类型 → lucide 图标映射
-  const actionIcons = {
-    FORK: GitFork,
-    PUSH: GitCommitHorizontal,
-    ISSUE: CircleAlert,
-    PR: GitPullRequest,
-    INIT: GitBranch,
-    RELEASE: GitFork,
+  const actionIcons: Record<GitHubActivityType, React.ElementType> = {
+    PushEvent: GitCommitHorizontal,
+    PullRequestEvent: GitPullRequest,
+    PullRequestReviewEvent: GitPullRequest,
+    PullRequestReviewCommentEvent: MessageSquareText,
+    CreateEvent: Plus,
+    DeleteEvent: Trash2,
+    IssuesEvent: CircleAlert,
+    ReleaseEvent: Tag,
+    ForkEvent: GitFork,
+    WatchEvent: Star,
+    IssueCommentEvent: MessageSquareText,
   };
 
-  // 预定义类型消除报错
-  interface Activity {
-    id: number,
-    action: string,
-    desc: string,
-    user: string,
-    userInitials: string,
-    userColor: string,
-    repo: string,
-    branch: string,
-    time: string
+  interface OrgStatsPayload {
+    members: number;
+    projects: number;
+    stars: number;
+    source: ActivitySource | string;
   }
-  type ActionType = keyof typeof actionIcons;
-
-  // GitHub 事件类型 → 简化动作标签映射
-  const TYPE_TO_ACTION: Record<string, string> = {
-    PushEvent: "PUSH",
-    PullRequestEvent: "PR",
-    IssuesEvent: "ISSUE",
-    ForkEvent: "FORK",
-    CreateEvent: "INIT",
-    ReleaseEvent: "RELEASE",
-  };
 
   // 成员动态数据，从 /api/activities 拉取
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activities, setActivities] = useState<GitHubActivity[]>([]);
 
   // 社团概览统计，从 /api/org-stats 拉取
-  const [orgStats, setOrgStats] = useState({ members: 0, projects: 0, stars: 0, source: "mock" });
+  const [orgStats, setOrgStats] = useState<OrgStatsPayload>({
+    members: 0,
+    projects: 0,
+    stars: 0,
+    source: "mock",
+  });
 
   useEffect(() => {
     fetch("/api/activities")
@@ -138,19 +145,8 @@ export default function Home() {
         if (!res.ok) throw new Error(`请求失败 ${res.status}`);
         return res.json();
       })
-      .then((data) => {
-        const items = (data.activities ?? []).map((item: any) => ({
-          id: item.id,
-          action: TYPE_TO_ACTION[item.type] ?? item.type?.replace("Event", "") ?? "EVENT",
-          desc: item.message ?? "",
-          user: item.actor?.login ?? "unknown",
-          userInitials: item.actor?.avatar ?? "??",
-          userColor: item.color ?? "#64748B",
-          repo: (item.repo ?? "").split("/")[1] ?? item.repo ?? "",
-          branch: item.branch ?? null,
-          time: item.time ?? "",
-        }));
-        setActivities(items);
+      .then((data: GitHubActivityResponse) => {
+        setActivities(Array.isArray(data.activities) ? data.activities : []);
       })
       .catch((err) => console.error("[activities] 获取失败：", err));
   }, []);
@@ -158,7 +154,7 @@ export default function Home() {
   useEffect(() => {
     fetch("/api/org-stats")
       .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
+      .then((data: OrgStatsPayload | null) => {
         if (data) setOrgStats(data);
       })
       .catch(() => {});
@@ -307,22 +303,17 @@ export default function Home() {
 
             <div className={activityList}>
               {activities.map((item) => {
-                const cfg = actionConfig[item.action as ActionType] ?? {
-                  iconBg: "#f3f4f6",
-                  iconColor: "#6b7280",
-                  badgeBg: "#f3f4f6",
-                  badgeText: "#6b7280",
-                };
-                const ActionIcon =
-                  actionIcons[item.action as ActionType] ?? GitCommitHorizontal;
+                const badgeText = EVENT_TYPE_LABELS[item.type] ?? "EVENT";
+                const ActionIcon = actionIcons[item.type] ?? GitCommitHorizontal;
+                const repoName = item.repo.split("/")[1] || item.repo;
                 return (
                   <div key={item.id} className={activityCard}>
                     {/* 左侧：圆角方形动作图标 */}
                     <div
                       className={activityIconBox}
-                      style={{ backgroundColor: cfg.iconBg }}
+                      style={{ backgroundColor: `${item.color}14` }}
                     >
-                      <ActionIcon size={18} color={cfg.iconColor} />
+                      <ActionIcon size={18} color={item.color} />
                     </div>
                     {/* 右侧：内容区 */}
                     <div className={activityRight}>
@@ -331,30 +322,61 @@ export default function Home() {
                         <span
                           className={activityBadge}
                           style={{
-                            backgroundColor: cfg.badgeBg,
-                            color: cfg.badgeText,
+                            backgroundColor: `${item.color}14`,
+                            color: item.color,
                           }}
                         >
-                          {item.action}
+                          {badgeText}
                         </span>
                         <span className={activityTimeText}>{item.time}</span>
                       </div>
                       {/* 第二行：描述（commit message 风格） */}
-                      <p className={activityDesc}>{item.desc}</p>
+                      <p className={activityDesc}>{item.message}</p>
+                      {item.details.length > 0 && (
+                        <div className={activityDetails}>
+                          {item.details.slice(0, 2).map((detail, index) => (
+                            <span key={`${item.id}-detail-${index}`} className={activityDetailPill}>
+                              {detail}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                       {/* 第三行：用户头像 · 用户名 · 仓库 + 可选分支 */}
                       <div className={activityBottomRow}>
                         <div
                           className={activityUserAvatar}
-                          style={{ backgroundColor: item.userColor }}
+                          style={{ backgroundColor: item.color }}
                         >
-                          {item.userInitials}
+                          {item.actor.avatar}
                         </div>
-                        <span className={activityUserName}>{item.user}</span>
-                        <span className={activityRepo}>· {item.repo}</span>
+                        <span className={activityUserName}>{item.actor.login}</span>
+                        <span className={activityRepo}>· {repoName}</span>
                         {item.branch && (
                           <span className={activityBranch}>
                             <GitBranch size={9} />
                             {item.branch}
+                          </span>
+                        )}
+                        {item.commits > 0 && (
+                          <span
+                            className={activityMetaPill}
+                            style={{
+                              backgroundColor: `${item.color}12`,
+                              color: item.color,
+                            }}
+                          >
+                            {item.commits} commit{item.commits > 1 ? "s" : ""}
+                          </span>
+                        )}
+                        {item.isMergedPr && (
+                          <span
+                            className={activityMetaPill}
+                            style={{
+                              backgroundColor: "#ECFDF5",
+                              color: "#059669",
+                            }}
+                          >
+                            merged
                           </span>
                         )}
                       </div>
@@ -384,5 +406,3 @@ export default function Home() {
     </main>
   );
 }
-
-

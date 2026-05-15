@@ -47,13 +47,6 @@ const CLUB_OVERVIEW_ITEMS = [
   },
 ];
 
-const HOME_STATS = [
-  { label: "42 members", color: "#0A84FF" },
-  { label: "18 projects", color: "#06E5CC" },
-  { label: "1.2k stars", color: "#F59E0B" },
-  { label: "year-round activity", color: "#10B981" },
-];
-
 const HOME_INFO_CARDS = [
   {
     title: "社团域名",
@@ -74,6 +67,58 @@ const HOME_INFO_CARDS = [
     color: "#F59E0B",
   },
 ];
+
+const ORG_STATS_API = "/api/org-stats";
+const ACTIVITIES_API = "/api/activities";
+
+const DEFAULT_HOME_STATS = [
+  { key: "members", label: "-- members", color: "#0A84FF" },
+  { key: "projects", label: "-- projects", color: "#06E5CC" },
+  { key: "stars", label: "-- stars", color: "#F59E0B" },
+  { key: "activity", label: "syncing events", color: "#10B981" },
+];
+
+const formatCompactCount = (value) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) return "--";
+  if (numeric >= 1000) {
+    return `${(numeric / 1000).toFixed(numeric >= 10000 ? 0 : 1).replace(/\.0$/, "")}k`;
+  }
+  return String(numeric);
+};
+
+const buildHomeStats = (orgStats, activityPayload) => {
+  const activities = Array.isArray(activityPayload?.activities)
+    ? activityPayload.activities.length
+    : null;
+  const activitySource = activityPayload?.source || orgStats?.source || "api";
+  const activityLabel = activities === null
+    ? `${activitySource} events`
+    : `${formatCompactCount(activities)} ${activitySource === "github" ? "live" : activitySource} events`;
+
+  return [
+    {
+      key: "members",
+      label: `${formatCompactCount(orgStats?.members)} members`,
+      color: "#0A84FF",
+    },
+    {
+      key: "projects",
+      label: `${formatCompactCount(orgStats?.projects)} projects`,
+      color: "#06E5CC",
+    },
+    {
+      key: "stars",
+      label: `${formatCompactCount(orgStats?.stars)} stars`,
+      color: "#F59E0B",
+    },
+    {
+      key: "activity",
+      label: activityLabel,
+      color: activitySource === "github" ? "#10B981" : "#F59E0B",
+    },
+  ];
+};
 
 const MINI_GAME_BACKGROUND_URL =
   "https://opengameart.org/sites/default/files/back_3.png";
@@ -799,11 +844,10 @@ export function MiniTapGame({ isDarkMode = false }) {
           height: 176,
           borderRadius: 10,
           border: `1px solid ${isDarkMode ? "#334155" : "#BFDBFE"}`,
-          backgroundImage: `linear-gradient(${
-            isDarkMode
-              ? "rgba(15,23,42,0.35), rgba(15,23,42,0.55)"
-              : "rgba(255,255,255,0.35), rgba(241,245,249,0.45)"
-          }), url(${MINI_GAME_BACKGROUND_URL})`,
+          backgroundImage: `linear-gradient(${isDarkMode
+            ? "rgba(15,23,42,0.35), rgba(15,23,42,0.55)"
+            : "rgba(255,255,255,0.35), rgba(241,245,249,0.45)"
+            }), url(${MINI_GAME_BACKGROUND_URL})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           padding: 8,
@@ -986,6 +1030,43 @@ export default function CentralHub({
   // 中心区域负责两种主状态：默认主页态，以及 activeCategory 打开的分类详情态。
   const [viewportMode, setViewportMode] = useState("desktop");
   const [isShortViewport, setIsShortViewport] = useState(false);
+  const [homeStats, setHomeStats] = useState(DEFAULT_HOME_STATS);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncHomeStats = async () => {
+      try {
+        const [orgStatsRes, activitiesRes] = await Promise.all([
+          fetch(ORG_STATS_API, { cache: "no-store" }),
+          fetch(ACTIVITIES_API, { cache: "no-store" }),
+        ]);
+        const [orgStats, activityPayload] = await Promise.all([
+          orgStatsRes.ok ? orgStatsRes.json() : null,
+          activitiesRes.ok ? activitiesRes.json() : null,
+        ]);
+        if (!cancelled) {
+          setHomeStats(buildHomeStats(orgStats, activityPayload));
+        }
+      } catch {
+        if (!cancelled) {
+          setHomeStats([
+            { key: "members", label: "members unavailable", color: "#64748B" },
+            { key: "projects", label: "projects unavailable", color: "#64748B" },
+            { key: "stars", label: "stars unavailable", color: "#64748B" },
+            { key: "activity", label: "events unavailable", color: "#64748B" },
+          ]);
+        }
+      }
+    };
+
+    syncHomeStats();
+    const refreshId = setInterval(syncHomeStats, 120000);
+    return () => {
+      cancelled = true;
+      clearInterval(refreshId);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1032,9 +1113,9 @@ export default function CentralHub({
   const infoCardMinWidth = isMobileViewport ? 104 : isTabletViewport ? 136 : 120;
   const overviewCardMinWidth = isMobileViewport
     ? 132
-      : isTabletViewport
-        ? 150
-        : 160;
+    : isTabletViewport
+      ? 150
+      : 160;
   const homeStackGap = isDenseViewport ? 5 : 10;
   const homeTopPadding = isMobileViewport ? 10 : isDenseViewport ? 6 : 14;
 
@@ -1089,21 +1170,21 @@ export default function CentralHub({
               <div
                 style={{
                   display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                background: isDarkMode
-                  ? "rgba(15,23,42,0.92)"
-                  : "rgba(255,255,255,0.9)",
-                border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-                borderRadius: 999,
-                padding: "3px 11px",
-                fontSize: 10,
-                color: "#64748B",
-                backdropFilter: "blur(8px)",
+                  alignItems: "center",
+                  gap: 6,
+                  background: isDarkMode
+                    ? "rgba(15,23,42,0.92)"
+                    : "rgba(255,255,255,0.9)",
+                  border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                  borderRadius: 999,
+                  padding: "3px 11px",
+                  fontSize: 10,
+                  color: "#64748B",
+                  backdropFilter: "blur(8px)",
                 }}
               >
                 <Zap size={10} color="#0A84FF" />
-                <span>选择分类打开资源面板</span>
+                <span style={{ fontWeight: 1000 }}>左侧选择分类打开资源面板</span>
                 <span
                   style={{
                     width: 1,
@@ -1240,9 +1321,9 @@ export default function CentralHub({
                 justifyContent: "center",
               }}
             >
-              {HOME_STATS.map((p) => (
+              {homeStats.map((stat) => (
                 <div
-                  key={p.label}
+                  key={stat.key}
                   style={{
                     padding: "2px 9px",
                     borderRadius: 999,
@@ -1264,10 +1345,10 @@ export default function CentralHub({
                       width: 5,
                       height: 5,
                       borderRadius: "50%",
-                      background: p.color,
+                      background: stat.color,
                     }}
                   />
-                  {p.label}
+                  {stat.label}
                 </div>
               ))}
             </div>

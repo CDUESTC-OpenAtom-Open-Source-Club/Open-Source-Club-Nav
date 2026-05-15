@@ -13,7 +13,6 @@ import {
   Layers,
   Radar,
   Sparkles,
-  Activity,
   ExternalLink,
   X,
 } from "lucide-react";
@@ -395,10 +394,10 @@ function WorkCard({ work, style, isCenter, onClick }) {
         position: "absolute",
         left: "50%",
         top: "50%",
-        width: 208,
-        marginLeft: -104,
-        marginTop: -108,
-        height: 216,
+        width: 210,
+        marginLeft: -105,
+        marginTop: -109,
+        height: 218,
         background: "rgba(255,255,255,0.92)",
         border: `1px solid ${isCenter ? work.color + "38" : "#E5EDF5"}`,
         borderRadius: 14,
@@ -1362,7 +1361,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
   const isDenseDesktop = isShortViewport && !isMobile;
-  const desktopStageScale = isDenseDesktop ? 0.9 : isTablet ? 1.12 : 1.3;
+  const desktopStageScale = isDenseDesktop ? 0.95 : isTablet ? 1 : 1.08;
   const sectionBg = isDarkMode ? "rgba(15,23,42,0.86)" : "transparent";
   const sectionBorder = isDarkMode ? "#334155" : "#EAF0F6";
   const stageOverlayBg = isDarkMode
@@ -1381,7 +1380,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const controlBtnIconColor = isDarkMode ? "#CBD5E1" : "#7A8EA5";
   const controlBtnActiveIconColor = isDarkMode ? "#93C5FD" : "#3B9CD7";
   const controlDividerColor = isDarkMode ? "#334155" : "#E2EAF2";
-  const stageMinHeight = isDenseDesktop ? 170 : isTablet ? 272 : 304;
+  const stageMinHeight = isDenseDesktop ? 150 : isTablet ? 200 : 240;
+  const stageBottomGap = isDenseDesktop ? 8 : 10;
 
   const go = (dir) => {
     setCurrentIndex((i) => (i + dir + total) % total);
@@ -1394,7 +1394,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
       const width = window.innerWidth;
       setIsMobile(width <= 768);
       setIsTablet(width > 768 && width <= 1200);
-      setIsShortViewport(window.innerHeight <= 820);
+      setIsShortViewport(window.innerHeight <= 900);
     };
 
     update();
@@ -1443,12 +1443,12 @@ export default function WorksCarousel({ isDarkMode = false }) {
 
     if (absD > 2) return null;
 
-    const rotateStep = isDenseDesktop ? 12 : isTablet ? 14 : 18;
-    const depthStep = isDenseDesktop ? 82 : isTablet ? 94 : 112;
-    const spreadStep = isDenseDesktop ? 82 : isTablet ? 90 : 106;
-    const centerScale = isDenseDesktop ? 1 : isTablet ? 1.04 : 1.1;
-    const sideBaseScale = isDenseDesktop ? 0.88 : isTablet ? 0.95 : 0.93;
-    const sideScaleLoss = isDenseDesktop ? 0.04 : isTablet ? 0.05 : 0.07;
+    const rotateStep = isDenseDesktop ? 12 : isTablet ? 14 : 16;
+    const depthStep = isDenseDesktop ? 70 : isTablet ? 84 : 100;
+    const spreadStep = isDenseDesktop ? 78 : isTablet ? 86 : 100;
+    const centerScale = isDenseDesktop ? 1 : isTablet ? 1.02 : 1.06;
+    const sideBaseScale = isDenseDesktop ? 0.88 : isTablet ? 0.9 : 0.92;
+    const sideScaleLoss = isDenseDesktop ? 0.04 : isTablet ? 0.05 : 0.06;
     const rotY = normalized * rotateStep;
     const z = absD === 0 ? 12 : -depthStep * absD;
     const tx = normalized * spreadStep;
@@ -1807,11 +1807,13 @@ export default function WorksCarousel({ isDarkMode = false }) {
           }}
           style={{
             position: "relative",
-            flex: 1,
-            minHeight: stageMinHeight,
+            flex: "1 1 0",
+            minHeight: `min(${stageMinHeight}px, 100%)`,
+            margin: `0 16px ${stageBottomGap}px`,
+            borderRadius: 14,
             overflow: "hidden",
             outline: "none",
-            borderTop: "1px solid transparent",
+            border: `1px solid ${isDarkMode ? "rgba(51,65,85,0.72)" : "rgba(226,234,242,0.92)"}`,
             boxShadow: isFocused ? "inset 0 0 0 1px #BBDCF2" : "none",
           }}
           aria-label="Member works carousel"
@@ -1947,7 +1949,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
           <div
             style={{
               position: "absolute",
-              bottom: 6,
+              bottom: -2,
               left: 0,
               right: 0,
               display: "flex",
@@ -1998,45 +2000,6 @@ export default function WorksCarousel({ isDarkMode = false }) {
             ))}
           </div>
 
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 26,
-              display: "flex",
-              justifyContent: "center",
-              zIndex: 14,
-              pointerEvents: "none",
-            }}
-          >
-            <div
-              style={{
-                border: "1px solid #DCEAF6",
-                borderRadius: 999,
-                background: "rgba(255,255,255,0.82)",
-                backdropFilter: "blur(8px)",
-                padding: "4px 10px",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                fontSize: 9,
-                color: "#708090",
-                letterSpacing: 0.35,
-              }}
-            >
-              <Activity size={10} color="#3B9CD7" />
-              <span>Live focus on {focused?.author}</span>
-              <span
-                style={{
-                  color: "#2F8FE4",
-                  fontFamily: '"Courier New", monospace',
-                }}
-              >
-                #{focused?.id}
-              </span>
-            </div>
-          </div>
         </div>
       )}
 

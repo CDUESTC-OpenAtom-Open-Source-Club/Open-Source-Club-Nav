@@ -8,7 +8,10 @@ import {
   Tag,
   GitFork,
   Plus,
+  MessageSquareText,
   RefreshCw,
+  Star,
+  Trash2,
 } from "lucide-react";
 import {
   EVENT_TYPE_LABELS,
@@ -19,13 +22,20 @@ import {
 const EVENT_ICONS = {
   PushEvent: GitCommit,
   PullRequestEvent: GitPullRequest,
+  PullRequestReviewEvent: GitPullRequest,
+  PullRequestReviewCommentEvent: MessageSquareText,
   CreateEvent: Plus,
+  DeleteEvent: Trash2,
   IssuesEvent: AlertCircle,
+  IssueCommentEvent: MessageSquareText,
   ReleaseEvent: Tag,
   ForkEvent: GitFork,
+  WatchEvent: Star,
 };
 
 const PANEL_WIDTH = "clamp(238px, 18vw, 296px)";
+const DEFAULT_ACTIVITY_LIMIT = 20;
+const EXPANDED_ACTIVITY_LIMIT = 100;
 
 function ActivityCard({ item, index, isDarkMode }) {
   const Icon = EVENT_ICONS[item.type] || GitCommit;
@@ -126,6 +136,38 @@ function ActivityCard({ item, index, isDarkMode }) {
           {item.message}
         </div>
 
+        {Array.isArray(item.details) && item.details.length > 0 && (
+          <div
+            style={{
+              marginTop: 6,
+              display: "flex",
+              flexDirection: "column",
+              gap: 4,
+            }}
+          >
+            {item.details.slice(0, 3).map((detail, detailIndex) => (
+              <div
+                key={`${item.id}-detail-${detailIndex}`}
+                style={{
+                  fontSize: 10,
+                  lineHeight: 1.45,
+                  color: isDarkMode ? "#CBD5E1" : "#64748B",
+                  background: isDarkMode ? "#0F172A" : "#F8FAFC",
+                  border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                  borderRadius: 6,
+                  padding: "4px 6px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+                title={detail}
+              >
+                {detail}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div
           style={{
             display: "flex",
@@ -174,23 +216,47 @@ function ActivityCard({ item, index, isDarkMode }) {
           </span>
         </div>
 
-        {item.branch && (
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 9,
-              color: isDarkMode ? "#94A3B8" : "#94A3B8",
-              fontFamily: '"Courier New", monospace',
-              background: isDarkMode ? "#0F172A" : "#F8FAFC",
-              border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-              borderRadius: 4,
-              padding: "1px 6px",
-              display: "inline-block",
-            }}
-          >
-            ↳ {item.branch}
-          </div>
-        )}
+        <div
+          style={{
+            marginTop: 4,
+            display: "flex",
+            gap: 4,
+            flexWrap: "wrap",
+          }}
+        >
+          {item.branch && (
+            <div
+              style={{
+                fontSize: 9,
+                color: isDarkMode ? "#94A3B8" : "#94A3B8",
+                fontFamily: '"Courier New", monospace',
+                background: isDarkMode ? "#0F172A" : "#F8FAFC",
+                border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                borderRadius: 4,
+                padding: "1px 6px",
+                display: "inline-block",
+              }}
+            >
+              ↳ {item.branch}
+            </div>
+          )}
+          {item.commits > 0 && (
+            <div
+              style={{
+                fontSize: 9,
+                color: item.color,
+                fontFamily: '"Courier New", monospace',
+                background: `${item.color}12`,
+                border: `1px solid ${item.color}24`,
+                borderRadius: 4,
+                padding: "1px 6px",
+                display: "inline-block",
+              }}
+            >
+              {item.commits} commit{item.commits > 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -212,6 +278,7 @@ export default function RightPanel({ isDarkMode = false }) {
   const [source, setSource] = useState("mock");
   const [notice, setNotice] = useState("正在尝试连接 GitHub API...");
   const [nowTs, setNowTs] = useState(Date.now());
+  const [activityLimit, setActivityLimit] = useState(DEFAULT_ACTIVITY_LIMIT);
   const fetchAbortRef = useRef(null);
 
   const refresh = useCallback(async ({ silent = false } = {}) => {
@@ -227,7 +294,7 @@ export default function RightPanel({ isDarkMode = false }) {
     fetchAbortRef.current = controller;
 
     try {
-      const response = await fetch("/api/activities", {
+      const response = await fetch(`/api/activities?limit=${activityLimit}`, {
         method: "GET",
         signal: controller.signal,
       });
@@ -269,7 +336,7 @@ export default function RightPanel({ isDarkMode = false }) {
         setLoading(false);
       }
     }
-  }, []);
+  }, [activityLimit]);
 
   useEffect(() => {
     refresh();
@@ -290,6 +357,7 @@ export default function RightPanel({ isDarkMode = false }) {
   }, [refresh]);
 
   const diffLabel = getDiffLabel(lastUpdated, nowTs);
+  const sourceLabel = source === "github" ? "LIVE" : "MOCK DATA";
 
   const stats = useMemo(() => {
     const commits = activity.reduce(
@@ -358,8 +426,7 @@ export default function RightPanel({ isDarkMode = false }) {
               letterSpacing: 0.5,
             }}
           >
-            更新于 {diffLabel} ·{" "}
-            {source === "github" ? "GITHUB API" : "MOCK FALLBACK"}
+            更新于 {diffLabel} · {sourceLabel}
           </div>
         </div>
         <button
@@ -428,18 +495,59 @@ export default function RightPanel({ isDarkMode = false }) {
               animation: "pulse 2s infinite",
             }}
           />
-          {source === "github" ? `ORG: ${GITHUB_ORG}` : "MOCK DATA"}
+          {sourceLabel}
         </div>
 
         <div
           style={{
             marginTop: 6,
-            fontSize: 9,
-            color: isDarkMode ? "#94A3B8" : "#94A3B8",
-            lineHeight: 1.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
           }}
         >
-          {notice}
+          <div
+            style={{
+              fontSize: 9,
+              color: isDarkMode ? "#94A3B8" : "#94A3B8",
+              lineHeight: 1.4,
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
+            {source === "github" ? "GitHub 公开动态已同步" : notice}
+          </div>
+          <button
+            onClick={() =>
+              setActivityLimit((current) =>
+                current === DEFAULT_ACTIVITY_LIMIT
+                  ? EXPANDED_ACTIVITY_LIMIT
+                  : DEFAULT_ACTIVITY_LIMIT,
+              )
+            }
+            data-ui-touch="true"
+            style={{
+              borderRadius: 999,
+              border: `1px solid ${isDarkMode ? "#475569" : "#E5E7EB"}`,
+              background: "transparent",
+              color: isDarkMode ? "#CBD5E1" : "#475569",
+              fontSize: 9,
+              fontWeight: 600,
+              padding: "4px 8px",
+              cursor: "pointer",
+              letterSpacing: 0.3,
+              flexShrink: 0,
+              whiteSpace: "nowrap",
+            }}
+            title={
+              activityLimit === DEFAULT_ACTIVITY_LIMIT
+                ? "按时间顺序查看前 100 条"
+                : "收起为前 20 条"
+            }
+          >
+            {activityLimit === DEFAULT_ACTIVITY_LIMIT ? "查看前 100 条" : "收起到 20 条"}
+          </button>
         </div>
       </div>
 
