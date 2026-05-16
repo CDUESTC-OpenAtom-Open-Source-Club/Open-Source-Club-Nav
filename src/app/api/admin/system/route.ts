@@ -9,7 +9,7 @@ export async function GET() {
   const memFree = os.freemem();
   const load = os.loadavg();
 
-  // 系统面板直接取当前 Node 进程所在机器的信息，方便快速排查运行状态。
+  // 系统面板直接读取当前 Node 进程所在机器的信息，便于快速排查运行状态。
   return Response.json({
     uptimeSec: Math.floor(process.uptime()),
     node: process.version,

@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type AdminUser = {
@@ -28,7 +28,15 @@ type StatDay = {
 };
 type SystemInfo = { uptimeSec: number; cpuCores: number; mem: { usageRate: number } };
 type LinkHealth = { link_id: number; title: string; status_code: number | null; is_ok: number; message: string; checked_at: string };
-type LinkLog = { id: number; link_id: number | null; action: string; actor_username: string; actor_role: string; created_at: string };
+type LinkLog = {
+  id: number;
+  link_id: number | null;
+  action: string;
+  actor_username: string;
+  actor_role: string;
+  created_at: string;
+  detail?: unknown;
+};
 
 const baseSections = [
   { id: "overview", label: "首页" },
@@ -37,6 +45,38 @@ const baseSections = [
   { id: "health", label: "健康检测" },
   { id: "logs", label: "操作日志" },
 ] as const;
+
+async function readJsonSafe<T>(res: Response): Promise<T | null> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function formatLogDetail(detail: unknown): string {
+  if (detail === null || detail === undefined) return "-";
+  if (typeof detail === "string") {
+    const text = detail.trim();
+    if (!text) return "-";
+    try {
+      const parsed = JSON.parse(text);
+      return JSON.stringify(parsed);
+    } catch {
+      return text;
+    }
+  }
+  if (typeof detail === "object") {
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return String(detail);
+    }
+  }
+  return String(detail);
+}
 
 export default function AdminPage() {
   const router = useRouter();
@@ -52,8 +92,10 @@ export default function AdminPage() {
   const [trend7, setTrend7] = useState<Array<{ stat_date: string; link_clicks: number }>>([]);
   const [popular, setPopular] = useState<Array<{ category: string; clicks: number }>>([]);
   const [activeSection, setActiveSection] = useState("overview");
+  const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
   const [hoveredTrendIndex, setHoveredTrendIndex] = useState<number | null>(null);
   const [trendHovered, setTrendHovered] = useState(false);
+  const [healthChecking, setHealthChecking] = useState(false);
 
   const [linkForm, setLinkForm] = useState({
     title: "",
@@ -144,36 +186,93 @@ export default function AdminPage() {
     return { width, height, padding, innerWidth, innerHeight, points, linePath, areaPath, yTicks };
   }, [trend7]);
 
-  // 后台首页依赖的多个接口统一在这里加载，避免分散在各个按钮逻辑里。
-  const loadAll = async (role: "super" | "editor") => {
-    const [linksRes, statsRes] = await Promise.all([
-      fetch("/api/admin/links"),
-      fetch("/api/admin/stats"),
-    ]);
-    if (!linksRes.ok || !statsRes.ok) throw new Error("加载失败");
-    const linksData = await linksRes.json();
-    const statsData = await statsRes.json();
-    setLinks(linksData.links || []);
-    setStats(statsData.days || []);
-    setTrend7(statsData.trend7 || []);
-    setPopular(statsData.popularCategories || []);
+  const markSectionLoaded = useCallback((sectionId: string) => {
+    setLoadedSections((prev) => (prev[sectionId] ? prev : { ...prev, [sectionId]: true }));
+  }, []);
 
-    if (role === "super") {
-      const usersRes = await fetch("/api/admin/users");
-      if (usersRes.ok) {
-        const usersData = await usersRes.json();
-        setUsers(usersData.users || []);
-      }
+  const loadStats = useCallback(async () => {
+    const statsRes = await fetch("/api/admin/stats");
+    if (!statsRes.ok) throw new Error("加载统计失败");
+    const statsData = await readJsonSafe<{
+      days?: StatDay[];
+      trend7?: Array<{ stat_date: string; link_clicks: number }>;
+      popularCategories?: Array<{ category: string; clicks: number }>;
+    }>(statsRes);
+    setStats(statsData?.days || []);
+    setTrend7(statsData?.trend7 || []);
+    setPopular(statsData?.popularCategories || []);
+    markSectionLoaded("popular");
+  }, [markSectionLoaded]);
+
+  const loadSystem = useCallback(async () => {
+    const sysRes = await fetch("/api/admin/system");
+    if (!sysRes.ok) throw new Error("加载系统信息失败");
+    const systemData = await readJsonSafe<SystemInfo>(sysRes);
+    setSystem(systemData);
+  }, []);
+
+  const loadOverview = useCallback(async () => {
+    await Promise.all([loadStats(), loadSystem()]);
+    markSectionLoaded("overview");
+  }, [loadStats, loadSystem, markSectionLoaded]);
+
+  const loadLinks = useCallback(async () => {
+    const linksRes = await fetch("/api/admin/links");
+    if (!linksRes.ok) throw new Error("加载链接失败");
+    const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
+    setLinks(linksData?.links || []);
+    markSectionLoaded("links");
+  }, [markSectionLoaded]);
+
+  const loadUsers = useCallback(async () => {
+    const usersRes = await fetch("/api/admin/users");
+    if (!usersRes.ok) throw new Error("加载用户失败");
+    const usersData = await readJsonSafe<{ users?: AdminUser[] }>(usersRes);
+    setUsers(usersData?.users || []);
+    markSectionLoaded("users");
+  }, [markSectionLoaded]);
+
+  const loadHealth = useCallback(async () => {
+    const healthRes = await fetch("/api/admin/link-health");
+    if (!healthRes.ok) throw new Error("加载健康检测失败");
+    const healthData = await readJsonSafe<{ health?: LinkHealth[] }>(healthRes);
+    setHealth(healthData?.health || []);
+    markSectionLoaded("health");
+  }, [markSectionLoaded]);
+
+  const loadLogs = useCallback(async () => {
+    const logRes = await fetch("/api/admin/logs");
+    if (!logRes.ok) throw new Error("加载日志失败");
+    const logsData = await readJsonSafe<{ logs?: LinkLog[] }>(logRes);
+    setLogs(logsData?.logs || []);
+    markSectionLoaded("logs");
+  }, [markSectionLoaded]);
+
+  const loadSectionById = useCallback(async (sectionId: string, role: "super" | "editor") => {
+    if (sectionId === "overview") {
+      await loadOverview();
+      return;
     }
-    const [sysRes, healthRes, logRes] = await Promise.all([
-      fetch("/api/admin/system"),
-      fetch("/api/admin/link-health"),
-      fetch("/api/admin/logs"),
-    ]);
-    if (sysRes.ok) setSystem((await sysRes.json()) as SystemInfo);
-    if (healthRes.ok) setHealth(((await healthRes.json()) as { health: LinkHealth[] }).health || []);
-    if (logRes.ok) setLogs(((await logRes.json()) as { logs: LinkLog[] }).logs || []);
-  };
+    if (sectionId === "links") {
+      await loadLinks();
+      return;
+    }
+    if (sectionId === "popular") {
+      await loadStats();
+      return;
+    }
+    if (sectionId === "health") {
+      await loadHealth();
+      return;
+    }
+    if (sectionId === "logs") {
+      await loadLogs();
+      return;
+    }
+    if (sectionId === "users" && role === "super") {
+      await loadUsers();
+    }
+  }, [loadHealth, loadLinks, loadLogs, loadOverview, loadStats, loadUsers]);
 
   useEffect(() => {
     // 先确认当前登录态，再决定是否进入后台或跳转登录页。
@@ -184,9 +283,13 @@ export default function AdminPage() {
           router.replace("/admin/login");
           return;
         }
-        const me = await meRes.json();
+        const me = await readJsonSafe<{ user?: { id: number; username: string; role: "super" | "editor" } }>(meRes);
+        if (!me?.user) {
+          throw new Error("登录态异常");
+        }
         setUser(me.user);
-        await loadAll(me.user.role);
+        await Promise.all([loadOverview(), loadLinks()]);
+        setLoadedSections({ overview: true, popular: true, links: true });
       } catch {
         setError("加载后台数据失败");
       } finally {
@@ -194,11 +297,15 @@ export default function AdminPage() {
       }
     };
     init();
-  }, [router]);
+  }, [loadLinks, loadOverview, router]);
 
   // 当前后台是“单页模块切换”模式，这里只切换可见模块，不走路由跳转。
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
+    if (!user || loadedSections[sectionId]) return;
+    loadSectionById(sectionId, user.role).catch(() => {
+      setError("加载模块数据失败");
+    });
   };
 
   const logout = async () => {
@@ -215,10 +322,14 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(linkForm),
       });
-      const data = await res.json();
+      const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "新增链接失败");
       setLinkForm({ title: "", url: "", description: "", sort: 0 });
-      await loadAll(user!.role);
+      await Promise.all([
+        loadLinks(),
+        loadLogs().catch(() => {}),
+        loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
+      ]);
     } catch (err) {
       setError(String((err as Error).message || "新增链接失败"));
     }
@@ -227,7 +338,11 @@ export default function AdminPage() {
   // 删除后会重新拉取列表，保证表格和统计区同步刷新。
   const removeLink = async (id: number) => {
     await fetch(`/api/admin/links?id=${id}`, { method: "DELETE" });
-    await loadAll(user!.role);
+    await Promise.all([
+      loadLinks(),
+      loadLogs().catch(() => {}),
+      loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
+    ]);
   };
 
   // 启用/禁用共用同一个更新入口，只切 active 字段。
@@ -237,7 +352,12 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: item.id, active: item.active ? 0 : 1 }),
     });
-    await loadAll(user!.role);
+    await Promise.all([
+      loadLinks(),
+      loadLogs().catch(() => {}),
+      loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
+      loadedSections.health ? loadHealth().catch(() => {}) : Promise.resolve(),
+    ]);
   };
 
   const submitUser = async (e: FormEvent) => {
@@ -249,17 +369,26 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userForm),
       });
-      const data = await res.json();
+      const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "创建用户失败");
       setUserForm({ username: "", password: "", role: "editor" });
-      await loadAll("super");
+      await loadUsers();
     } catch (err) {
       setError(String((err as Error).message || "创建用户失败"));
     }
   };
   const runHealthCheck = async () => {
-    await fetch("/api/admin/link-health", { method: "POST" });
-    await loadAll(user!.role);
+    setHealthChecking(true);
+    try {
+      const res = await fetch("/api/admin/link-health", { method: "POST" });
+      const data = await readJsonSafe<{ error?: string }>(res);
+      if (!res.ok) throw new Error(data?.error || "检测失败");
+      await loadHealth();
+    } catch (err) {
+      setError(String((err as Error).message || "检测失败"));
+    } finally {
+      setHealthChecking(false);
+    }
   };
 
   if (checking) {
@@ -516,7 +645,7 @@ export default function AdminPage() {
           {(popular.length
             ? popular
             : Array.from({ length: 5 }).map((_, i) => ({ category: `分类${i + 1}`, clicks: 0 }))).map((p) => (
-            <div key={p.category} style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: 8, alignItems: "center" }}>
+            <div key={p.category} className="admin-console-popular-row" style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: 8, alignItems: "center" }}>
               <span style={{ fontSize: 12, color: "#334155", overflow: "hidden", textOverflow: "ellipsis" }}>{p.category}</span>
               <div style={{ height: 8, background: "#DBEAFE", borderRadius: 999 }}>
                 <div style={{ width: `${Math.min(100, p.clicks * 10)}%`, height: "100%", background: "#2563EB", borderRadius: 999, opacity: p.clicks ? 1 : 0.25 }} />
@@ -613,9 +742,11 @@ export default function AdminPage() {
         <div className="admin-console-pagehead-desc">检测链接可用性，集中查看异常状态和最近检测时间。</div>
       </div>
       <div id="health" className="admin-card admin-console-section-card admin-console-anchor-card" style={{ padding: 14, display: "grid", gap: 8 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="admin-console-health-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
           <div style={{ fontWeight: 700 }}>链接健康检测</div>
-          <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 30, padding: "0 10px" }}>立即检测</button>
+          <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 30, padding: "0 10px" }} disabled={healthChecking}>
+            {healthChecking ? "检测中..." : "立即检测"}
+          </button>
         </div>
         <div style={{ overflowX: "auto", minHeight: 170 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
@@ -663,8 +794,15 @@ export default function AdminPage() {
         <div style={{ fontWeight: 700, marginBottom: 8 }}>操作日志</div>
         <div style={{ maxHeight: 220, minHeight: 220, overflow: "auto", fontSize: 12 }}>
           {(logs.length ? logs : [{ id: 0, link_id: null, action: "暂无操作日志", actor_username: "-", actor_role: "-", created_at: "-" }]).map((l) => (
-            <div key={l.id} style={{ padding: "6px 0", borderBottom: "1px solid #E2E8F0" }}>
-              {String(l.created_at).replace("T", " ").slice(0, 19)} - {l.actor_username}({l.actor_role}) {l.action} link#{l.link_id ?? "-"}
+            <div key={l.id} style={{ padding: "6px 0", borderBottom: "1px solid #E2E8F0", display: "grid", gap: 4 }}>
+              <div>
+                {String(l.created_at).replace("T", " ").slice(0, 19)} - {l.actor_username}({l.actor_role}) {l.action} link#{l.link_id ?? "-"}
+              </div>
+              {"detail" in l ? (
+                <div style={{ color: "#64748B", fontSize: 11, wordBreak: "break-all", lineHeight: 1.45 }}>
+                  detail: {formatLogDetail((l as LinkLog).detail)}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

@@ -20,29 +20,20 @@ const boardCardStyle = {
 export default function GamesPage() {
   return (
     <main
+      className="games-page"
       style={{
-        minHeight: "100vh",
-        padding: "24px 16px 36px",
         background:
           "radial-gradient(circle at top, rgba(250,204,21,0.18), transparent 30%), radial-gradient(circle at 85% 18%, rgba(59,130,246,0.16), transparent 26%), linear-gradient(180deg, #f8fbff 0%, #eef5ff 48%, #f8fbff 100%)",
       }}
     >
-      <div
-        style={{
-          maxWidth: 1180,
-          margin: "0 auto",
-          display: "grid",
-          gap: 20,
-        }}
-      >
+      <div className="games-shell">
         <div
+          className="games-hero"
           style={{
             border: "1px solid #dbeafe",
-            borderRadius: 28,
             background: "rgba(255,255,255,0.88)",
             backdropFilter: "blur(12px)",
             boxShadow: "0 28px 70px rgba(15,23,42,0.10)",
-            padding: "22px 24px",
             display: "grid",
             gap: 18,
             overflow: "hidden",
@@ -172,33 +163,18 @@ export default function GamesPage() {
         </div>
 
         <section
+          className="games-main-card"
           style={{
             border: "1px solid #dbeafe",
-            borderRadius: 28,
             background: "rgba(255,255,255,0.9)",
             boxShadow: "0 20px 48px rgba(37,99,235,0.08)",
-            padding: 20,
             display: "grid",
             gap: 18,
           }}
         >
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) minmax(300px, 340px)",
-              gap: 18,
-              alignItems: "start",
-            }}
-          >
+          <div className="games-main-grid">
             <div style={{ display: "grid", gap: 16 }}>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1.2fr) minmax(260px, 0.8fr)",
-                  gap: 16,
-                  alignItems: "start",
-                }}
-              >
+              <div className="games-intro-grid">
                 <div style={{ display: "grid", gap: 6 }}>
                   <div style={{ fontSize: 11, color: "#F59E0B", fontWeight: 700, letterSpacing: 1.5 }}>
                     HIDDEN GAME

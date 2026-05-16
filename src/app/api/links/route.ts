@@ -60,7 +60,7 @@ export async function GET() {
 
   try {
     const [rows] = await pool.query(
-      "SELECT * FROM friend_links WHERE active = 1 ORDER BY sort ASC"
+      "SELECT * FROM friend_links WHERE active = 1 ORDER BY sort ASC, id ASC"
     );
     return Response.json({ links: rows, source: "mysql" });
   } catch {
@@ -150,7 +150,7 @@ export async function DELETE(request: Request) {
       return Response.json({ error: "id 为必填项" }, { status: 400 });
     }
 
-    // 这里保留软删除，方便后台后续恢复或排查历史数据。
+    // 这里保留软删除，后台可恢复或继续审计历史数据。
     const [result] = await pool.query(
       "UPDATE friend_links SET active = 0 WHERE id = ?",
       [id]

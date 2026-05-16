@@ -2,24 +2,67 @@ import pool from "@/lib/db";
 import { getAdminSessionFromCookies, hashPassword } from "@/lib/admin-auth";
 import { ensureBootstrapSuperUser } from "@/lib/admin-db";
 
+const USE_MOCK = process.env.USE_MOCK_DATA === "true";
+
+const mockUsers = [
+  {
+    id: 1,
+    username: "admin",
+    role: "super",
+    created_at: new Date().toISOString(),
+    last_login_at: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    username: "editor",
+    role: "editor",
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    last_login_at: null,
+  },
+] as const;
+
 function forbidden() {
   return Response.json({ error: "无权限" }, { status: 403 });
 }
 
 export async function GET() {
-  // 用户管理仅允许超级管理员访问。
-  await ensureBootstrapSuperUser();
-  const session = await getAdminSessionFromCookies();
-  if (!session) return Response.json({ error: "未登录" }, { status: 401 });
-  if (session.role !== "super") return forbidden();
+  if (USE_MOCK) {
+    return Response.json({ users: mockUsers });
+  }
 
-  const [rows] = await pool.query(
-    "SELECT id, username, role, created_at, last_login_at FROM admin_users ORDER BY id ASC",
-  );
-  return Response.json({ users: rows });
+  try {
+    // 用户管理仅允许 super 角色访问。
+    await ensureBootstrapSuperUser();
+    const session = await getAdminSessionFromCookies();
+    if (!session) return Response.json({ error: "未登录" }, { status: 401 });
+    if (session.role !== "super") return forbidden();
+
+    const [rows] = await pool.query(
+      "SELECT id, username, role, created_at, last_login_at FROM admin_users ORDER BY id ASC",
+    );
+    return Response.json({ users: rows });
+  } catch {
+    return Response.json({ error: "加载用户失败" }, { status: 500 });
+  }
 }
 
 export async function POST(request: Request) {
+  if (USE_MOCK) {
+    const body = await request.json().catch(() => ({}));
+    return Response.json(
+      {
+        user: {
+          id: Date.now(),
+          username: String(body?.username || "demo-user"),
+          role: body?.role === "super" ? "super" : "editor",
+          created_at: new Date().toISOString(),
+          last_login_at: null,
+        },
+      },
+      { status: 201 },
+    );
+  }
+
   await ensureBootstrapSuperUser();
   const session = await getAdminSessionFromCookies();
   if (!session) return Response.json({ error: "未登录" }, { status: 401 });

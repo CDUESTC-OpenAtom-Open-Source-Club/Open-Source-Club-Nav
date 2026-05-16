@@ -31,7 +31,7 @@ import {
 export default function Home() {
   // 样式 tailwindCSS
   const page = "relative min-h-screen font-sans";
-  const section = "w-full px-6 md:px-16 py-10 h-[calc(115vh)]";
+  const section = "w-full px-4 sm:px-6 md:px-12 lg:px-16 py-8 md:py-10 min-h-[calc(100dvh-24px)] md:h-[calc(115vh)]";
   const grid = "min-h-0 grid grid-cols-1 md:grid-cols-5 grid-rows-2 gap-6 h-full";
 
   // 卡片通用

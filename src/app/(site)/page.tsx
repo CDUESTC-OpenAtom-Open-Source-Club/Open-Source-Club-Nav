@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 "use client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
   CentralHub,
   HUDHeader,
@@ -269,14 +270,26 @@ const FOOTER_QUICK_LINKS = [
 
 export default function HomePage() {
   // 这里的状态分三类：启动流程、首页交互、关于弹层/主题/设备适配。
-  const [booted, setBooted] = useState(false);
-  const [fadeIn, setFadeIn] = useState(false);
+  const [booted, setBooted] = useState(
+    () =>
+      typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY)),
+  );
+  const [fadeIn, setFadeIn] = useState(
+    () =>
+      typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY)),
+  );
   const [activeCategory, setActiveCategory] = useState(null);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [aboutOpen, setAboutOpen] = useState(false);
   const [activeAboutSection, setActiveAboutSection] = useState("mission");
-  const [themeMode, setThemeMode] = useState("auto");
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [themeMode, setThemeMode] = useState(() => {
+    if (typeof window === "undefined") return "auto";
+    const savedThemeMode = localStorage.getItem(THEME_MODE_STORAGE_KEY);
+    return savedThemeMode && VALID_THEME_MODES.has(savedThemeMode)
+      ? savedThemeMode
+      : "auto";
+  });
+  const [autoThemeClock, setAutoThemeClock] = useState(() => Date.now());
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isTabletViewport, setIsTabletViewport] = useState(false);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
@@ -342,7 +355,7 @@ export default function HomePage() {
         window.clearTimeout(state.timer);
         state.timer = null;
       }
-      window.location.href = "/admin/login";
+      window.location.href = "/admin-gate";
     }
   }, []);
 
@@ -557,7 +570,7 @@ export default function HomePage() {
       />
 
       <div
-        className="lg:hidden"
+        className="xl:hidden"
         style={{
           display: "flex",
           alignItems: "center",
@@ -626,7 +639,7 @@ export default function HomePage() {
         }}
       >
         <div
-          className="hidden lg:flex"
+          className="hidden xl:flex"
           style={{ display: "flex", flexShrink: 0 }}
         >
           <LeftPanel
@@ -653,7 +666,7 @@ export default function HomePage() {
         </div>
 
         <div
-          className="hidden lg:flex"
+          className="hidden xl:flex"
           style={{ display: "flex", flexShrink: 0 }}
         >
           <RightPanel isDarkMode={isDarkMode} />
