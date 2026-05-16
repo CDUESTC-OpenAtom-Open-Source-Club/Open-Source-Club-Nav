@@ -2,7 +2,7 @@
 package utils
 
 import (
-	"Open-Source-Club-Nav/backend/config"
+	"open-source-club-nav/backend/config"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"

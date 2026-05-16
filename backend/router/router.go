@@ -2,14 +2,16 @@
 package router
 
 import (
-	"Open-Source-Club-Nav/backend/handler" // 导入handler里的接口
-	"Open-Source-Club-Nav/backend/utils"   // 导入日志工具
+	"net/http"                             // 导入日志工具
+	"open-source-club-nav/backend/handler" // 导入handler里的接口
+
 	"gorm.io/gorm"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/swaggo/files"
 )
+
 // router/router.go
 // 初始化路由（传入数据库连接，后续注入到Context）
 func InitRouter(db *gorm.DB) *gin.Engine {
@@ -34,7 +36,7 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 	backendGroup := r.Group("/backend")
 	backendGroup.Use(handler.AuthMiddleware()) // 权限中间件（要移到handler里）
 	{
-		backendGroup.GET("/test", handler.BackendHandler) // 关联管理员接口
+		backendGroup.GET("/admin/list", handler.GetAdminListHandler) // 关联管理员接口
 	}
 
 	return r

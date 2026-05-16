@@ -7,28 +7,26 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// 配置结构体，与config.yaml的字段一一对应
 type Config struct {
-	MySQL struct { // 对应yaml里的mysql节点
+	MySQL struct {
 		DSN string `yaml:"dsn"`
 	} `yaml:"mysql"`
-	JWT struct { // 对应yaml里的jwt节点
+	JWT struct {
 		Secret string `yaml:"secret"`
 		Expire int    `yaml:"expire"`
 	} `yaml:"jwt"`
 }
 
-// 加载配置文件
+// 首字母大写，导出函数
 func LoadConfig() Config {
 	var cfg Config
-	// 读取config.yaml文件（路径是backend/config/config.yaml）
-	file, err := os.ReadFile("config/config.yaml")
+	file, err := os.Open("config.yaml")
 	if err != nil {
-		panic("加载配置文件失败: " + err.Error())
+		panic("无法打开config.yaml: " + err.Error())
 	}
-	// 解析yaml到结构体
-	if err := yaml.Unmarshal(file, &cfg); err != nil {
-		panic("解析配置文件失败: " + err.Error())
+	defer file.Close()
+	if err := yaml.NewDecoder(file).Decode(&cfg); err != nil {
+		panic("解析config.yaml失败: " + err.Error())
 	}
 	return cfg
 }
