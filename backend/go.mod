@@ -1,3 +1,7 @@
+module new-backend
+
+go 1.26.2
+
 require github.com/swaggo/swag v1.16.6
 
 require (
