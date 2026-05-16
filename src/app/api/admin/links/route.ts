@@ -1,13 +1,10 @@
-﻿import { getAdminSessionFromCookies } from "@/lib/admin-auth";
+import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/admin-db";
+import { MOCK_ADMIN_LINKS } from "@/data/mock/links";
+import { getAllLinks, createLink, updateLink, deleteLink } from "@/services/links";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
-const mockLinks = [
-  { id: 1, title: "OpenAtom Docs", url: "https://openatom.cn", description: "OpenAtom 开放原子开源基金会", sort: 1, active: 1 },
-  { id: 2, title: "GitHub", url: "https://github.com", description: "全球代码托管平台", sort: 2, active: 1 },
-  { id: 3, title: "Next.js", url: "https://nextjs.org", description: "React 全栈开发框架", sort: 3, active: 0 },
-];
 
 function unauthorized() {
   return Response.json({ error: "未登录" }, { status: 401 });
@@ -18,7 +15,6 @@ function forbidden() {
 }
 
 async function requireEditorOrSuper() {
-  // 演示模式直接注入一个虚拟 super 账号，便于后台本地联调。
   if (USE_MOCK) {
     return {
       error: null,
@@ -47,31 +43,23 @@ async function writeLinkLog(
     `INSERT INTO admin_link_logs
       (link_id, action, actor_user_id, actor_username, actor_role, detail)
      VALUES (?, ?, ?, ?, ?, ?)`,
-    [
-      linkId,
-      action,
-      session.userId,
-      session.username,
-      session.role,
-      JSON.stringify(detail || {}),
-    ],
+    [linkId, action, session.userId, session.username, session.role, JSON.stringify(detail || {})],
   );
 }
 
 export async function GET() {
-  // 列表接口既服务后台首屏加载，也服务增删改后的刷新。
   if (USE_MOCK) {
-    return Response.json({ links: mockLinks });
+    return Response.json({ links: MOCK_ADMIN_LINKS });
   }
 
   const auth = await requireEditorOrSuper();
   if (auth.error) return auth.error;
-  const [rows] = await pool.query("SELECT * FROM friend_links ORDER BY sort ASC, id ASC");
-  return Response.json({ links: rows });
+
+  const links = await getAllLinks();
+  return Response.json({ links });
 }
 
 export async function POST(request: Request) {
-  // mock 模式只返回新增结果，不做真实持久化。
   if (USE_MOCK) {
     const body = await request.json().catch(() => ({}));
     return Response.json({
@@ -100,20 +88,16 @@ export async function POST(request: Request) {
     if (!title || !url) {
       return Response.json({ error: "标题和链接不能为空" }, { status: 400 });
     }
-    const [result] = await pool.query(
-      "INSERT INTO friend_links (title, url, description, sort, active) VALUES (?, ?, ?, ?, 1)",
-      [title, url, description, Number.isFinite(sort) ? sort : 0],
-    );
-    const linkId = Number((result as { insertId?: number }).insertId || 0) || null;
-    await writeLinkLog(auth.session, "create", linkId, { title, url, description, sort });
-    return Response.json({ ok: true }, { status: 201 });
+
+    const link = await createLink({ title, url, description, sort });
+    await writeLinkLog(auth.session, "create", link.id, { title, url, description, sort });
+    return Response.json({ ok: true, link }, { status: 201 });
   } catch {
     return Response.json({ error: "新增链接失败" }, { status: 500 });
   }
 }
 
 export async function PUT(request: Request) {
-  // 更新接口统一处理标题、描述、排序和启用状态修改。
   if (USE_MOCK) {
     const body = await request.json().catch(() => ({}));
     return Response.json({ ok: true, link: body });
@@ -127,35 +111,9 @@ export async function PUT(request: Request) {
     const id = Number(body?.id);
     if (!id) return Response.json({ error: "缺少 id" }, { status: 400 });
 
-    const fields: string[] = [];
-    const values: Array<string | number> = [];
-    if (body?.title !== undefined) {
-      fields.push("title = ?");
-      values.push(String(body.title));
-    }
-    if (body?.url !== undefined) {
-      fields.push("url = ?");
-      values.push(String(body.url));
-    }
-    if (body?.description !== undefined) {
-      fields.push("description = ?");
-      values.push(String(body.description));
-    }
-    if (body?.sort !== undefined) {
-      fields.push("sort = ?");
-      values.push(Number(body.sort) || 0);
-    }
-    if (body?.active !== undefined) {
-      fields.push("active = ?");
-      values.push(body.active ? 1 : 0);
-    }
+    const link = await updateLink(body);
+    if (!link) return Response.json({ error: "没有可更新字段" }, { status: 400 });
 
-    if (fields.length === 0) {
-      return Response.json({ error: "没有可更新字段" }, { status: 400 });
-    }
-
-    values.push(id);
-    await pool.query(`UPDATE friend_links SET ${fields.join(", ")} WHERE id = ?`, values);
     await writeLinkLog(auth.session, "update", id, {
       title: body?.title,
       url: body?.url,
@@ -163,14 +121,13 @@ export async function PUT(request: Request) {
       sort: body?.sort,
       active: body?.active,
     });
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, link });
   } catch {
     return Response.json({ error: "更新链接失败" }, { status: 500 });
   }
 }
 
 export async function DELETE(request: Request) {
-  // 删除逻辑实际是“禁用链接”，数据库记录仍保留。
   if (USE_MOCK) {
     return Response.json({ ok: true });
   }
@@ -182,9 +139,7 @@ export async function DELETE(request: Request) {
   const id = Number(searchParams.get("id"));
   if (!id) return Response.json({ error: "缺少 id" }, { status: 400 });
 
-  await pool.query("UPDATE friend_links SET active = 0 WHERE id = ?", [id]);
+  await deleteLink(id);
   await writeLinkLog(auth.session, "disable", id, {});
   return Response.json({ ok: true });
 }
-
-

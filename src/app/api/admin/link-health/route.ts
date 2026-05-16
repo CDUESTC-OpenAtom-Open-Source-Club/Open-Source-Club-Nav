@@ -1,6 +1,7 @@
-﻿import { getAdminSessionFromCookies } from "@/lib/admin-auth";
+import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/admin-db";
+import { MOCK_HEALTH } from "@/data/mock/health";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 const LINK_CHECK_TIMEOUT_MS = 10000;
@@ -16,35 +17,7 @@ type LinkHealthRow = {
   title: string;
 };
 
-let mockHealth: LinkHealthRow[] = [
-  {
-    link_id: 1,
-    url: "https://openatom.cn",
-    status_code: 200,
-    is_ok: 1,
-    checked_at: new Date().toISOString(),
-    message: "",
-    title: "OpenAtom Docs",
-  },
-  {
-    link_id: 2,
-    url: "https://github.com",
-    status_code: 200,
-    is_ok: 1,
-    checked_at: new Date(Date.now() - 1800000).toISOString(),
-    message: "",
-    title: "GitHub",
-  },
-  {
-    link_id: 3,
-    url: "https://nextjs.org",
-    status_code: 503,
-    is_ok: 0,
-    checked_at: new Date(Date.now() - 5400000).toISOString(),
-    message: "HTTP 503",
-    title: "Next.js",
-  },
-];
+let mockHealth: LinkHealthRow[] = MOCK_HEALTH.map((item) => ({ ...item }));
 
 function refreshMockHealth() {
   const now = Date.now();
@@ -56,9 +29,8 @@ function refreshMockHealth() {
 }
 
 export async function GET() {
-  // 列表接口给后台表格使用，只负责展示最近检测结果。
   if (USE_MOCK) {
-    return Response.json({ health: mockHealth });
+    return Response.json({ health: MOCK_HEALTH });
   }
 
   await ensureAdminTables();
@@ -76,7 +48,6 @@ export async function GET() {
 }
 
 export async function POST() {
-  // POST 会主动触发一次检测，并把结果写回健康表。
   if (USE_MOCK) {
     const health = refreshMockHealth();
     return Response.json({ ok: true, checked: health.length, health });
@@ -86,7 +57,6 @@ export async function POST() {
   const session = await getAdminSessionFromCookies();
   if (!session) return Response.json({ error: "未登录" }, { status: 401 });
 
-  // 只检查当前启用中的链接，避免无效数据反复探测。
   const [links] = await pool.query(
     "SELECT id, url FROM friend_links WHERE active = 1 ORDER BY id ASC",
   );

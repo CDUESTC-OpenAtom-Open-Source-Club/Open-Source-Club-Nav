@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 import { cookies } from "next/headers";
-import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/admin-db";
+import { recordVisit } from "@/services/stats";
 
 const VISITOR_COOKIE = "kcos_vid";
 const VISITOR_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
@@ -18,25 +18,7 @@ export async function POST() {
       createdCookie = true;
     }
 
-    await pool.query(
-      `INSERT INTO admin_daily_stats (stat_date, page_views, unique_visitors, link_clicks)
-       VALUES (CURDATE(), 1, 0, 0)
-       ON DUPLICATE KEY UPDATE page_views = page_views + 1`,
-    );
-
-    const [insertResult] = await pool.query(
-      `INSERT IGNORE INTO admin_daily_visits (stat_date, visitor_id)
-       VALUES (CURDATE(), ?)`,
-      [visitorId],
-    );
-    const affected = Number((insertResult as { affectedRows?: number }).affectedRows || 0);
-    if (affected > 0) {
-      await pool.query(
-        `UPDATE admin_daily_stats
-         SET unique_visitors = unique_visitors + 1
-         WHERE stat_date = CURDATE()`,
-      );
-    }
+    const { newVisitor } = await recordVisit(visitorId);
 
     if (createdCookie) {
       cookieStore.set(VISITOR_COOKIE, visitorId, {
@@ -48,7 +30,7 @@ export async function POST() {
       });
     }
 
-    return Response.json({ ok: true });
+    return Response.json({ ok: true, newVisitor });
   } catch {
     return Response.json({ ok: false }, { status: 200 });
   }

@@ -18,7 +18,7 @@ const DEFAULT_ACTIVITY_LIMIT = 20;
 const MAX_ACTIVITY_LIMIT = 100;
 const MAX_ACTIVITY_PAGES = 5;
 
-const SUPPORTED_EVENT_TYPES = new Set(SUPPORTED_GITHUB_ACTIVITY_TYPES);
+const SUPPORTED_EVENT_TYPES: Set<string> = new Set(SUPPORTED_GITHUB_ACTIVITY_TYPES);
 
 const MAX_ENRICHED_PUSHES = 8;
 
@@ -173,10 +173,10 @@ export async function GET(request: Request) {
 
   // 模拟数据模式：直接返回本地数据
   if (USE_MOCK) {
-    return Response.json<GitHubActivityResponse>({
+    return Response.json({
       activities: MOCK_ACTIVITY.slice(0, activityLimit),
       source: "mock",
-    });
+    } satisfies GitHubActivityResponse);
   }
 
   try {
@@ -204,17 +204,17 @@ export async function GET(request: Request) {
       })
       .slice(0, activityLimit);
 
-    return Response.json<GitHubActivityResponse>({
+    return Response.json({
       activities,
       source: "github",
-    });
+    } satisfies GitHubActivityResponse);
   } catch (error) {
     console.error("[activities] GitHub API 请求失败：", error);
     // 降级：网络错误时返回本地 mock 数据
     const { MOCK_ACTIVITY } = await import("@/data/githubActivity");
-    return Response.json<GitHubActivityResponse>({
+    return Response.json({
       activities: MOCK_ACTIVITY.slice(0, activityLimit),
       source: "mock",
-    });
+    } satisfies GitHubActivityResponse);
   }
 }
