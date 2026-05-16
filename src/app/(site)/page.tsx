@@ -2,6 +2,8 @@
 // @ts-nocheck
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
+import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CentralHub,
   HUDHeader,
@@ -9,6 +11,7 @@ import {
   RightPanel,
   StartupSplash,
 } from "@/components/home";
+import { RESOURCE_CATEGORIES } from "@/data/resources";
 
 const STORAGE_KEY = "kcos_booted";
 const THEME_MODE_STORAGE_KEY = "kcos_theme_mode";
@@ -270,6 +273,9 @@ const FOOTER_QUICK_LINKS = [
 
 export default function HomePage() {
   // 这里的状态分三类：启动流程、首页交互、关于弹层/主题/设备适配。
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [booted, setBooted] = useState(
     () =>
       typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY)),
@@ -278,7 +284,6 @@ export default function HomePage() {
     () =>
       typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY)),
   );
-  const [activeCategory, setActiveCategory] = useState(null);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [aboutOpen, setAboutOpen] = useState(false);
   const [activeAboutSection, setActiveAboutSection] = useState("mission");
@@ -298,6 +303,12 @@ export default function HomePage() {
   const aboutSectionRefs = useRef({});
   const mobileTapGuardRef = useRef({ element: null, ts: 0, timer: null });
   const adminTapGuardRef = useRef({ count: 0, timer: null });
+  const activeCategoryParam = searchParams.get("section");
+  const activeCategory = RESOURCE_CATEGORIES.some(
+    (category) => category.id === activeCategoryParam,
+  )
+    ? activeCategoryParam
+    : null;
 
   useEffect(() => {
     // 启动页只在用户第一次进入时展示，之后直接进入首页。
@@ -325,8 +336,31 @@ export default function HomePage() {
   }, []);
 
   const handleCategorySelect = useCallback((catId) => {
-    setActiveCategory(catId);
-  }, []);
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (catId) {
+      nextParams.set("section", catId);
+    } else {
+      nextParams.delete("section");
+    }
+
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, {
+      scroll: false,
+    });
+  }, [pathname, router, searchParams]);
+
+  const buildCategoryHref = useCallback((catId) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    if (catId) {
+      nextParams.set("section", catId);
+    } else {
+      nextParams.delete("section");
+    }
+    const nextQuery = nextParams.toString();
+    return nextQuery
+      ? { pathname, query: Object.fromEntries(nextParams.entries()) }
+      : pathname;
+  }, [pathname, searchParams]);
 
   const scrollToAboutSection = useCallback((sectionId) => {
     // 关于弹层内部不是路由切换，而是滚动到对应 section。
@@ -458,9 +492,13 @@ export default function HomePage() {
     const onClickCapture = (event) => {
       if (!(event.target instanceof Element)) return;
 
-      const clickable = event.target.closest(
-        '[data-ui-touch="true"], button, a[href], [role="button"]',
-      );
+      // 显式标记为 data-ui-touch 的控件按单击处理，双击确认只兜底未标记的原生可点击元素。
+      if (event.target.closest('[data-ui-touch="true"]')) {
+        resetArmedState();
+        return;
+      }
+
+      const clickable = event.target.closest('button, a[href], [role="button"]');
       if (!clickable) return;
 
       if (
@@ -590,10 +628,16 @@ export default function HomePage() {
           { id: "surface", label: "校园" },
           { id: "armory", label: "工具" },
         ].map((item) => (
-          <button
+          <Link
             key={item.id || "home"}
-            onClick={() => handleCategorySelect(item.id)}
+            href={buildCategoryHref(item.id)}
+            replace
+            scroll={false}
+            data-ui-touch="true"
             style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
               flexShrink: 0,
               padding: "5px 12px",
               borderRadius: 999,
@@ -622,10 +666,12 @@ export default function HomePage() {
               cursor: "pointer",
               whiteSpace: "nowrap",
               transition: "all 0.15s",
+              textDecoration: "none",
+              touchAction: "manipulation",
             }}
           >
             {item.label}
-          </button>
+          </Link>
         ))}
       </div>
 
@@ -660,7 +706,7 @@ export default function HomePage() {
           <CentralHub
             activeCategory={activeCategory}
             parallax={parallax}
-            onClosePanel={() => setActiveCategory(null)}
+            onClosePanel={() => handleCategorySelect(null)}
             isDarkMode={isDarkMode}
           />
         </div>
@@ -1567,7 +1613,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-
-

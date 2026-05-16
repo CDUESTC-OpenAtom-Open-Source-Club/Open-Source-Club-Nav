@@ -1,7 +1,7 @@
 ﻿// @ts-nocheck
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { Clock, Radio } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Radio } from "lucide-react";
 
 const TYPEWRITER_MESSAGES = [
   "KCOS 科成开放原子开源社团 · 探索、共创、分享",
@@ -13,7 +13,7 @@ const TYPEWRITER_MESSAGES = [
 const HEADER_HEIGHT = "clamp(50px, 6vh, 56px)";
 const HEADER_PADDING_X = "clamp(12px, 1.3vw, 20px)";
 const LEFT_BLOCK_MIN_WIDTH = "clamp(156px, 18vw, 190px)";
-const RIGHT_BLOCK_MIN_WIDTH = "clamp(210px, 24vw, 280px)";
+const RIGHT_BLOCK_MIN_WIDTH = "clamp(108px, 12vw, 140px)";
 const THEME_MODES = [
   { key: "light", label: "白天" },
   { key: "dark", label: "黑夜" },
@@ -77,54 +77,10 @@ export default function HUDHeader({
   themeMode = "auto",
   onThemeModeChange = () => {},
 }) {
-  const [uptimeText, setUptimeText] = useState("--");
-  const uptimeBaseSecRef = useRef(0);
-  const uptimeAnchorMsRef = useRef(0);
   const [typeText, setTypeText] = useState("");
   const [msgIdx, setMsgIdx] = useState(0);
   const [charIdx, setCharIdx] = useState(0);
   const [deleting, setDeleting] = useState(false);
-
-  const formatDuration = (totalSec) => {
-    const safeSec = Math.max(0, Math.floor(totalSec));
-    const days = Math.floor(safeSec / 86400);
-    const hours = Math.floor((safeSec % 86400) / 3600);
-    const minutes = Math.floor((safeSec % 3600) / 60);
-    const seconds = safeSec % 60;
-    return `${days}天 ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  };
-
-  useEffect(() => {
-    const tick = () => {
-      if (uptimeAnchorMsRef.current > 0) {
-        const elapsedSec = uptimeBaseSecRef.current + Math.floor((Date.now() - uptimeAnchorMsRef.current) / 1000);
-        setUptimeText(formatDuration(elapsedSec));
-      }
-    };
-
-    const syncSystemTime = async () => {
-      try {
-        const res = await fetch("/api/system", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
-        const nextUptime = Number(data?.uptimeSec || 0);
-        uptimeBaseSecRef.current = nextUptime;
-        uptimeAnchorMsRef.current = Date.now();
-        setUptimeText(formatDuration(nextUptime));
-      } catch {
-        // 首页头部运行时长读取失败时保留现有显示，不阻塞主界面。
-      }
-    };
-
-    tick();
-    syncSystemTime();
-    const id = setInterval(tick, 1000);
-    const refreshId = setInterval(syncSystemTime, 60000);
-    return () => {
-      clearInterval(id);
-      clearInterval(refreshId);
-    };
-  }, []);
 
   useEffect(() => {
     if (compact) return undefined;
@@ -283,50 +239,12 @@ export default function HUDHeader({
               themeMode={themeMode}
               onThemeModeChange={onThemeModeChange}
             />
-            <div style={{ textAlign: "right" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  justifyContent: "flex-end",
-                }}
-              >
-                <Clock size={10} color="#10B981" />
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: "#10B981",
-                    fontFamily: '"Courier New", monospace',
-                  }}
-                >
-                  {uptimeText}
-                </span>
-              </div>
-              <div
-                style={{
-                  fontSize: 9,
-                  color: isDarkMode ? "#94A3B8" : "#64748B",
-                  textAlign: "right",
-                  letterSpacing: 0.5,
-                }}
-              >
-                项目运行时长
-              </div>
-            </div>
           </div>
         </>
       ) : (
         <div
           style={{
             marginLeft: "auto",
-            display: "grid",
-            gap: 2,
-            justifyItems: "end",
-            color: isDarkMode ? "#94A3B8" : "#64748B",
-            fontSize: 10,
-            fontFamily: '"Courier New", monospace',
           }}
         >
           <ThemeModeSwitch
@@ -335,10 +253,6 @@ export default function HUDHeader({
             themeMode={themeMode}
             onThemeModeChange={onThemeModeChange}
           />
-          <span>项目运行时长</span>
-          <span style={{ color: "#10B981", fontWeight: 700 }}>
-            {uptimeText}
-          </span>
         </div>
       )}
 

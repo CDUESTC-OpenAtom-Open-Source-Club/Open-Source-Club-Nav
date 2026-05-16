@@ -56,6 +56,7 @@ async function fetchGitHubEvents(
   activityLimit: number,
 ): Promise<GitHubOrgEvent[]> {
   const events: GitHubOrgEvent[] = [];
+  const supportedEvents: GitHubOrgEvent[] = [];
   const seenEventIds = new Set<string>();
   const perPage = Math.min(activityLimit, MAX_ACTIVITY_LIMIT);
 
@@ -76,13 +77,16 @@ async function fetchGitHubEvents(
       }
       seenEventIds.add(eventId);
       events.push(event);
-      if (events.length >= activityLimit) {
-        return events;
+      if (SUPPORTED_EVENT_TYPES.has(event?.type ?? "")) {
+        supportedEvents.push(event);
+      }
+      if (supportedEvents.length >= activityLimit) {
+        return supportedEvents;
       }
     }
   }
 
-  return events;
+  return supportedEvents;
 }
 
 async function enrichPushEvent(
@@ -178,9 +182,7 @@ export async function GET(request: Request) {
   try {
     const headers = createGitHubHeaders();
     const events = await fetchGitHubEvents(headers, activityLimit);
-    const filteredEvents = events
-      .filter((event) => SUPPORTED_EVENT_TYPES.has(event?.type ?? ""))
-      .slice(0, activityLimit);
+    const filteredEvents = events.slice(0, activityLimit);
 
     let enrichedPushes = 0;
     const enrichedEvents = await Promise.all(

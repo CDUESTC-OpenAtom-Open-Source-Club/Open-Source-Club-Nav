@@ -84,3 +84,29 @@ CREATE TABLE IF NOT EXISTS admin_daily_visits (
   UNIQUE KEY uk_stat_visitor (stat_date, visitor_id),
   INDEX idx_stat_date (stat_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='每日访客去重';
+
+-- 链接操作日志
+CREATE TABLE IF NOT EXISTS admin_link_logs (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  link_id INT NULL COMMENT '链接 ID',
+  action VARCHAR(20) NOT NULL COMMENT '操作类型：create/update/delete/disable/enable',
+  actor_user_id INT NOT NULL COMMENT '操作者 ID',
+  actor_username VARCHAR(64) NOT NULL COMMENT '操作者用户名',
+  actor_role VARCHAR(20) NOT NULL COMMENT '操作者角色',
+  detail JSON NULL COMMENT '操作详情',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_created_at (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='链接操作日志';
+
+-- 友链健康检测
+CREATE TABLE IF NOT EXISTS admin_link_health (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  link_id INT NOT NULL COMMENT '链接 ID',
+  url VARCHAR(500) NOT NULL COMMENT '检测 URL',
+  status_code INT NULL COMMENT 'HTTP 状态码',
+  is_ok TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否正常',
+  message VARCHAR(255) DEFAULT '' COMMENT '检测信息',
+  checked_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '检测时间',
+  INDEX idx_link_id (link_id),
+  INDEX idx_checked_at (checked_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='友链健康检测';
