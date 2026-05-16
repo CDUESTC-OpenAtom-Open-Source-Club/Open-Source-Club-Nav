@@ -35,6 +35,7 @@ dev-server*.log
 temp_*.txt
 *.tmp
 *.bak
+/logs/
 
 # env files — ignore all but keep the example template
 .env

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 "use client";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   CentralHub,
   HUDHeader,
@@ -289,7 +289,7 @@ export default function HomePage() {
       ? savedThemeMode
       : "auto";
   });
-  const [autoThemeClock, setAutoThemeClock] = useState(() => Date.now());
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isTabletViewport, setIsTabletViewport] = useState(false);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
