@@ -31,4 +31,4 @@ export interface WorkCreateInput {
   display_order?: number;
 }
 
-export interface WorkUpdateInput extends Partial<WorkCreateInput> {}
+export type WorkUpdateInput = Partial<WorkCreateInput>;

@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 "use client";
 import { useState, useEffect } from "react";
 
@@ -14,20 +13,24 @@ const STARTUP_LINES = [
   "SYSTEM READY · WELCOME TO KCOS",
 ];
 
-function getLineColor(text) {
+function getLineColor(text: string) {
   const safe = typeof text === "string" ? text : "";
   if (safe.indexOf("OK") !== -1) return "#10B981";
   if (safe.indexOf("READY") !== -1) return "#0A84FF";
   return "#374151";
 }
 
-function getLineWeight(text) {
+function getLineWeight(text: string) {
   const safe = typeof text === "string" ? text : "";
   return safe.indexOf("READY") !== -1 ? 700 : 400;
 }
 
-export default function StartupSplash({ onComplete }) {
-  const [visibleLines, setVisibleLines] = useState([]);
+type StartupSplashProps = {
+  onComplete?: () => void;
+};
+
+export default function StartupSplash({ onComplete }: StartupSplashProps) {
+  const [visibleLines, setVisibleLines] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [fadeOut, setFadeOut] = useState(false);
 

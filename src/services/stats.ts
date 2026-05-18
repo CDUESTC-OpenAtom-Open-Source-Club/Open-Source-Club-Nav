@@ -3,6 +3,24 @@ import { getMockAdminStats } from "@/data/mock/stats";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 
+function toRepoLabel(title: string | null, url: string, linkId: number): string {
+  const safeTitle = String(title || "").trim();
+  if (safeTitle) return safeTitle;
+
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes("github.com")) {
+      const pathParts = parsed.pathname.split("/").filter(Boolean);
+      if (pathParts.length >= 2) {
+        return `${pathParts[0]}/${pathParts[1]}`;
+      }
+    }
+    return parsed.hostname.replace(/^www\./i, "");
+  } catch {
+    return `link#${linkId}`;
+  }
+}
+
 export async function getAdminStats() {
   if (USE_MOCK) return getMockAdminStats();
 
@@ -16,13 +34,26 @@ export async function getAdminStats() {
   const trend7 = days.slice(-7);
 
   const [popularRows] = await pool.query(
-    `SELECT SUBSTRING_INDEX(SUBSTRING_INDEX(f.url, '/', 3), '://', -1) AS category, COUNT(*) AS clicks
-     FROM metrics m JOIN friend_links f ON m.link_id = f.id
+    `SELECT m.link_id, f.title, f.url, COUNT(*) AS clicks
+     FROM metrics m
+     JOIN friend_links f ON m.link_id = f.id
      WHERE m.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-     GROUP BY category ORDER BY clicks DESC LIMIT 5`
+     GROUP BY m.link_id, f.title, f.url
+     ORDER BY clicks DESC
+     LIMIT 5`
   );
 
-  return { today, days, trend7, popularCategories: popularRows };
+  const popularRepos = (popularRows as Array<{
+    link_id: number;
+    title: string | null;
+    url: string;
+    clicks: number;
+  }>).map((row) => ({
+    repo: toRepoLabel(row.title, row.url, row.link_id),
+    clicks: Number(row.clicks || 0),
+  }));
+
+  return { today, days, trend7, popularRepos, popularCategories: popularRepos };
 }
 
 export async function recordVisit(visitorId: string): Promise<{ newVisitor: boolean }> {

@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const password = String(body?.password || "");
 
     if (!username || !password) {
-      return Response.json({ error: "用户名和密码不能为空" }, { status: 400 });
+      return Response.json({ error: "?????????" }, { status: 400 });
     }
 
     await ensureBootstrapSuperUser();
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     }>)[0];
 
     if (!user || !verifyPassword(password, user.password_hash)) {
-      return Response.json({ error: "用户名或密码错误" }, { status: 401 });
+      return Response.json({ error: "?????????????" }, { status: 401 });
     }
 
     // 登录成功后把最小必要身份信息写入会话，前台后续只依赖 cookie 验证。
@@ -49,6 +49,6 @@ export async function POST(request: Request) {
       user: { id: user.id, username: user.username, role: user.role },
     });
   } catch {
-    return Response.json({ error: "登录失败" }, { status: 500 });
+    return Response.json({ error: "??????????" }, { status: 500 });
   }
 }

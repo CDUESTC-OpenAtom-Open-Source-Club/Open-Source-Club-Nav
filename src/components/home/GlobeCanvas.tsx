@@ -1,11 +1,18 @@
-﻿// @ts-nocheck
 "use client";
 import { useEffect, useRef } from "react";
 
-export default function GlobeCanvas({ pulse = false, size = 260 }) {
-  const canvasRef = useRef(null);
-  const frameRef = useRef(null);
-  const sceneRef = useRef({});
+type GlobeCanvasProps = {
+  pulse?: boolean;
+  size?: number;
+};
+
+export default function GlobeCanvas({
+  pulse = false,
+  size = 260,
+}: GlobeCanvasProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const sceneRef = useRef<Record<string, unknown>>({});
 
   useEffect(() => {
     let THREE;
@@ -146,13 +153,7 @@ export default function GlobeCanvas({ pulse = false, size = 260 }) {
       }
       sceneRef.current = {};
     };
-  }, [size]);
-
-  // Pulse reactivity
-  useEffect(() => {
-    const { sphereMat, sphere } = sceneRef.current;
-    if (!sphereMat) return;
-  }, [pulse]);
+  }, [pulse, size]);
 
   return (
     <canvas

@@ -1,4 +1,3 @@
-﻿// @ts-nocheck
 export const WORKS = [
   {
     id: 1,

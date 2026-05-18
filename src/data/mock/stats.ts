@@ -22,12 +22,12 @@ export function getMockAdminStats() {
     unique_visitors: [318, 336, 322, 374, 388, 420, 426][index],
     link_clicks: item.link_clicks,
   })).reverse();
-  const popularCategories = [
-    { category: "github.com", clicks: 52 },
-    { category: "openatom.cn", clicks: 37 },
-    { category: "nextjs.org", clicks: 26 },
-    { category: "react.dev", clicks: 22 },
-    { category: "nodejs.org", clicks: 18 },
+  const popularRepos = [
+    { repo: "cdcas/open-source-club-nav", clicks: 52 },
+    { repo: "openatomfoundation/openatom-docs", clicks: 37 },
+    { repo: "vercel/next.js", clicks: 26 },
+    { repo: "facebook/react", clicks: 22 },
+    { repo: "nodejs/node", clicks: 18 },
   ];
-  return { today, days, trend7, popularCategories };
+  return { today, days, trend7, popularRepos, popularCategories: popularRepos };
 }

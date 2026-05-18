@@ -1,12 +1,11 @@
-// @ts-nocheck
 "use client";
-import Link from "next/link";
 import {
   Brain,
   MapPin,
   Wrench,
   ChevronRight,
   ExternalLink,
+  Gamepad2,
 } from "lucide-react";
 import { RESOURCE_CATEGORIES } from "@/data/resources";
 
@@ -14,43 +13,48 @@ const ICON_MAP = { Brain, MapPin, Wrench };
 
 const FRIEND_LINKS = [
   { title: "电子科技大学成都学院", url: "https://www.cduestc.fun/" },
-  { title: "社团成员博客", url: "https://opensouce-club.top/" },
   { title: "相关技术社区", url: "https://github.com/CDUESTC-OpenAtom-Club" },
 ];
 
 const PANEL_WIDTH = "clamp(214px, 16vw, 252px)";
 
-const applyCategoryHoverStyle = (target) => {
+const applyCategoryHoverStyle = (target: HTMLElement) => {
   target.style.background = "#F8FAFC";
   target.style.border = "1px solid #E5E7EB";
   target.style.transform = "translateY(-1px)";
   target.style.boxShadow = "0 6px 12px rgba(15,23,42,0.06)";
 };
 
-const resetCategoryHoverStyle = (target) => {
+const resetCategoryHoverStyle = (target: HTMLElement) => {
   target.style.background = "transparent";
   target.style.border = "1px solid transparent";
   target.style.transform = "translateY(0)";
   target.style.boxShadow = "none";
 };
 
-const applyFriendLinkHoverStyle = (target) => {
+const applyFriendLinkHoverStyle = (target: HTMLElement) => {
   target.style.transform = "translateY(-1px)";
   target.style.boxShadow = "0 5px 10px rgba(15,23,42,0.08)";
   target.style.borderColor = "#BFDBFE";
 };
 
-const resetFriendLinkHoverStyle = (target) => {
+const resetFriendLinkHoverStyle = (target: HTMLElement) => {
   target.style.transform = "translateY(0)";
   target.style.boxShadow = "none";
   target.style.borderColor = "#E5E7EB";
+};
+
+type LeftPanelProps = {
+  activeCategory: string | null;
+  onCategorySelect: (category: string | null) => void;
+  isDarkMode?: boolean;
 };
 
 export default function LeftPanel({
   activeCategory,
   onCategorySelect,
   isDarkMode = false,
-}) {
+}: LeftPanelProps) {
   return (
     <aside
       style={{
@@ -277,39 +281,50 @@ export default function LeftPanel({
           ))}
         </div>
 
-        <div style={{ marginTop: 10, paddingTop: 9, borderTop: "1px dashed #DBEAFE" }}>
-          <Link
+        <div
+          style={{
+            marginTop: 10,
+            borderTop: "1px dashed #E2E8F0",
+            paddingTop: 10,
+          }}
+        >
+          <a
             href="/games"
+            data-ui-touch="true"
             style={{
-              display: "block",
               textDecoration: "none",
-              border: "1px dashed #BFDBFE",
+              border: "1px solid #BFDBFE",
               borderRadius: 10,
-              background: "linear-gradient(180deg, #F8FBFF 0%, #EFF6FF 100%)",
+              background: "linear-gradient(180deg, #FFFFFF, #F8FBFF)",
               padding: "8px 9px",
-              textAlign: "center",
-              color: "#94A3B8",
-              fontSize: 10,
-              letterSpacing: 1.2,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 8,
               transition: "all 0.18s ease",
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = "#0A84FF";
-              e.currentTarget.style.borderColor = "#93C5FD";
-              e.currentTarget.style.transform = "translateY(-1px)";
-              e.currentTarget.style.boxShadow = "0 8px 18px rgba(37,99,235,0.10)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = "#94A3B8";
-              e.currentTarget.style.borderColor = "#BFDBFE";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
+            onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget)}
+            onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget)}
           >
-            解压小游戏
-          </Link>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+              <Gamepad2 size={12} color="#0A84FF" />
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#0F172A",
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                吃豆人小游戏
+              </span>
+            </span>
+            <ChevronRight size={12} color="#0A84FF" />
+          </a>
         </div>
       </div>
     </aside>
-  )
+  );
 }
