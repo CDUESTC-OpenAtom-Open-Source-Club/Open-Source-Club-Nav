@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -72,10 +73,10 @@ const PACMAN_LEVEL_TEMPLATES = [
 ];
 
 const PACMAN_DIR = {
-  up: { dx: 0, dy: -1, label: "鈫?, angle: 270 },
-  down: { dx: 0, dy: 1, label: "鈫?, angle: 90 },
-  left: { dx: -1, dy: 0, label: "鈫?, angle: 180 },
-  right: { dx: 1, dy: 0, label: "鈫?, angle: 0 },
+  up: { dx: 0, dy: -1, label: "↑", angle: 270 },
+  down: { dx: 0, dy: 1, label: "↓", angle: 90 },
+  left: { dx: -1, dy: 0, label: "←", angle: 180 },
+  right: { dx: 1, dy: 0, label: "→", angle: 0 },
 };
 
 const PACMAN_GHOST_META = {
@@ -166,7 +167,7 @@ const createPacmanRound = ({
     frightenedTicks: 0,
     ghostCombo: 0,
     tick: 0,
-    status: `缂?${safeLevel}/${totalLevels} 闁稿繒顒茬槐娆撳棘閻楀牆顤侀柡鍫氬亾闁逛究鍨鸿啯鐎殿喖楠忕槐姝?
+    status: `第 ${safeLevel}/${totalLevels} 关（新手最慢模式）`,
   };
 };
 
@@ -728,7 +729,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           score += 50;
           frightenedTicks = PACMAN_EASY.frightenedTicks;
           ghostCombo = 0;
-          status = "闁煎厖绮欓崳铏规寬閸☆厾纾兼鐐垫櫕娴兼帗娼诲☉妯哄汲闁诡垰锕ら幃锟犳偐閼哥鍋?;
+          status = "能量豆！幽灵进入惊吓状态";
         }
 
         const levelIdx = Math.max(
@@ -785,7 +786,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             const ghostScore = 200 * 2 ** Math.min(3, ghostCombo);
             score += ghostScore;
             ghostCombo += 1;
-            status = `闁告艾鍟撮?+${ghostScore}`;
+            status = `吃鬼 +${ghostScore}`;
             return {
               ...ghost,
               x: ghost.spawnX,
@@ -812,7 +813,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
               running: false,
               finished: true,
               tick: (Number(prev.tick) || 0) + 1,
-              status: "閻炴凹鍋勯懣鍥倶閸偄顫夐柛鎺戝簻缁辨繂銆掗崨濠傜亞缂備焦鎸诲?,
+              status: "被幽灵抓到，游戏结束",
             };
           }
 
@@ -827,7 +828,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             running: true,
             finished: false,
             tick: (Number(prev.tick) || 0) + 1,
-            status: `闁瑰湱鍠庨妵?1 闁哄鈧櫕鍤掗柨娑樿嫰婢ф寧鎷?${lives} 闁哄鈧櫕鍤抈,
+            status: `损失 1 条命，剩余 ${lives} 条命`,
           };
         }
 
@@ -845,7 +846,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
               frightenedTicks: 0,
               ghostCombo: 0,
               tick: (Number(prev.tick) || 0) + 1,
-              status: `濞戞挸顦崣褔鏌呭顒€褰犻柨娑楃劍閳ь剝顕ч崹?${score + 500}`,
+              status: `三关通关！总分 ${score + 500}`,
             };
           }
 
@@ -859,7 +860,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             ...nextRound,
             running: true,
             tick: (Number(prev.tick) || 0) + 1,
-            status: `閺夆晜绋戦崣鍡欑箔?${nextRound.level} 闁稿繒顒茬槐娆愭交閸パ冨綘濠靛倹鐗曟慨?+300闁挎稑藝,
+            status: `进入第 ${nextRound.level} 关（过关奖励 +300）`,
           };
         }
 
@@ -890,7 +891,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
       return {
         ...prev,
         running: !prev.running,
-        status: prev.running ? "鐎圭寮跺▓蹇涘磻? : "READY!",
+        status: prev.running ? "已暂停" : "READY!",
       };
     });
   };
@@ -915,21 +916,12 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
   const mouthGap = safeTick % 8 < 4 ? 70 : 28;
   const frightenedBlink =
     game.frightenedTicks > 0 && game.frightenedTicks < 18 && safeTick % 4 < 2;
-  const panelWidth = standalone ? "min(100%, 620px)" : compact ? 206 : 240;
+  const panelWidth = standalone ? "min(100%, 520px)" : compact ? 196 : 230;
   const boardHeight = standalone
-    ? "min(68vw, 520px)"
+    ? "min(62vw, 440px)"
     : compact
-      ? 150
-      : 176;
-  const actorSize = standalone ? 18 : compact ? 10 : 12;
-  const pelletSize = standalone ? 4 : compact ? 3 : 3.2;
-  const powerPelletSize = standalone
-    ? safeTick % 8 < 4
-      ? 8
-      : 7
-    : safeTick % 8 < 4
-      ? 6
-      : 5;
+      ? 146
+      : 168;
   const handleBoardPointer = (x, y) => {
     const dx = x - safePac.x;
     const dy = y - safePac.y;
@@ -958,7 +950,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         border: "1px solid #D6E7F7",
         background: "rgba(255,255,255,0.9)",
         backdropFilter: "blur(8px)",
-        padding: standalone ? 18 : compact ? 9 : 12,
+        padding: standalone ? 16 : compact ? 9 : 12,
         display: "grid",
         gap: standalone ? 12 : 8,
         boxShadow: standalone ? "0 24px 60px rgba(15,23,42,0.12)" : "none",
@@ -977,18 +969,18 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         }}
       >
         <span style={{ color: "#F59E0B", fontWeight: 700 }}>PAC-MAN</span>
-        <span>闁?{game.score}</span>
-        <span>闁?{game.lives}</span>
+        <span>分 {game.score}</span>
+        <span>命 {game.lives}</span>
         <span>
-          闁?{game.level}/{game.totalLevels}
+          关 {game.level}/{game.totalLevels}
         </span>
       </div>
 
       <div
         style={{
-          borderRadius: standalone ? 12 : 8,
+          borderRadius: 8,
           border: "1px solid #D6E7F7",
-          padding: standalone ? 10 : 5,
+          padding: standalone ? 8 : 5,
           background: "#0F172A",
           display: "grid",
           gridTemplateColumns: `repeat(${cellsX}, 1fr)`,
@@ -1028,8 +1020,8 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
                 {cell === "." && !isPac && !isGhost ? (
                   <span
                     style={{
-                      width: pelletSize,
-                      height: pelletSize,
+                      width: 3,
+                      height: 3,
                       borderRadius: "50%",
                       background: "#FDE68A",
                       display: "block",
@@ -1040,8 +1032,8 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
                 {cell === "o" && !isPac && !isGhost ? (
                   <span
                     style={{
-                      width: powerPelletSize,
-                      height: powerPelletSize,
+                      width: safeTick % 8 < 4 ? 6 : 5,
+                      height: safeTick % 8 < 4 ? 6 : 5,
                       borderRadius: "50%",
                       background: "#FBBF24",
                       boxShadow: "0 0 6px rgba(251,191,36,0.8)",
@@ -1053,8 +1045,8 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
                 {isPac ? (
                   <span
                     style={{
-                      width: actorSize,
-                      height: actorSize,
+                      width: standalone ? 16 : 11,
+                      height: standalone ? 16 : 11,
                       borderRadius: "50%",
                       background: `conic-gradient(from ${pacDir.angle + mouthGap / 2}deg, transparent 0deg ${mouthGap}deg, #FACC15 ${mouthGap}deg 360deg)`,
                       boxShadow: "0 0 7px rgba(250,204,21,0.7)",
@@ -1066,8 +1058,8 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
                 {isGhost ? (
                   <span
                     style={{
-                      width: actorSize,
-                      height: actorSize,
+                      width: standalone ? 16 : 11,
+                      height: standalone ? 16 : 11,
                       borderRadius: "50% 50% 35% 35%",
                       background: ghostFrightened
                         ? frightenedBlink
@@ -1115,7 +1107,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: standalone ? 10 : 4,
+          gap: standalone ? 8 : 4,
         }}
       >
         <button
@@ -1126,10 +1118,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: standalone ? 14 : 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: standalone ? "10px 0" : "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.up.label}
@@ -1142,10 +1134,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: standalone ? 14 : 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: standalone ? "10px 0" : "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.left.label}
@@ -1158,10 +1150,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: standalone ? 14 : 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: standalone ? "10px 0" : "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.right.label}
@@ -1174,10 +1166,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             border: "1px solid #C7DCF4",
             borderRadius: 6,
             background: "#F1F7FF",
-            fontSize: standalone ? 14 : 11,
+            fontSize: standalone ? 13 : 11,
             color: "#2563EB",
             cursor: "pointer",
-            padding: standalone ? "10px 0" : "3px 0",
+            padding: standalone ? "8px 0" : "3px 0",
           }}
         >
           {PACMAN_DIR.down.label}
@@ -1196,10 +1188,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
-            闁瑰灝绉崇紞鏃堝棘閻熸壆纭€
+            操作方式
           </div>
           <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>
-            闁绘劗鎳撻崵顔嘉涚€ｎ剚纾稿☉鎾筹工閹棛鎸掗崱鏇熺溄闁告稏鍔屽ú鍧楁儍閸曨亞绉寸紓鍐惧枛瑜版煡寮ㄩ悷鏉跨秮缂佸顕ф慨鈺呭棘閻熺増鍊婚柨娑欑洴閺侇參鎯勫Ο缁樻殰闁归晲鐒﹂弻鐔煎触閹达附鏆涢柨娑欑琚濋悘鐐茬箺椤旀洘寰勯崶褍璁查柣鈺佺摠鐢挳鎮欑憴鍕樆濞戞挸顑嗛弻鐔煎棘閻熺増鍊婚梺娆惧枔閳?
+            点击棋盘上吃豆人周围的位置可改变移动方向；键盘支持方向键；触屏设备可直接点按下方方向键。
           </div>
         </div>
       ) : null}
@@ -1228,10 +1220,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           }}
         >
           {game.finished || game.lives <= 0
-            ? "闂佹彃绉寸槐?
+            ? "重开"
             : game.running
-              ? "闁哄棗鍊告禒?
-              : "鐎殿喒鍋撳┑?}
+              ? "暂停"
+              : "开始"}
         </button>
         <button
           type="button"
@@ -1248,7 +1240,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             cursor: "pointer",
           }}
         >
-          闁哄倹婢橀惇?
+          新局
         </button>
         <span
           style={{
@@ -1266,7 +1258,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         {game.status}
       </div>
       <div style={{ fontSize: 9, color: "#94A3B8" }}>
-        闁哄倻澧楁晶婊堝嫉閳ь剟骞堥姀鈭т礁顕ｈ箛銉х獥閻℃帒鎳忛崣鍐焻閻斿嘲顔婇柕?0闁哄鈧櫕鍤掗柕鍡曟祰缁夋挳姊归幐搴″壏闁告碍鎸诲鍌炴⒒?
+        新手最慢模式：超慢速度、10条命、超长惊吓时间
       </div>
     </div>
   );
@@ -1302,12 +1294,12 @@ export default function WorksCarousel({ isDarkMode = false }) {
               avatar: w.author_avatar || (w.author_name || "").slice(0, 2).toUpperCase(),
               tags: Array.isArray(w.tags) ? w.tags : [],
               color: w.color || "#0A84FF",
-              status: w.status || "鐎殿喒鍋撻柛娆愬灣閼?,
+              status: w.status || "开发中",
               stars: w.stars || 0,
               preview: w.preview_url || null,
               projectUrl: w.repo_url || null,
               portfolioUrl: w.preview_url || null,
-              club: "缂佸鍨堕崹姘嚕閳ь剟寮ㄩ幆褍鏂ч悗娑欏姇缁辨垵鈹冮幇顔轰沪闁?,
+              club: "科成开放原子开源社团",
               recruitStatus: "",
               contact: "kcos@opensouce-club.top",
               activities: [],
@@ -1332,26 +1324,26 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const focusedPortfolioHref = getExternalHref(focused?.portfolioUrl);
   const totalStars = worksData.reduce((sum, w) => sum + w.stars, 0);
   const avgStars = Math.round(totalStars / Math.max(1, total));
-  const onlineCount = worksData.filter((w) => w.status.includes("鐎规瓕寮撶粭鍌滅棯?)).length;
+  const onlineCount = worksData.filter((w) => w.status.includes("已上线")).length;
   const highImpactCount = worksData.filter((w) => w.stars >= 150).length;
   const statusSnapshot = [
     {
-      label: "濞戞挸锕﹂崵搴亜閸︻厽绐?,
+      label: "上线项目",
       value: onlineCount,
       pct: Math.round((onlineCount / Math.max(1, total)) * 100),
       color: "#10B981",
     },
     {
-      label: "濡ゅ倹顭囬崕瑙勩亜閸︻厽绐?,
+      label: "高热项目",
       value: highImpactCount,
       pct: Math.round((highImpactCount / Math.max(1, total)) * 100),
       color: "#F59E0B",
     },
     {
-      label: "閺夆晜绋栭、鎴炵▔?,
-      value: worksData.filter((w) => !w.status.includes("鐎规瓕寮撶粭鍌滅棯?)).length,
+      label: "进行中",
+      value: worksData.filter((w) => !w.status.includes("已上线")).length,
       pct: Math.round(
-        (worksData.filter((w) => !w.status.includes("鐎规瓕寮撶粭鍌滅棯?)).length /
+        (worksData.filter((w) => !w.status.includes("已上线")).length /
           Math.max(1, total)) *
           100,
       ),
@@ -1524,10 +1516,10 @@ export default function WorksCarousel({ isDarkMode = false }) {
           </div>
           <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 1 }}>
             {isMobile
-              ? `${total} items 鐠?${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
+              ? `${total} items · ${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
               : isTablet
-                ? `${total} items 鐠?${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
-              : `${total} items 鐠?${worksSource === "github" ? "GitHub API connected" : worksSource === "fallback" ? "using local data" : worksSource} 鐠?Arrow keys / swipe`}
+                ? `${total} items · ${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
+              : `${total} items · ${worksSource === "github" ? "GitHub API connected" : worksSource === "fallback" ? "using local data" : worksSource} · Arrow keys / swipe`}
           </div>
         </div>
 

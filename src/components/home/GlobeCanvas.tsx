@@ -6,13 +6,17 @@ type GlobeCanvasProps = {
   size?: number;
 };
 
+type SceneRuntime = {
+  renderer?: { dispose: () => void } | null;
+};
+
 export default function GlobeCanvas({
   pulse = false,
   size = 260,
 }: GlobeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<number | null>(null);
-  const sceneRef = useRef<Record<string, unknown>>({});
+  const sceneRef = useRef<SceneRuntime>({});
 
   useEffect(() => {
     let THREE;
@@ -110,16 +114,7 @@ export default function GlobeCanvas({
       const particles = new THREE.Points(particleGeo, particleMat);
       scene.add(particles);
 
-      sceneRef.current = {
-        sphere,
-        outer,
-        ring,
-        ring2,
-        particles,
-        renderer,
-        scene,
-        camera,
-      };
+      sceneRef.current = { renderer };
 
       let t = 0;
       const animate = () => {
@@ -146,7 +141,9 @@ export default function GlobeCanvas({
 
     return () => {
       cleanup = true;
-      cancelAnimationFrame(frameRef.current);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+      }
       if (sceneRef.current.renderer) {
         const { renderer } = sceneRef.current;
         renderer.dispose();

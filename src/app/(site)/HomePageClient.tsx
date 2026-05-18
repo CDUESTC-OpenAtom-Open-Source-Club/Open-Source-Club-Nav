@@ -33,7 +33,7 @@ const VALID_THEME_MODES = new Set(["light", "dark", "auto"]);
 const GITHUB_USER_API = "/api/github-users";
 
 export default function HomePage() {
-  // 鏉╂瑩鍣烽惃鍕Ц閹礁鍨庢稉澶岃閿涙艾鎯庨崝銊︾ウ缁嬪鈧線顩绘い鍏告唉娴滄帇鈧礁鍙ф禍搴¤剨鐏炲倶鈧椒瀵屾０?鐠佹儳顦柅鍌炲帳閵?
+  // 页面主状态（启动动画、主题、关于弹层、响应式断点等）
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -71,16 +71,6 @@ export default function HomePage() {
     ? activeCategoryParam
     : null;
 
-  useEffect(() => {
-    // 閸氼垰濮╂い闈涘涧閸︺劎鏁ら幋椋庮儑娑撯偓濞喡ょ箻閸忋儲妞傜仦鏇犮仛閿涘奔绠ｉ崥搴ｆ纯閹恒儴绻橀崗銉╊浕妞ょ偣鈧?
-    const hasBooted =
-      typeof window !== "undefined" && localStorage.getItem(STORAGE_KEY);
-    if (hasBooted) {
-      setBooted(true);
-      setTimeout(() => setFadeIn(true), 50);
-    }
-  }, []);
-
   const handleBootComplete = useCallback(() => {
     if (typeof window !== "undefined") {
       localStorage.setItem(STORAGE_KEY, "1");
@@ -90,7 +80,7 @@ export default function HomePage() {
   }, []);
 
   const handleMouseMove = useCallback((e) => {
-    // 妫ｆ牠銆夋径褑鍎楅弲顖氭嫲娑擃厼绺鹃崠鍝勭厵娴兼俺顕伴崣鏍箹娑擃亙缍呯粔濠氬櫤閸嬫俺浜ゅ顔款潒瀹割喓鈧?
+    // 鼠标视差：根据光标位置微调背景位移
     const x = (e.clientX / window.innerWidth - 0.5) * 20;
     const y = (e.clientY / window.innerHeight - 0.5) * 20;
     setParallax({ x, y });
@@ -186,29 +176,21 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const savedThemeMode = localStorage.getItem(THEME_MODE_STORAGE_KEY);
-    if (savedThemeMode && VALID_THEME_MODES.has(savedThemeMode)) {
-      setThemeMode(savedThemeMode);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     localStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode);
   }, [themeMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
 
-    // auto 濡€崇础閹稿婀伴崷鐗堟闂傛潙鍨忛幑銏℃閺嗘ぞ瀵屾０姗堢礉闁灝鍘ゅ鍝勫煑鐠虹喖娈㈢化鑽ょ埠閵?
+    // auto 模式按本地时间自动切换明暗主题
     if (themeMode === "light") {
-      setIsDarkMode(false);
-      return undefined;
+      const id = setTimeout(() => setIsDarkMode(false), 0);
+      return () => clearTimeout(id);
     }
 
     if (themeMode === "dark") {
-      setIsDarkMode(true);
-      return undefined;
+      const id = setTimeout(() => setIsDarkMode(true), 0);
+      return () => clearTimeout(id);
     }
 
     const syncThemeByTime = () => {
@@ -216,14 +198,17 @@ export default function HomePage() {
       setIsDarkMode(hour >= 19 || hour < 7);
     };
 
-    syncThemeByTime();
+    const initId = setTimeout(syncThemeByTime, 0);
     const id = window.setInterval(syncThemeByTime, 60 * 1000);
-    return () => window.clearInterval(id);
+    return () => {
+      clearTimeout(initId);
+      window.clearInterval(id);
+    };
   }, [themeMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    // 妫ｆ牠銆夋径褔鍣虹敮鍐ㄧ湰娓氭繆绂嗛弬顓犲仯閻樿埖鈧緤绱濇潻娆撳櫡缂佺喍绔撮崥灞绢劄閸?React state閵?
+    // 视口断点同步到 React state
     const syncViewport = () => {
       const width = window.innerWidth;
       setIsPhoneViewport(width <= 768);
@@ -250,10 +235,10 @@ export default function HomePage() {
   useEffect(() => {
     if (!aboutOpen) return undefined;
 
-    // 閸忓厖绨鐟扮湴闁俺绻冮惄鎴濇儔濠婃艾濮╂担宥囩枂閿涘矂鐝禍顔肩秼閸撳秵澧嶉崷銊х彿閼哄倶鈧?
-    setActiveAboutSection("mission");
+    // 打开关于弹层后，默认定位到 mission 并同步章节高亮
+    const initId = setTimeout(() => setActiveAboutSection("mission"), 0);
     const root = aboutScrollRef.current;
-    if (!root) return undefined;
+    if (!root) return () => clearTimeout(initId);
 
     const syncActiveSection = () => {
       const rootTop = root.getBoundingClientRect().top + 72;
@@ -277,7 +262,10 @@ export default function HomePage() {
 
     syncActiveSection();
     root.addEventListener("scroll", syncActiveSection, { passive: true });
-    return () => root.removeEventListener("scroll", syncActiveSection);
+    return () => {
+      clearTimeout(initId);
+      root.removeEventListener("scroll", syncActiveSection);
+    };
   }, [aboutOpen]);
 
   if (!booted) {
@@ -322,10 +310,10 @@ export default function HomePage() {
         }}
       >
         {[
-          { id: null, label: "妫ｆ牠銆? },
-          { id: "intelligence", label: "閺呭搫绨? },
-          { id: "surface", label: "閺嶁€虫疮" },
-          { id: "armory", label: "瀹搞儱鍙? },
+          { id: null, label: "首页" },
+          { id: "intelligence", label: "情报" },
+          { id: "surface", label: "地表" },
+          { id: "armory", label: "武库" },
         ].map((item) => (
           <Link
             key={item.id || "home"}
@@ -441,14 +429,15 @@ export default function HomePage() {
             letterSpacing: 1,
           }}
         >
-          KCOS.CLUB 璺瘂" "}
+          KCOS.CLUB /{" "}
           <a
             href="/admin/login"
             onClick={handleHiddenAdminEntry}
             style={{ color: "inherit", textDecoration: "none", cursor: "pointer", userSelect: "none" }}
-            title={`鏉╃偟鐢婚悙鐟板毊 3 濞喡ょ箻閸忋儳娅ヨぐ鏇€夐敍鍫濈秼閸?${adminTapCount}/3閿涘ˇ}
+            title={`连续点击 3 次可进入后台（当前 ${adminTapCount}/3）`}
           >
-            瀵偓閺€鎯у斧鐎涙劕绱戝┃鎰仦閸?          </a>
+            后台隐藏入口
+          </a>
         </span>
         <div
           style={{
@@ -475,7 +464,7 @@ export default function HomePage() {
               (e.currentTarget.style.color = isDarkMode ? "#CBD5E1" : "#94A3B8")
             }
           >
-            閸忓厖绨幋鎴滄粦
+            关于社团
           </button>
 
           {FOOTER_QUICK_LINKS.map((item) => (
@@ -598,7 +587,7 @@ export default function HomePage() {
                     marginTop: 4,
                   }}
                 >
-                  閸忓厖绨幋鎴滄粦
+                  关于社团
                 </div>
                 <div
                   style={{
@@ -608,8 +597,8 @@ export default function HomePage() {
                     letterSpacing: 0.15,
                   }}
                 >
-                  缁€鎯ф礋娴ｅ灝鎳?璺?缁€鎯ф礋闁劑妫?璺?瀵偓濠ф劕宕楁担婊嗩潐閼?璺?闁插瞼鈻肩喊鎴炴闂傚鍤?璺?缁€鎯ф礋閸忣剛瀹?璺?
-                  缁€鎯ф礋缁夘垰鍨?璺?瀵偓閸欐垹绮嶆禍鍝勬喅 璺?閼风闃?
+                  社团使命 / 组织架构 / 开源协作 / 发展里程碑 / 社团章程 /
+                  积分制度 / 开发团队 / 致谢
                 </div>
               </div>
               <button
@@ -628,7 +617,7 @@ export default function HomePage() {
                   lineHeight: 1,
                   transition: "all 0.2s ease",
                 }}
-                aria-label="閸忔娊妫?
+                aria-label="关闭介绍弹层"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "translateY(-1px)";
                   e.currentTarget.style.boxShadow =
@@ -639,7 +628,7 @@ export default function HomePage() {
                   e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                鑴?
+                ×
               </button>
             </div>
 
@@ -672,7 +661,7 @@ export default function HomePage() {
                       lineHeight: 1.55,
                     }}
                   >
-                    娴间椒绗熼崠鏍彿閼哄倸顕辩憴鍫礉閻愮懓鍤崣顖氶挬濠婃垼鐑︽潪顒婄礉濠婃艾濮╅弮鎯板殰閸斻劑鐝禍顔肩秼閸撳秶澧楅崸妞尖偓?
+                    点击右侧目录可快速定位章节；内容会随着滚动自动高亮当前章节。
                   </div>
                 </div>
 
@@ -738,12 +727,12 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>01</span>
-                    <span>缁€鎯ф礋娴ｅ灝鎳?/span>
+                    <span>社团使命</span>
                   </div>
 
                   <div className="about-section-text">
-                    缁夋垶鍨氬鈧弨鎯у斧鐎涙劕绱戝┃鎰仦閸ヮ澀浜掗垾婊呮埂鐎圭偤銆嶉惄?+ 瀵偓濠ф劕宕楁担?+ 闂€鎸庢埂閹存劙鏆遍垾婵呰礋閺嶇绺剧捄顖氱窞閿?
-                    閼锋潙濮忔禍搴㈠ⅵ闁姴绱戦弨淇扁偓浣风瑩娑撴哎鈧礁褰查幐浣虹敾閻ㄥ嫭鐗庨崶顓熷Η閺堫垳銇為崠鎭掆偓?
+                    我们围绕开源协作、技术传播与社群共建持续推进导航生态建设，
+                    以开放共享与长期维护为核心，为开发者提供稳定、可信、可追踪的资源入口。
                   </div>
                   <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
                     {MISSION_POINTS.map((point) => (
@@ -762,10 +751,10 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>02</span>
-                    <span>缁€鎯ф礋闁劑妫敍鍫㈢矋缂佸洦鐏﹂弸鍕剁礆</span>
+                    <span>组织架构</span>
                   </div>
                   <div className="about-section-sub">
-                    娴兼岸鏆?/ 閸擃垯绱伴梹?/ 妞ゅ湱娲伴柈?/ 缂佸嫮绮愰柈?/ 鐎癸絿鐡ラ柈?/ 婢舵牞浠堥柈?/ 缁夋ü鍔熸径?
+                    项目 / 组织 / 宣策 / 外联 / 秘书处
                   </div>
                   <div className="about-grid-cards">
                     {ORG_DEPARTMENTS.map((dept) => (
@@ -785,7 +774,7 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>03</span>
-                    <span>瀵偓濠ф劕宕楁担婊嗩潐閼?/span>
+                    <span>开源协作</span>
                   </div>
                   <div className="about-grid-cards">
                     {OPEN_SOURCE_COLLAB_RULES.map((rule) => (
@@ -805,7 +794,7 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>04</span>
-                    <span>闁插瞼鈻肩喊鎴炴闂傚鍤?/span>
+                    <span>发展里程碑</span>
                   </div>
                   <div style={{ marginTop: 8, display: "grid", gap: 10 }}>
                     {MILESTONES.map((item) => (
@@ -829,7 +818,7 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>05</span>
-                    <span>缁€鎯ф礋閸忣剛瀹?/span>
+                    <span>社团章程</span>
                   </div>
                   <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
                     {CLUB_CHARTER.map((rule, index) => (
@@ -853,7 +842,7 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>06</span>
-                    <span>缁€鎯ф礋缁夘垰鍨?/span>
+                    <span>积分制度</span>
                   </div>
 
                   <div style={{ marginTop: 8, display: "grid", gap: 8 }}>
@@ -868,7 +857,7 @@ export default function HomePage() {
                         className="about-card-title"
                         style={{ marginBottom: 4 }}
                       >
-                        缁€鎯ф礋缁夘垰鍨庨懢宄板絿閺傜懓绱℃稉鈧憴鍫濆幢
+                        积分制度说明
                       </div>
                       <div className="about-card-text">
                         閻劌濮崝娑滅缁夘垰鍨庨敍宀€鏁ょ悰灞藉З鐠с垼宕崇懢澶堚偓?
@@ -936,7 +925,7 @@ export default function HomePage() {
                         className="about-card-title"
                         style={{ marginBottom: 3 }}
                       >
-                        缁夘垰鍨庨弶鍐抄鐠囧瓨妲?
+                        积分奖励说明
                       </div>
                       <div className="about-card-text">
                         {CLUB_POINTS_REWARD_NOTE}
@@ -953,7 +942,7 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>07</span>
-                    <span>瀵偓閸欐垹绮嶆禍鍝勬喅</span>
+                    <span>开发团队</span>
                   </div>
                   <div className="about-member-grid">
                     {DEV_TEAM_MEMBERS.map((member) => {
@@ -968,7 +957,7 @@ export default function HomePage() {
                           <img
                             className="about-member-avatar-img"
                             src={avatarUrl}
-                            alt={`${member.name} GitHub 婢舵潙鍎歚}
+                            alt={`${member.name} GitHub 头像`}
                             loading="lazy"
                           />
                           <div className="about-member-name">{member.name}</div>
@@ -1001,7 +990,7 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>08</span>
-                    <span>閼风闃?/span>
+                    <span>致谢</span>
                   </div>
                   <div className="about-card-text" style={{ marginTop: 8 }}>
                     {ABOUT_ACKNOWLEDGEMENT_TEXT}

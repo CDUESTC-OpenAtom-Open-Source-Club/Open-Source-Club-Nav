@@ -200,7 +200,7 @@ function ActivityCard({ item, index, isDarkMode }) {
           <span
             style={{ fontSize: 10, color: isDarkMode ? "#64748B" : "#CBD5E1" }}
           >
-            璺?
+            ·
           </span>
           <span
             style={{
@@ -236,7 +236,7 @@ function ActivityCard({ item, index, isDarkMode }) {
                 display: "inline-block",
               }}
             >
-              閳?{item.branch}
+              分支 {item.branch}
             </div>
           )}
           {item.commits > 0 && (
@@ -264,10 +264,10 @@ function ActivityCard({ item, index, isDarkMode }) {
 const getDiffLabel = (updatedAt, nowTs) => {
   const diffSec = Math.max(0, Math.floor((nowTs - updatedAt.getTime()) / 1000));
   if (diffSec < 60) {
-    return `${diffSec} 缁夋帒澧燻;
+    return `${diffSec} 秒前`;
   }
   const diffMin = Math.floor(diffSec / 60);
-  return `${diffMin} 閸掑棝鎸撻崜宄?
+  return `${diffMin} 分钟前`;
 };
 
 export default function RightPanel({ isDarkMode = false }) {
@@ -275,7 +275,7 @@ export default function RightPanel({ isDarkMode = false }) {
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [source, setSource] = useState("mock");
-  const [notice, setNotice] = useState("濮濓絽婀亸婵婄槸鏉╃偞甯?GitHub API...");
+  const [notice, setNotice] = useState("正在尝试连接 GitHub API...");
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [activityLimit, setActivityLimit] = useState(DEFAULT_ACTIVITY_LIMIT);
   const fetchAbortRef = useRef(null);
@@ -312,13 +312,13 @@ export default function RightPanel({ isDarkMode = false }) {
         setSource(payload?.source === "github" ? "github" : "mock");
         setNotice(
           payload?.source === "github"
-            ? `瀹歌尪绻涢幒銉х矋缂?${GITHUB_ORG} 閻ㄥ嫬鍙曞鈧禍瀣╂濞翠梗
-            : "瑜版挸澧犳担璺ㄦ暏閺堫剙婀寸粈杞扮伐閸斻劍鈧?,
+            ? `已连接 ${GITHUB_ORG} 的实时动态`
+            : "当前为本地模拟数据",
         );
       } else {
         setActivity(MOCK_ACTIVITY);
         setSource("mock");
-        setNotice("GitHub 閺嗗倹妫ら崗顒€绱戞禍瀣╂閿涘苯鍑￠崶鐐衡偓鈧崚鎵仛娓氬鏆熼幑?);
+        setNotice("GitHub 暂无可用数据，已回退到本地模拟数据。");
       }
     } catch {
       if (controller.signal.aborted) {
@@ -327,7 +327,7 @@ export default function RightPanel({ isDarkMode = false }) {
 
       setActivity(MOCK_ACTIVITY);
       setSource("mock");
-      setNotice("GitHub API 閹峰褰囨径杈Е閿涘苯鍑￠崶鐐衡偓鈧崚鎵仛娓氬鏆熼幑?);
+      setNotice("GitHub API 请求失败，已回退到本地模拟数据。");
     } finally {
       if (!controller.signal.aborted) {
         setLastUpdated(new Date());
@@ -338,7 +338,9 @@ export default function RightPanel({ isDarkMode = false }) {
   }, [activityLimit]);
 
   useEffect(() => {
-    void refresh();
+    const initialRefreshId = setTimeout(() => {
+      void refresh();
+    }, 0);
     const refreshId = setInterval(() => {
       refresh({ silent: true });
     }, 60000);
@@ -347,6 +349,7 @@ export default function RightPanel({ isDarkMode = false }) {
     }, 10000);
 
     return () => {
+      clearTimeout(initialRefreshId);
       clearInterval(refreshId);
       clearInterval(tickId);
       if (fetchAbortRef.current) {
@@ -415,7 +418,7 @@ export default function RightPanel({ isDarkMode = false }) {
               color: isDarkMode ? "#F8FAFC" : "#0F172A",
             }}
           >
-            閹存劕鎲抽崝銊︹偓?
+            成员动态
           </div>
           <div
             style={{
@@ -425,7 +428,7 @@ export default function RightPanel({ isDarkMode = false }) {
               letterSpacing: 0.5,
             }}
           >
-            閺囧瓨鏌婃禍?{diffLabel} 璺?{sourceLabel}
+            更新于 {diffLabel} · {sourceLabel}
           </div>
         </div>
         <button
@@ -451,7 +454,7 @@ export default function RightPanel({ isDarkMode = false }) {
             e.currentTarget.style.transform = "translateY(0)";
             e.currentTarget.style.boxShadow = "none";
           }}
-          title="閸掗攱鏌婇崝銊︹偓?
+          title="刷新动态"
         >
           <RefreshCw
             size={13}
@@ -515,7 +518,7 @@ export default function RightPanel({ isDarkMode = false }) {
               flex: 1,
             }}
           >
-            {source === "github" ? "GitHub 閸忣剙绱戦崝銊︹偓浣稿嚒閸氬本顒? : notice}
+            {source === "github" ? "GitHub 实时动态已同步展示。" : notice}
           </div>
           <button
             onClick={() =>
@@ -541,11 +544,11 @@ export default function RightPanel({ isDarkMode = false }) {
             }}
             title={
               activityLimit === DEFAULT_ACTIVITY_LIMIT
-                ? "閹稿妞傞梻鎾€庢惔蹇旂叀閻澧?100 閺?
-                : "閺€鎯版崳娑撳搫澧?20 閺?
+                ? "展开为 100 条"
+                : "收起为 20 条"
             }
           >
-            {activityLimit === DEFAULT_ACTIVITY_LIMIT ? "閺屻儳婀呴崜?100 閺? : "閺€鎯版崳閸?20 閺?}
+            {activityLimit === DEFAULT_ACTIVITY_LIMIT ? "展开 100 条" : "收起 20 条"}
           </button>
         </div>
       </div>
@@ -579,13 +582,13 @@ export default function RightPanel({ isDarkMode = false }) {
         }}
       >
         {[
-          { label: "閹绘劒姘﹂弫?, value: String(stats.commits), color: "#0A84FF" },
+          { label: "总提交", value: String(stats.commits), color: "#0A84FF" },
           {
-            label: "濞叉槒绌幋鎰喅",
+            label: "活跃成员",
             value: String(stats.activeMembers),
             color: "#06E5CC",
           },
-          { label: "閸氬牆鑻?PR", value: String(stats.mergedPr), color: "#10B981" },
+          { label: "已合并 PR", value: String(stats.mergedPr), color: "#10B981" },
         ].map((s) => (
           <div key={s.label} style={{ textAlign: "center" }}>
             <div

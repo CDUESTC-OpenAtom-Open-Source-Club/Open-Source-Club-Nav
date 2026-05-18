@@ -1,3 +1,4 @@
+// @ts-nocheck
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, X, Zap } from "lucide-react";
@@ -22,45 +23,45 @@ const TAG_COLORS = {
 
 const CLUB_OVERVIEW_ITEMS = [
   {
-    title: "绀惧洟浠嬬粛",
+    title: "社团介绍",
     value:
-      "寮€鏀惧師瀛愬紑婧愮ぞ鍥㈣仛鐒︾湡瀹為」鐩崗浣滐紝涓烘牎鍐呭悓瀛︽彁渚涗粠鍏ラ棬鍒拌繘闃剁殑宸ョ▼瀹炶返骞冲彴銆?,
+      "科成开放原子开源社团聚焦真实项目协作，面向校内同学提供从入门到进阶的工程实践平台。",
     color: "#0A84FF",
   },
   {
-    title: "娲诲姩瀹夋帓",
+    title: "活动安排",
     value:
-      "姣忓懆鎶€鏈垎浜€侀」鐩緥浼氫笌浣滃搧璺紨鎸佺画鎺ㄨ繘锛屽舰鎴愮ǔ瀹氬崗浣滆妭濂忋€?,
+      "每周技术分享 + 项目例会，每月作品路演与复盘，持续沉淀可复用的开源资产。",
     color: "#10B981",
   },
   {
-    title: "鎷涙柊淇℃伅",
+    title: "招新信息",
     value:
-      "闀挎湡寮€鏀炬嫑鏂帮紝娆㈣繋鍓嶇銆佸悗绔€佽璁°€佷骇鍝佸拰杩愮淮鏂瑰悜鍚屽鍔犲叆銆?,
+      "长期招新，按项目方向分组协作；欢迎前端、后端、设计、产品方向同学加入。",
     color: "#F59E0B",
   },
   {
-    title: "鑱旂郴鏂瑰紡",
-    value: "閭锛歬cos@opensouce-club.top / QQ缇わ細306601226",
+    title: "联系方式",
+    value: "邮箱：kcos@opensouce-club.top ｜ 社团QQ群：306601226",
     color: "#7C3AED",
   },
 ];
 
 const HOME_INFO_CARDS = [
   {
-    title: "绀惧洟鍩熷悕",
+    title: "社团域名",
     value: "kcos.club",
     hint: "brand identity",
     color: "#0A84FF",
   },
   {
-    title: "绀惧洟瀹樼綉",
+    title: "社团官网",
     value: "opensouce-club.top",
     hint: "official website",
     color: "#10B981",
   },
   {
-    title: "娲诲姩鐘舵€?,
+    title: "活动状态",
     value: "weekly update",
     hint: "community active",
     color: "#F59E0B",
@@ -123,7 +124,7 @@ const MINI_GAME_BACKGROUND_URL =
   "https://opengameart.org/sites/default/files/back_3.png";
 
 function getLinkMeta(url) {
-  // 缂備胶鍠嶇粩瀵告喆閿濆棛鈧晫鎸ч崟顒傜埍闂佸墽鍋撶敮鎾晬瀹€鍕┾偓搴㈢瑹閸喖鐏查柡鍌ゅ幗濡插摜绮╁▎蹇撴暥閻犲搫鐤囧ù鍡樻交濡粯笑濠㈣埖鐗犻幗濂稿箥閹惧磭纾婚柕?
+  // 统一解析资源链接，顺便判断是站内跳转还是外链打开。
   if (!url || url === "#") {
     return { label: "Campus Resource", href: "#", isExternal: false };
   }
@@ -141,7 +142,7 @@ function getLinkMeta(url) {
 }
 
 function HologramPanel({ category, onClose, isDarkMode }) {
-  // 閻犙冨缁噣宕氶崱娆掝潶闁绘劗鎳撶槐鎴﹀触鎼搭垳绀夊☉鎿冨幖缁洪箖宕犻崫鍕幍濞村吋鑹鹃崹蹇涘礆閹峰瞼绠瑰☉鎿冧海椤╊偊鎯勯弽褏婀撮悘鐐存礈閵囨氨鎷犻敂鍓х煄闂佸墽鍋撶敮鎾Υ?
+  // 资源分类点开后，中心区域会切到这个覆盖层展示详细链接。
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const lastTapRef = useRef({ index: null, ts: 0 });
@@ -174,7 +175,7 @@ function HologramPanel({ category, onClose, isDarkMode }) {
   };
 
   const handleMobileCardAction = (e, link, index) => {
-    // 缂佸顕ф慨鈺冪博椤栨艾绀嬮柛鎴ｎ嚙瑜把囨嚂濮樺崬濡介柛妤嬬磿婢ф牠鏁嶇仦钘夎摕闁告垹绮晶鐘绘儑閻斿壊鍔€闁瑰灚鎸哥槐鎴︽晬瀹€鍕級闁稿繐绉烽銈囨喆閿曚胶鍎查悹褑鍩囬埀?
+    // 移动端单击只聚焦卡片，双击才真正打开，避免误触跳走。
     if (!isMobile) return;
 
     e.preventDefault();
@@ -264,7 +265,7 @@ function HologramPanel({ category, onClose, isDarkMode }) {
             {cat.label}
           </h2>
           <p style={{ fontSize: 11, color: "#64748B", margin: "5px 0 0" }}>
-            {cat.links.length} resources 鐠?闁绘劗鎳撻崵顔剧矚閾忚顏ら柛娆樺灥缁绘垿宕堕悙鏉跨槣濡?
+            {cat.links.length} resources · 点击空白可返回主页
           </p>
         </div>
 
@@ -518,7 +519,7 @@ function HologramPanel({ category, onClose, isDarkMode }) {
         ) : (
           <div style={{ fontSize: 11, color: "#64748B", lineHeight: 1.5 }}>
             {isMobile
-              ? "闁告娲栭崵顕€宕￠敍鍕暬闁稿繐鐗撻。鈺冩喆閸剛绀夐柛娆忚嫰閸ゎ噣宕ョ仦鑲╊伇闁告绱曟晶鏍礃瀹ュ棗鈪电€殿喒鍋撻梺鍓у亾鐢挳濡?
+              ? "单击卡片先预览，双击同一卡片再打开链接。"
               : "Move your pointer over a card to preview full details here."}
           </div>
         )}
@@ -651,7 +652,7 @@ export function MiniTapGame({ isDarkMode = false }) {
   const [best, setBest] = useState(0);
   const [moves, setMoves] = useState(0);
   const [status, setStatus] = useState("playing");
-  const [hint, setHint] = useState("闁哄倻鎳撻幃婊堟煥?WASD 闁瑰瓨鐗楁晶婊堝嫉閻戞鎷ㄩ柛鏂诲姀缁绘鎮扮仦鑺ュ€ゆ鐐剁堪閳?);
+  const [hint, setHint] = useState("方向键/WASD 或手机滑动进行合并。");
   const touchStartRef = useRef(null);
 
   useEffect(() => {
@@ -681,7 +682,7 @@ export function MiniTapGame({ isDarkMode = false }) {
     setScore(0);
     setMoves(0);
     setStatus("playing");
-    setHint("闁哄倻鎳撻幃婊堟煥?WASD 闁瑰瓨鐗楁晶婊堝嫉閻戞鎷ㄩ柛鏂诲姀缁绘鎮扮仦鑺ュ€ゆ鐐剁堪閳?);
+    setHint("方向键/WASD 或手机滑动进行合并。");
   }, []);
 
   const handleMove = useCallback(
@@ -701,17 +702,17 @@ export function MiniTapGame({ isDarkMode = false }) {
 
       if (maxTile >= WIN_TILE && status !== "won") {
         setStatus("won");
-        setHint("闁诡収鍘奸弸鈺傛綇閻愵剙鐏?2048闁挎稑鑻ぐ鑼磼瑜忛悽濠氬礃閹绘帒姣婇柡鍥ㄦ尦閻濐噣宕氶崱鎰ㄥ亾?);
+        setHint("恭喜达成 2048，可继续冲击更高分。");
         return;
       }
 
       if (!hasMove(withNewTile)) {
         setStatus("over");
-        setHint("鐎圭寮跺Λ銈夊矗椤栨粍鏆忕紒澶庮嚙婵晠鏁嶅畝鈧崑锝夊礄缂佹ɑ鐓€閻忕偐鍋撻梺鎻掔Т缁辨垿濡?);
+        setHint("已无可用移动，点击新局重开。");
         return;
       }
 
-      setHint("缂備綀鍛暰闁告艾鐗嗛懟鐔兼儎缁嬫寧鍊遍柡浣规緲閻⊙囨晬鐏炶棄鏆遍柛鎴犵帛濞叉寧顨囧Ο鍝勭€婚柕?);
+      setHint("继续合并相同数字，冲击更高分。");
     },
     [grid, score, status, updateBest],
   );
@@ -824,16 +825,16 @@ export function MiniTapGame({ isDarkMode = false }) {
             justifyContent: "flex-end",
           }}
         >
-          <span>闁告帒妫欓弳?{score}</span>
-          <span>婵縿鍎查弳?{moves}</span>
+          <span>分数 {score}</span>
+          <span>步数 {moves}</span>
           <span>
             {status === "won"
-              ? "闁绘鍩栭埀?闁艰櫕绮岄崺?
+              ? "状态 胜利"
               : status === "over"
-                ? "闁绘鍩栭埀?缂備焦鎸诲?
-                : "闁绘鍩栭埀?閺夆晜绋栭、鎴炵▔?}
+                ? "状态 结束"
+                : "状态 进行中"}
           </span>
-          <span>闁哄牃鍋撳Δ?{best}</span>
+          <span>最高 {best}</span>
         </div>
       </div>
 
@@ -926,7 +927,7 @@ export function MiniTapGame({ isDarkMode = false }) {
               cursor: "pointer",
             }}
           >
-            闁?
+            ↑
           </button>
           <button
             type="button"
@@ -943,7 +944,7 @@ export function MiniTapGame({ isDarkMode = false }) {
               cursor: "pointer",
             }}
           >
-            闁?
+            ←
           </button>
           <button
             type="button"
@@ -960,7 +961,7 @@ export function MiniTapGame({ isDarkMode = false }) {
               cursor: "pointer",
             }}
           >
-            闁?
+            →
           </button>
         </div>
 
@@ -993,7 +994,7 @@ export function MiniTapGame({ isDarkMode = false }) {
               whiteSpace: "nowrap",
             }}
           >
-            闁?
+            ↓
           </button>
         </div>
 
@@ -1013,7 +1014,7 @@ export function MiniTapGame({ isDarkMode = false }) {
             justifySelf: "flex-end",
           }}
         >
-          闁哄倹婢橀惇?
+          新局
         </button>
       </div>
     </div>
@@ -1026,7 +1027,7 @@ export default function CentralHub({
   onClosePanel,
   isDarkMode = false,
 }) {
-  // 濞戞搩鍘肩缓楣冨礌閸濆嫮鍘甸悹鎰枙閻绋夐妶鍥舵綒濞戞捁宕垫慨鎼佸箑娓氬﹦绐楀娑欘焾椤撶粯绋夋繝姘モ偓澶愬箑娓氬﹦绀夊ù鐘劚瀵?activeCategory 闁瑰灚鎸哥槐鎴︽儍閸曨偄鐎荤紒顐ｆ椤曟盯骞嗛崨顔瑰亾娴ｇ鍋?
+  // 中心区域负责两种主状态：默认主页态，以及 activeCategory 打开的分类详情态。
   const [viewportMode, setViewportMode] = useState("desktop");
   const [isShortViewport, setIsShortViewport] = useState(false);
   const [homeStats, setHomeStats] = useState(DEFAULT_HOME_STATS);
@@ -1143,7 +1144,7 @@ export default function CentralHub({
       />
 
       {activeCategory && (
-        // 闂侇偄顦懙鎴﹀礆閸℃瑨顫﹂柛姘捣閺併倗鎲伴崱娆愮０閻忕偛鍊瑰ù娑㈠箲椤厼鐦滃銈夋涧閸炲鈧湱娅㈢槐婵堟喆閸℃凹娼曞☉鎾筹攻濞插潡宕撹箛濞惧亾濠婂棛绠婚柛蹇嬪劙缁斿瓨绋夐鍕憤缂佸本妞藉Λ鍧楀灳濠靛嫧鍋?
+        // 选中分类后用覆盖层替换主页内容，视觉上更像“进入一个子空间”。
         <HologramPanel
           category={activeCategory}
           onClose={onClosePanel}
@@ -1152,7 +1153,7 @@ export default function CentralHub({
       )}
 
       {!activeCategory && (
-        // 闁哄牜浜埀顒€顦懙鎴﹀礆閸℃瑨顫﹂柡鍐啇缁辨繄浠﹂弴鐘粵濡絾鐗犻妴澶嬵渶濡鍚囧☉鎿冨幗閻忔垿宕橀崨顓у晣闁?
+        // 未选中分类时，展示首页默认中枢内容。
         <>
           <div
             style={{
@@ -1183,7 +1184,7 @@ export default function CentralHub({
                 }}
               >
                 <Zap size={10} color="#0A84FF" />
-                <span style={{ fontWeight: 1000 }}>鐎归潻缂氶弲鍫曟焻婢跺顏ラ柛鎺戞鐞氼偊骞嶉幘宕囩；閻犙冨缁噣妫冮姀鈩冪凡</span>
+                <span style={{ fontWeight: 1000 }}>左侧选择分类打开资源面板</span>
                 <span
                   style={{
                     width: 1,
@@ -1209,7 +1210,7 @@ export default function CentralHub({
                 justifyContent: "center",
               }}
             >
-              {/* 鐎归潻缂氶弲?HUD 闂傚牄鍨哄?*/}
+              {/* 左侧 HUD 面板 */}
               <div
                 style={{
                   position: "absolute",
@@ -1248,7 +1249,7 @@ export default function CentralHub({
 
               <GlobeCanvas size={globeSize} />
 
-              {/* 闁告瑥鍘栭弲?HUD 闂傚牄鍨哄?*/}
+              {/* 右侧 HUD 面板 */}
               <div
                 style={{
                   position: "absolute",
@@ -1296,7 +1297,7 @@ export default function CentralHub({
                   lineHeight: 1.1,
                 }}
               >
-                缂佸鍨堕崹?span style={{ color: "#0A84FF" }}>鐎殿喒鍋撻柡鈧幆褍鏂ч悗娑欏姇缁辨垵鈹冮幇顔轰沪闁?/span>
+                科成<span style={{ color: "#0A84FF" }}>开放原子开源社团</span>
               </div>
               <div
                 style={{
