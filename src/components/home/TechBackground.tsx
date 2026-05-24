@@ -27,6 +27,13 @@ type Orbit = {
   opacity: number;
 };
 
+type GridPulse = {
+  x: number;
+  y: number;
+  phase: number;
+  amp: number;
+};
+
 export default function TechBackground() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -42,9 +49,19 @@ export default function TechBackground() {
     let particles: Particle[] = [];
     let dataStreams: DataStream[] = [];
     let orbits: Orbit[] = [];
+    let gridPulses: GridPulse[] = [];
     let time = 0;
 
-    const mouse = { x: 0, y: 0, active: false };
+    const mouse = {
+      x: 0,
+      y: 0,
+      targetX: 0,
+      targetY: 0,
+      prevX: 0,
+      prevY: 0,
+      speed: 0,
+      active: false,
+    };
 
     const resizeCanvas = () => {
       const rect = parent.getBoundingClientRect();
@@ -93,6 +110,22 @@ export default function TechBackground() {
           opacity: 0.2,
         });
       }
+
+      gridPulses = [];
+      const step = 40;
+      for (let x = 0; x <= canvas.width; x += step) {
+        for (let y = 0; y <= canvas.height; y += step) {
+          // Stable pulse dots instead of per-frame random flicker.
+          if (Math.random() > 0.935) {
+            gridPulses.push({
+              x,
+              y,
+              phase: Math.random() * Math.PI * 2,
+              amp: Math.random() * 0.08 + 0.02,
+            });
+          }
+        }
+      }
     };
 
     const drawGrid = () => {
@@ -115,15 +148,16 @@ export default function TechBackground() {
         ctx.stroke();
       }
 
-      for (let x = 0; x <= canvas.width; x += step) {
-        for (let y = 0; y <= canvas.height; y += step) {
-          if (Math.random() > 0.992) {
-            ctx.fillStyle = `rgba(59,130,246,${Math.sin(time * 2) * 0.1 + 0.08})`;
-            ctx.beginPath();
-            ctx.arc(x, y, 1, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
+      for (let i = 0; i < gridPulses.length; i += 1) {
+        const pulse = gridPulses[i];
+        const alpha = Math.max(
+          0,
+          Math.sin(time * 1.6 + pulse.phase) * pulse.amp + 0.05,
+        );
+        ctx.fillStyle = `rgba(59,130,246,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(pulse.x, pulse.y, 1, 0, Math.PI * 2);
+        ctx.fill();
       }
     };
 
@@ -182,6 +216,11 @@ export default function TechBackground() {
     };
 
     const updateAndDrawParticles = () => {
+      const speedFactor = Math.min(1, mouse.speed / 48);
+      const mouseInfluenceScale = 1 - speedFactor * 0.5;
+      const particleLinkScale = 1 - speedFactor * 0.7;
+      const mouseLinkScale = 1 - speedFactor * 0.75;
+
       particles.forEach((p1, i) => {
         if (mouse.active) {
           const dx = mouse.x - p1.x;
@@ -189,8 +228,8 @@ export default function TechBackground() {
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 120 && dist > 0.001) {
             const force = (120 - dist) / 120;
-            p1.x -= (dx / dist) * force * 2;
-            p1.y -= (dy / dist) * force * 2;
+            p1.x -= (dx / dist) * force * 2 * mouseInfluenceScale;
+            p1.y -= (dy / dist) * force * 2 * mouseInfluenceScale;
           }
         }
 
@@ -212,7 +251,7 @@ export default function TechBackground() {
             (mouse.x - p1.x) ** 2 + (mouse.y - p1.y) ** 2,
           );
           if (dist < 150) {
-            ctx.strokeStyle = `rgba(59,130,246,${0.12 * (1 - dist / 150)})`;
+            ctx.strokeStyle = `rgba(59,130,246,${0.12 * (1 - dist / 150) * mouseLinkScale})`;
             ctx.beginPath();
             ctx.moveTo(mouse.x, mouse.y);
             ctx.lineTo(p1.x, p1.y);
@@ -221,10 +260,11 @@ export default function TechBackground() {
         }
 
         for (let j = i + 1; j < particles.length; j += 1) {
+          if (particleLinkScale < 0.2 && (j + i) % 2 === 1) continue;
           const p2 = particles[j];
           const dist = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
           if (dist < 100) {
-            ctx.strokeStyle = `rgba(59,130,246,${0.08 * (1 - dist / 100)})`;
+            ctx.strokeStyle = `rgba(59,130,246,${0.08 * (1 - dist / 100) * particleLinkScale})`;
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
@@ -294,6 +334,16 @@ export default function TechBackground() {
     };
 
     const animate = () => {
+      // Smooth mouse follow to avoid jitter when pointer moves fast.
+      mouse.prevX = mouse.x;
+      mouse.prevY = mouse.y;
+      mouse.x += (mouse.targetX - mouse.x) * 0.2;
+      mouse.y += (mouse.targetY - mouse.y) * 0.2;
+      const dx = mouse.x - mouse.prevX;
+      const dy = mouse.y - mouse.prevY;
+      const instantSpeed = Math.sqrt(dx * dx + dy * dy);
+      mouse.speed += (instantSpeed - mouse.speed) * 0.18;
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       drawAtmosphericGlow();
       drawGrid();
@@ -307,8 +357,12 @@ export default function TechBackground() {
 
     const handlePointerMove = (event: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
-      mouse.x = event.clientX - rect.left;
-      mouse.y = event.clientY - rect.top;
+      mouse.targetX = event.clientX - rect.left;
+      mouse.targetY = event.clientY - rect.top;
+      if (!mouse.active) {
+        mouse.x = mouse.targetX;
+        mouse.y = mouse.targetY;
+      }
       mouse.active = true;
     };
 
@@ -318,7 +372,7 @@ export default function TechBackground() {
 
     const resizeObserver = new ResizeObserver(() => resizeCanvas());
     resizeObserver.observe(parent);
-    parent.addEventListener("mousemove", handlePointerMove);
+    parent.addEventListener("mousemove", handlePointerMove, { passive: true });
     parent.addEventListener("mouseleave", handlePointerLeave);
 
     resizeCanvas();

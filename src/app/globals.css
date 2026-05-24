@@ -110,6 +110,205 @@
   padding: 24px;
 }
 
+.admin-login-pro-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.admin-login-pro-media__gradient,
+.admin-login-pro-media__brandPattern,
+.admin-login-pro-media__halo {
+  position: absolute;
+  inset: 0;
+}
+
+.admin-login-pro-media__gradient {
+  background:
+    radial-gradient(circle at 16% 22%, rgba(96, 165, 250, 0.22), transparent 36%),
+    radial-gradient(circle at 78% 74%, rgba(59, 130, 246, 0.18), transparent 42%),
+    radial-gradient(circle at 50% 46%, rgba(34, 211, 238, 0.1), transparent 46%),
+    linear-gradient(150deg, #081124 0%, #0e1a32 45%, #142746 100%);
+}
+
+.admin-login-pro-media__brandPattern {
+  background-image: url("/images/branding/openatom-club-logo.svg");
+  background-repeat: repeat;
+  background-size: 104px 104px;
+  opacity: 0.06;
+  filter: grayscale(1) brightness(1.8);
+  animation: adminLoginPatternDrift 36s linear infinite;
+}
+
+.admin-login-pro-media__halo {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(125, 211, 252, 0.09), transparent 56%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.12), rgba(15, 23, 42, 0.58));
+  transform: scale(1.04);
+  animation: adminLoginBgBreath 24s ease-in-out infinite alternate;
+}
+
+.admin-login-pro-media__gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      115deg,
+      transparent 0 36px,
+      rgba(56, 189, 248, 0.08) 36px 38px,
+      transparent 38px 78px
+    );
+  opacity: 0.24;
+  animation: adminLoginScanFlow 11s linear infinite;
+}
+
+.admin-login-pro-cubefield {
+  position: absolute;
+  inset: 0;
+  perspective: 1400px;
+  perspective-origin: 50% 42%;
+  transform-style: preserve-3d;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.admin-login-pro-cube {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--cube-size);
+  height: var(--cube-size);
+  transform-style: preserve-3d;
+  transform:
+    translate3d(var(--cube-x), var(--cube-y), var(--cube-z))
+    rotateX(-20deg)
+    rotateY(35deg);
+}
+
+.admin-login-pro-cube__rotor {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  animation: adminLoginCubeSpin 36s linear infinite;
+  animation-delay: var(--cube-delay);
+}
+
+.admin-login-pro-cube .face {
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(191, 219, 254, 0.34);
+  box-shadow:
+    inset 0 0 0.5px rgba(219, 234, 254, 0.72),
+    inset 0 0 18px rgba(59, 130, 246, 0.2);
+  overflow: hidden;
+}
+
+.admin-login-pro-cube .face::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(239, 246, 255, 0.22), transparent 48%),
+    linear-gradient(180deg, rgba(125, 211, 252, 0.06), transparent 56%);
+}
+
+.admin-login-pro-cube .face::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(
+    110deg,
+    transparent 34%,
+    rgba(219, 234, 254, 0.24) 48%,
+    rgba(147, 197, 253, 0.3) 52%,
+    transparent 66%
+  );
+  transform: translateX(-120%) rotate(6deg);
+  animation: adminLoginCubeScan 7.8s ease-in-out infinite;
+  animation-delay: var(--cube-delay);
+}
+
+.admin-login-pro-cube--near {
+  opacity: 0.9;
+  filter: saturate(1.05);
+}
+
+.admin-login-pro-cube--mid {
+  opacity: 0.72;
+}
+
+.admin-login-pro-cube--far {
+  opacity: 0.5;
+  filter: saturate(0.9);
+}
+
+.admin-login-pro-cube .f-front {
+  transform: translateZ(calc(var(--cube-size) / 2));
+  background: linear-gradient(145deg, rgba(219, 234, 254, 0.72), rgba(147, 197, 253, 0.38));
+}
+.admin-login-pro-cube .f-back {
+  transform: rotateY(180deg) translateZ(calc(var(--cube-size) / 2));
+  background: linear-gradient(145deg, rgba(125, 211, 252, 0.2), rgba(96, 165, 250, 0.14));
+}
+.admin-login-pro-cube .f-right {
+  transform: rotateY(90deg) translateZ(calc(var(--cube-size) / 2));
+  background: linear-gradient(165deg, rgba(191, 219, 254, 0.52), rgba(96, 165, 250, 0.22));
+}
+.admin-login-pro-cube .f-left {
+  transform: rotateY(-90deg) translateZ(calc(var(--cube-size) / 2));
+  background: linear-gradient(165deg, rgba(219, 234, 254, 0.5), rgba(125, 211, 252, 0.2));
+}
+.admin-login-pro-cube .f-top {
+  transform: rotateX(90deg) translateZ(calc(var(--cube-size) / 2));
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.82), rgba(191, 219, 254, 0.3));
+}
+.admin-login-pro-cube .f-bottom {
+  transform: rotateX(-90deg) translateZ(calc(var(--cube-size) / 2));
+  background: linear-gradient(180deg, rgba(147, 197, 253, 0.16), rgba(96, 165, 250, 0.12));
+}
+
+.admin-login-pro-media::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+  background-size: 36px 36px;
+  opacity: 0.16;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.admin-login-pro-media::after {
+  content: "";
+  position: absolute;
+  inset: -22% -12%;
+  pointer-events: none;
+  opacity: 0.2;
+  background:
+    linear-gradient(145deg, rgba(147, 197, 253, 0.5), rgba(59, 130, 246, 0.28)) 8% 16% / 260px 180px no-repeat,
+    linear-gradient(145deg, rgba(191, 219, 254, 0.5), rgba(59, 130, 246, 0.26)) 70% 22% / 300px 210px no-repeat,
+    linear-gradient(145deg, rgba(147, 197, 253, 0.46), rgba(37, 99, 235, 0.24)) 18% 66% / 280px 190px no-repeat,
+    linear-gradient(145deg, rgba(191, 219, 254, 0.44), rgba(37, 99, 235, 0.22)) 74% 72% / 320px 220px no-repeat,
+    linear-gradient(325deg, rgba(219, 234, 254, 0.5) 0 42%, rgba(96, 165, 250, 0.15) 42% 100%) 8% 16% / 260px 180px no-repeat,
+    linear-gradient(325deg, rgba(219, 234, 254, 0.5) 0 42%, rgba(96, 165, 250, 0.15) 42% 100%) 70% 22% / 300px 210px no-repeat,
+    linear-gradient(325deg, rgba(219, 234, 254, 0.48) 0 42%, rgba(96, 165, 250, 0.14) 42% 100%) 18% 66% / 280px 190px no-repeat,
+    linear-gradient(325deg, rgba(219, 234, 254, 0.48) 0 42%, rgba(96, 165, 250, 0.14) 42% 100%) 74% 72% / 320px 220px no-repeat,
+    radial-gradient(ellipse at 50% 70%, rgba(37, 99, 235, 0.2), transparent 60%) 8% 20% / 260px 110px no-repeat,
+    radial-gradient(ellipse at 50% 70%, rgba(37, 99, 235, 0.2), transparent 60%) 70% 26% / 300px 120px no-repeat,
+    radial-gradient(ellipse at 50% 70%, rgba(37, 99, 235, 0.18), transparent 60%) 18% 70% / 280px 110px no-repeat,
+    radial-gradient(ellipse at 50% 70%, rgba(37, 99, 235, 0.18), transparent 60%) 74% 76% / 320px 130px no-repeat;
+  transform: perspective(1200px) rotateX(8deg) rotateY(-7deg) translate3d(0, 0, 0);
+  transform-origin: 50% 50%;
+  filter: blur(0.15px);
+  animation: adminLoginBlockFlow 32s linear infinite;
+}
+
 .admin-login-pro-topclose {
   position: fixed;
   top: 18px;
@@ -129,7 +328,7 @@
 
 .admin-login-pro-shell {
   width: min(440px, calc(100vw - 32px));
-  padding-top: 80px;
+  padding-top: 74px;
   position: relative;
 }
 
@@ -140,7 +339,7 @@
   transform: translateX(-50%);
   display: grid;
   justify-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .admin-login-pro-brand__logo {
@@ -182,23 +381,23 @@
 
 .admin-login-pro-brand__name {
   color: #ffffff;
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.35px;
   text-align: center;
 }
 
 .admin-login-pro-card {
   position: relative;
   width: 100%;
-  padding: 32px 32px 26px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 20px 40px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(20px);
+  padding: 28px 28px 22px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(203, 213, 225, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 18px 38px rgba(2, 8, 23, 0.42);
+  backdrop-filter: blur(16px);
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .admin-login-pro-close {
@@ -216,59 +415,59 @@
 }
 
 .admin-login-pro-card__eyebrow {
-  color: #b0b9cc;
-  font-size: 12px;
+  color: #c5cedf;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.16em;
 }
 
 .admin-login-pro-card__title {
   margin: 0;
   color: #ffffff;
-  font-size: 28px;
-  line-height: 1.15;
+  font-size: 25px;
+  line-height: 1.2;
   font-weight: 700;
 }
 
 .admin-login-pro-card__desc {
-  margin: -6px 0 0;
-  color: #7c879e;
-  font-size: 14px;
-  line-height: 1.7;
+  margin: -4px 0 0;
+  color: #a9b5cb;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .admin-login-pro-field {
   display: grid;
-  gap: 8px;
-  color: #b0b9cc;
-  font-size: 14px;
+  gap: 6px;
+  color: #c5cedf;
+  font-size: 13px;
 }
 
 .admin-login-pro-input {
   width: 100%;
-  height: 48px;
+  height: 46px;
   border-radius: 8px;
-  border: 1px solid #3d4a6b;
-  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: rgba(15, 23, 42, 0.36);
   color: #ffffff;
-  font-size: 16px;
-  padding: 0 16px;
+  font-size: 15px;
+  padding: 0 14px;
   transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background-color 0.2s ease-out;
 }
 
 .admin-login-pro-input::placeholder {
-  color: #7c879e;
+  color: #8d9bb4;
 }
 
 .admin-login-pro-input:hover {
-  border-color: #4d5a7b;
-  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(15, 23, 42, 0.48);
 }
 
 .admin-login-pro-input:focus {
-  border: 2px solid #2a6dff;
-  box-shadow: 0 0 0 4px rgba(42, 109, 255, 0.1);
-  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid #60a5fa;
+  box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.16);
+  background: rgba(15, 23, 42, 0.58);
 }
 
 .admin-login-pro-password {
@@ -314,14 +513,14 @@
 }
 
 .admin-login-pro-submit {
-  height: 52px;
+  height: 48px;
   border: 0;
   border-radius: 8px;
   background: linear-gradient(135deg, #2a6dff, #1a4fcc);
   color: #ffffff;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: 0.6px;
   cursor: pointer;
   transition: transform 0.15s ease-in-out, box-shadow 0.15s ease-in-out, background 0.15s ease-in-out;
 }
@@ -369,10 +568,10 @@
 }
 
 .admin-login-pro-note {
-  margin-top: -2px;
+  margin-top: 0;
   text-align: center;
-  color: #7c879e;
-  font-size: 12px;
+  color: #9aa9c2;
+  font-size: 11px;
 }
 
 .admin-login-pro-strength {
@@ -425,10 +624,10 @@
 }
 
 .admin-login-pro-copyright {
-  margin-top: -8px;
+  margin-top: -4px;
   text-align: center;
   font-size: 11px;
-  color: #7c879e;
+  color: #8695af;
   letter-spacing: 0.02em;
 }
 
@@ -452,6 +651,57 @@
 @keyframes adminLoginButtonRing {
   0% { background-position: 0% 50%; }
   100% { background-position: 200% 50%; }
+}
+
+@keyframes adminLoginBgBreath {
+  from { transform: scale(1.03) translate3d(0, 0, 0); }
+  to { transform: scale(1.09) translate3d(-1.2%, -0.8%, 0); }
+}
+
+@keyframes adminLoginPatternDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-80px, 60px, 0); }
+}
+
+@keyframes adminLoginScanFlow {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-110px, 70px, 0); }
+}
+
+@keyframes adminLoginBlockFlow {
+  from {
+    transform: perspective(1200px) rotateX(8deg) rotateY(-7deg) translate3d(0, 0, 0);
+  }
+  to {
+    transform: perspective(1200px) rotateX(8deg) rotateY(-7deg) translate3d(-90px, 40px, 0);
+  }
+}
+
+@keyframes adminLoginCubeSpin {
+  from {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg);
+  }
+  to {
+    transform: rotateX(360deg) rotateY(720deg) rotateZ(360deg);
+  }
+}
+
+@keyframes adminLoginCubeScan {
+  0%, 14% { transform: translateX(-120%) rotate(6deg); opacity: 0; }
+  20% { opacity: 0.5; }
+  42% { transform: translateX(120%) rotate(6deg); opacity: 0.18; }
+  100% { transform: translateX(120%) rotate(6deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-login-pro-media__brandPattern,
+  .admin-login-pro-media__halo,
+  .admin-login-pro-media::after,
+  .admin-login-pro-cube,
+  .admin-login-pro-cube__rotor,
+  .admin-login-pro-cube .face::after {
+    animation: none;
+  }
 }
 
 @media (max-width: 640px) {

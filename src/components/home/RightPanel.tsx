@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GitCommit,
@@ -18,6 +18,20 @@ import {
   MOCK_ACTIVITY,
 } from "@/data/githubActivity";
 
+type ActivityItem = {
+  id: string | number;
+  type: string;
+  color: string;
+  time: string;
+  message: string;
+  details?: string[];
+  actor: { avatar: string; login: string };
+  repo: string;
+  branch?: string | null;
+  commits?: number;
+  isMergedPr?: boolean;
+};
+
 const EVENT_ICONS = {
   PushEvent: GitCommit,
   PullRequestEvent: GitPullRequest,
@@ -36,9 +50,18 @@ const PANEL_WIDTH = "clamp(238px, 18vw, 296px)";
 const DEFAULT_ACTIVITY_LIMIT = 20;
 const EXPANDED_ACTIVITY_LIMIT = 100;
 
-function ActivityCard({ item, index, isDarkMode }) {
-  const Icon = EVENT_ICONS[item.type] || GitCommit;
-  const label = EVENT_TYPE_LABELS[item.type] || "EVENT";
+function ActivityCard({
+  item,
+  index,
+  isDarkMode,
+}: {
+  item: ActivityItem;
+  index: number;
+  isDarkMode: boolean;
+}) {
+  const Icon = EVENT_ICONS[item.type as keyof typeof EVENT_ICONS] || GitCommit;
+  const label =
+    EVENT_TYPE_LABELS[item.type as keyof typeof EVENT_TYPE_LABELS] || "EVENT";
 
   return (
     <div
@@ -144,7 +167,7 @@ function ActivityCard({ item, index, isDarkMode }) {
               gap: 4,
             }}
           >
-            {item.details.slice(0, 3).map((detail, detailIndex) => (
+            {item.details.slice(0, 3).map((detail: string, detailIndex: number) => (
               <div
                 key={`${item.id}-detail-${detailIndex}`}
                 style={{
@@ -192,20 +215,12 @@ function ActivityCard({ item, index, isDarkMode }) {
           >
             {item.actor.avatar}
           </div>
-          <span
-            style={{ fontSize: 10, color: isDarkMode ? "#94A3B8" : "#94A3B8" }}
-          >
-            {item.actor.login}
-          </span>
-          <span
-            style={{ fontSize: 10, color: isDarkMode ? "#64748B" : "#CBD5E1" }}
-          >
-            ·
-          </span>
+          <span style={{ fontSize: 10, color: "#94A3B8" }}>{item.actor.login}</span>
+          <span style={{ fontSize: 10, color: isDarkMode ? "#64748B" : "#CBD5E1" }}>路</span>
           <span
             style={{
               fontSize: 10,
-              color: isDarkMode ? "#94A3B8" : "#94A3B8",
+              color: "#94A3B8",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -215,19 +230,12 @@ function ActivityCard({ item, index, isDarkMode }) {
           </span>
         </div>
 
-        <div
-          style={{
-            marginTop: 4,
-            display: "flex",
-            gap: 4,
-            flexWrap: "wrap",
-          }}
-        >
+        <div style={{ marginTop: 4, display: "flex", gap: 4, flexWrap: "wrap" }}>
           {item.branch && (
             <div
               style={{
                 fontSize: 9,
-                color: isDarkMode ? "#94A3B8" : "#94A3B8",
+                color: "#94A3B8",
                 fontFamily: '"Courier New", monospace',
                 background: isDarkMode ? "#0F172A" : "#F8FAFC",
                 border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
@@ -239,7 +247,7 @@ function ActivityCard({ item, index, isDarkMode }) {
               分支 {item.branch}
             </div>
           )}
-          {item.commits > 0 && (
+          {(item.commits || 0) > 0 && (
             <div
               style={{
                 fontSize: 9,
@@ -252,7 +260,7 @@ function ActivityCard({ item, index, isDarkMode }) {
                 display: "inline-block",
               }}
             >
-              {item.commits} commit{item.commits > 1 ? "s" : ""}
+              {item.commits || 0} commit{(item.commits || 0) > 1 ? "s" : ""}
             </div>
           )}
         </div>
@@ -261,33 +269,29 @@ function ActivityCard({ item, index, isDarkMode }) {
   );
 }
 
-const getDiffLabel = (updatedAt, nowTs) => {
+const getDiffLabel = (updatedAt: Date, nowTs: number) => {
   const diffSec = Math.max(0, Math.floor((nowTs - updatedAt.getTime()) / 1000));
-  if (diffSec < 60) {
-    return `${diffSec} 秒前`;
-  }
+  if (diffSec < 60) return `${diffSec} 秒前`;
   const diffMin = Math.floor(diffSec / 60);
   return `${diffMin} 分钟前`;
 };
 
 export default function RightPanel({ isDarkMode = false }) {
-  const [activity, setActivity] = useState(MOCK_ACTIVITY);
+  const [activity, setActivity] = useState<ActivityItem[]>(
+    MOCK_ACTIVITY as ActivityItem[],
+  );
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [source, setSource] = useState("mock");
   const [notice, setNotice] = useState("正在尝试连接 GitHub API...");
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [activityLimit, setActivityLimit] = useState(DEFAULT_ACTIVITY_LIMIT);
-  const fetchAbortRef = useRef(null);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const refresh = useCallback(async ({ silent = false } = {}) => {
-    if (!silent) {
-      setLoading(true);
-    }
+    if (!silent) setLoading(true);
 
-    if (fetchAbortRef.current) {
-      fetchAbortRef.current.abort();
-    }
+    if (fetchAbortRef.current) fetchAbortRef.current.abort();
 
     const controller = new AbortController();
     fetchAbortRef.current = controller;
@@ -297,35 +301,30 @@ export default function RightPanel({ isDarkMode = false }) {
         method: "GET",
         signal: controller.signal,
       });
-      if (!response.ok) {
-        throw new Error(`activities ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`activities ${response.status}`);
+
       const payload = await response.json();
-      const items = Array.isArray(payload?.activities) ? payload.activities : [];
+      const items: ActivityItem[] = Array.isArray(payload?.activities)
+        ? (payload.activities as ActivityItem[])
+        : [];
+      if (controller.signal.aborted) return;
 
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      if (Array.isArray(items) && items.length > 0) {
-        setActivity(items);
+      if (items.length > 0) {
+        setActivity(items as ActivityItem[]);
         setSource(payload?.source === "github" ? "github" : "mock");
         setNotice(
           payload?.source === "github"
             ? `已连接 ${GITHUB_ORG} 的实时动态`
-            : "当前为本地模拟数据",
+            : "",
         );
       } else {
-        setActivity(MOCK_ACTIVITY);
+        setActivity(MOCK_ACTIVITY as ActivityItem[]);
         setSource("mock");
         setNotice("GitHub 暂无可用数据，已回退到本地模拟数据。");
       }
     } catch {
-      if (controller.signal.aborted) {
-        return;
-      }
-
-      setActivity(MOCK_ACTIVITY);
+      if (controller.signal.aborted) return;
+      setActivity(MOCK_ACTIVITY as ActivityItem[]);
       setSource("mock");
       setNotice("GitHub API 请求失败，已回退到本地模拟数据。");
     } finally {
@@ -352,32 +351,21 @@ export default function RightPanel({ isDarkMode = false }) {
       clearTimeout(initialRefreshId);
       clearInterval(refreshId);
       clearInterval(tickId);
-      if (fetchAbortRef.current) {
-        fetchAbortRef.current.abort();
-      }
+      if (fetchAbortRef.current) fetchAbortRef.current.abort();
     };
   }, [refresh]);
 
   const diffLabel = getDiffLabel(lastUpdated, nowTs);
-  const sourceLabel = source === "github" ? "LIVE" : "MOCK DATA";
+  const sourceLabel = source === "github" ? "实时数据" : "";
 
   const stats = useMemo(() => {
-    const commits = activity.reduce(
-      (sum, item) => sum + (item.commits || 0),
-      0,
-    );
-    const memberSet = new Set(
-      activity.map((item) => item.actor?.login).filter(Boolean),
-    );
+    const commits = activity.reduce((sum, item) => sum + (item.commits || 0), 0);
+    const memberSet = new Set(activity.map((item) => item.actor?.login).filter(Boolean));
     const mergedPr = activity.filter(
       (item) => item.type === "PullRequestEvent" && item.isMergedPr,
     ).length;
 
-    return {
-      commits,
-      activeMembers: memberSet.size,
-      mergedPr,
-    };
+    return { commits, activeMembers: memberSet.size, mergedPr };
   }, [activity]);
 
   return (
@@ -385,9 +373,7 @@ export default function RightPanel({ isDarkMode = false }) {
       style={{
         width: PANEL_WIDTH,
         minWidth: PANEL_WIDTH,
-        background: isDarkMode
-          ? "rgba(15,23,42,0.92)"
-          : "rgba(255,255,255,0.9)",
+        background: isDarkMode ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.9)",
         borderLeft: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
         display: "flex",
         flexDirection: "column",
@@ -403,32 +389,17 @@ export default function RightPanel({ isDarkMode = false }) {
           justifyContent: "space-between",
           position: "sticky",
           top: 0,
-          background: isDarkMode
-            ? "rgba(15,23,42,0.95)"
-            : "rgba(255,255,255,0.95)",
+          background: isDarkMode ? "rgba(15,23,42,0.95)" : "rgba(255,255,255,0.95)",
           backdropFilter: "blur(8px)",
           zIndex: 10,
         }}
       >
         <div>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: isDarkMode ? "#F8FAFC" : "#0F172A",
-            }}
-          >
+          <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? "#F8FAFC" : "#0F172A" }}>
             成员动态
           </div>
-          <div
-            style={{
-              fontSize: 9,
-              color: isDarkMode ? "#94A3B8" : "#94A3B8",
-              marginTop: 2,
-              letterSpacing: 0.5,
-            }}
-          >
-            更新于 {diffLabel} · {sourceLabel}
+          <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 2, letterSpacing: 0.5 }}>
+            更新于 {diffLabel} 路 {sourceLabel}
           </div>
         </div>
         <button
@@ -459,27 +430,19 @@ export default function RightPanel({ isDarkMode = false }) {
           <RefreshCw
             size={13}
             color={isDarkMode ? "#CBD5E1" : "#94A3B8"}
-            style={{
-              animation: loading ? "spin 0.8s linear infinite" : "none",
-            }}
+            style={{ animation: loading ? "spin 0.8s linear infinite" : "none" }}
           />
         </button>
       </div>
 
-      <div
-        style={{
-          padding: "8px 14px",
-          borderBottom: `1px solid ${isDarkMode ? "#334155" : "#F1F5F9"}`,
-        }}
-      >
+      <div style={{ padding: "8px 14px", borderBottom: `1px solid ${isDarkMode ? "#334155" : "#F1F5F9"}` }}>
         <div
           style={{
             display: "inline-flex",
             alignItems: "center",
             gap: 5,
             background: source === "github" ? "#F0FDF4" : "#FFF7ED",
-            border:
-              source === "github" ? "1px solid #BBF7D0" : "1px solid #FED7AA",
+            border: source === "github" ? "1px solid #BBF7D0" : "1px solid #FED7AA",
             borderRadius: 999,
             padding: "3px 8px",
             fontSize: 9,
@@ -500,25 +463,9 @@ export default function RightPanel({ isDarkMode = false }) {
           {sourceLabel}
         </div>
 
-        <div
-          style={{
-            marginTop: 6,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 9,
-              color: isDarkMode ? "#94A3B8" : "#94A3B8",
-              lineHeight: 1.4,
-              minWidth: 0,
-              flex: 1,
-            }}
-          >
-            {source === "github" ? "GitHub 实时动态已同步展示。" : notice}
+        <div style={{ marginTop: 6, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ fontSize: 9, color: "#94A3B8", lineHeight: 1.4, minWidth: 0, flex: 1 }}>
+            {source === "github" ? "GitHub 实时动态已同步显示。" : notice}
           </div>
           <button
             onClick={() =>
@@ -542,11 +489,7 @@ export default function RightPanel({ isDarkMode = false }) {
               flexShrink: 0,
               whiteSpace: "nowrap",
             }}
-            title={
-              activityLimit === DEFAULT_ACTIVITY_LIMIT
-                ? "展开为 100 条"
-                : "收起为 20 条"
-            }
+            title={activityLimit === DEFAULT_ACTIVITY_LIMIT ? "展开至 100 条" : "收起至 20 条"}
           >
             {activityLimit === DEFAULT_ACTIVITY_LIMIT ? "展开 100 条" : "收起 20 条"}
           </button>
@@ -564,12 +507,7 @@ export default function RightPanel({ isDarkMode = false }) {
         }}
       >
         {activity.map((item, i) => (
-          <ActivityCard
-            key={`${item.id}-${i}`}
-            item={item}
-            index={i}
-            isDarkMode={isDarkMode}
-          />
+          <ActivityCard key={`${item.id}-${i}`} item={item} index={i} isDarkMode={isDarkMode} />
         ))}
       </div>
 
@@ -583,11 +521,7 @@ export default function RightPanel({ isDarkMode = false }) {
       >
         {[
           { label: "总提交", value: String(stats.commits), color: "#0A84FF" },
-          {
-            label: "活跃成员",
-            value: String(stats.activeMembers),
-            color: "#06E5CC",
-          },
+          { label: "活跃成员", value: String(stats.activeMembers), color: "#06E5CC" },
           { label: "已合并 PR", value: String(stats.mergedPr), color: "#10B981" },
         ].map((s) => (
           <div key={s.label} style={{ textAlign: "center" }}>
@@ -601,15 +535,7 @@ export default function RightPanel({ isDarkMode = false }) {
             >
               {s.value}
             </div>
-            <div
-              style={{
-                fontSize: 9,
-                color: isDarkMode ? "#94A3B8" : "#94A3B8",
-                marginTop: 1,
-              }}
-            >
-              {s.label}
-            </div>
+            <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 1 }}>{s.label}</div>
           </div>
         ))}
       </div>

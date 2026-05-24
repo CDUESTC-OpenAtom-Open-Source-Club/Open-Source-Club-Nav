@@ -1,5 +1,4 @@
-// @ts-nocheck
-"use client";
+﻿"use client";
 import { useEffect, useRef, useState } from "react";
 import {
   Star,
@@ -13,14 +12,9 @@ import {
   Layers,
   Radar,
   Sparkles,
-  ExternalLink,
-  X,
 } from "lucide-react";
 import { WORKS } from "@/data/works";
 import TechBackground from "./TechBackground";
-
-const getExternalHref = (url) =>
-  typeof url === "string" && /^https?:\/\//i.test(url) ? url : null;
 
 const PACMAN_BEST_KEY = "kcos_pacman_best";
 const PACMAN_EASY = {
@@ -167,7 +161,7 @@ const createPacmanRound = ({
     frightenedTicks: 0,
     ghostCombo: 0,
     tick: 0,
-    status: `第 ${safeLevel}/${totalLevels} 关（新手最慢模式）`,
+    status: `绗?${safeLevel}/${totalLevels} 鍏筹紙鏂版墜鏈€鎱㈡ā寮忥級`,
   };
 };
 
@@ -416,7 +410,7 @@ function WorkCard({ work, style, isCenter, onClick }) {
         ...style,
       }}
       aria-label={`Focus ${work.title}`}
-      title={isCenter ? work.desc : "Click to bring to center"}
+      title={isCenter ? work.desc : "查看详情"}
     >
       <CardBody work={work} />
     </button>
@@ -613,17 +607,19 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
     if (typeof window === "undefined") return undefined;
     const stored = Number(localStorage.getItem(PACMAN_BEST_KEY) || 0);
     if (Number.isFinite(stored) && stored > 0) {
-      setBest(stored);
+      const id = setTimeout(() => setBest(stored), 0);
+      return () => clearTimeout(id);
     }
     return undefined;
   }, []);
 
   useEffect(() => {
     if (game.score <= best) return;
-    setBest(game.score);
+    const id = setTimeout(() => setBest(game.score), 0);
     if (typeof window !== "undefined") {
       localStorage.setItem(PACMAN_BEST_KEY, String(game.score));
     }
+    return () => clearTimeout(id);
   }, [best, game.score]);
 
   const setDirection = (dir) => {
@@ -729,7 +725,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           score += 50;
           frightenedTicks = PACMAN_EASY.frightenedTicks;
           ghostCombo = 0;
-          status = "能量豆！幽灵进入惊吓状态";
+          status = "能量豆触发，幽灵进入惊吓状态";
         }
 
         const levelIdx = Math.max(
@@ -786,7 +782,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             const ghostScore = 200 * 2 ** Math.min(3, ghostCombo);
             score += ghostScore;
             ghostCombo += 1;
-            status = `吃鬼 +${ghostScore}`;
+            status = `鍚冮 +${ghostScore}`;
             return {
               ...ghost,
               x: ghost.spawnX,
@@ -813,7 +809,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
               running: false,
               finished: true,
               tick: (Number(prev.tick) || 0) + 1,
-              status: "被幽灵抓到，游戏结束",
+              status: "琚菇鐏垫姄鍒帮紝娓告垙缁撴潫",
             };
           }
 
@@ -828,7 +824,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             running: true,
             finished: false,
             tick: (Number(prev.tick) || 0) + 1,
-            status: `损失 1 条命，剩余 ${lives} 条命`,
+            status: `鎹熷け 1 鏉″懡锛屽墿浣?${lives} 鏉″懡`,
           };
         }
 
@@ -846,7 +842,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
               frightenedTicks: 0,
               ghostCombo: 0,
               tick: (Number(prev.tick) || 0) + 1,
-              status: `三关通关！总分 ${score + 500}`,
+              status: `三关通关，总分 ${score + 500}`,
             };
           }
 
@@ -969,11 +965,9 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         }}
       >
         <span style={{ color: "#F59E0B", fontWeight: 700 }}>PAC-MAN</span>
-        <span>分 {game.score}</span>
-        <span>命 {game.lives}</span>
-        <span>
-          关 {game.level}/{game.totalLevels}
-        </span>
+        <span>分数 {game.score}</span>
+        <span>生命 {game.lives}</span>
+        <span>关卡 {game.level}/{game.totalLevels}</span>
       </div>
 
       <div
@@ -983,10 +977,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           padding: standalone ? 8 : 5,
           background: "#0F172A",
           display: "grid",
-          gridTemplateColumns: `repeat(${cellsX}, 1fr)`,
+          gridTemplateColumns: "repeat(" + cellsX + ", 1fr)",
           gap: 1,
           height: boardHeight,
-          aspectRatio: `${cellsX} / ${cellsY}`,
+          aspectRatio: String(cellsX) + " / " + String(cellsY),
           position: "relative",
         }}
       >
@@ -1188,10 +1182,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
-            操作方式
+            鎿嶄綔鏂瑰紡
           </div>
           <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>
-            点击棋盘上吃豆人周围的位置可改变移动方向；键盘支持方向键；触屏设备可直接点按下方方向键。
+            鐐瑰嚮妫嬬洏涓婂悆璞嗕汉鍛ㄥ洿鐨勪綅缃彲鏀瑰彉绉诲姩鏂瑰悜锛涢敭鐩樻敮鎸佹柟鍚戦敭锛涜Е灞忚澶囧彲鐩存帴鐐规寜涓嬫柟鏂瑰悜閿€?
           </div>
         </div>
       ) : null}
@@ -1258,7 +1252,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         {game.status}
       </div>
       <div style={{ fontSize: 9, color: "#94A3B8" }}>
-        新手最慢模式：超慢速度、10条命、超长惊吓时间
+        鏂版墜鏈€鎱㈡ā寮忥細瓒呮參閫熷害銆?0鏉″懡銆佽秴闀挎儕鍚撴椂闂?
       </div>
     </div>
   );
@@ -1279,7 +1273,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const touchStartRef = useRef(null);
 
   useEffect(() => {
-    let abortRef = new AbortController();
+    const abortRef = new AbortController();
 
     const fetchWorks = () => {
       fetch("/api/works", { signal: abortRef.signal })
@@ -1321,35 +1315,9 @@ export default function WorksCarousel({ isDarkMode = false }) {
 
   const total = worksData.length;
   const focused = worksData[currentIndex];
-  const focusedPortfolioHref = getExternalHref(focused?.portfolioUrl);
-  const totalStars = worksData.reduce((sum, w) => sum + w.stars, 0);
+    const totalStars = worksData.reduce((sum, w) => sum + w.stars, 0);
   const avgStars = Math.round(totalStars / Math.max(1, total));
   const onlineCount = worksData.filter((w) => w.status.includes("已上线")).length;
-  const highImpactCount = worksData.filter((w) => w.stars >= 150).length;
-  const statusSnapshot = [
-    {
-      label: "上线项目",
-      value: onlineCount,
-      pct: Math.round((onlineCount / Math.max(1, total)) * 100),
-      color: "#10B981",
-    },
-    {
-      label: "高热项目",
-      value: highImpactCount,
-      pct: Math.round((highImpactCount / Math.max(1, total)) * 100),
-      color: "#F59E0B",
-    },
-    {
-      label: "进行中",
-      value: worksData.filter((w) => !w.status.includes("已上线")).length,
-      pct: Math.round(
-        (worksData.filter((w) => !w.status.includes("已上线")).length /
-          Math.max(1, total)) *
-          100,
-      ),
-      color: "#0A84FF",
-    },
-  ];
   const topTags = Object.entries(
     worksData.reduce((acc, work) => {
       work.tags.forEach((tag) => {
@@ -1405,8 +1373,10 @@ export default function WorksCarousel({ isDarkMode = false }) {
 
   useEffect(() => {
     if (isMobile) {
-      setAutoPlay(false);
+      const id = setTimeout(() => setAutoPlay(false), 0);
+      return () => clearTimeout(id);
     }
+    return undefined;
   }, [isMobile]);
 
   useEffect(() => {
@@ -1516,10 +1486,10 @@ export default function WorksCarousel({ isDarkMode = false }) {
           </div>
           <div style={{ fontSize: 10, color: "#94A3B8", marginTop: 1 }}>
             {isMobile
-              ? `${total} items · ${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
+              ? `${total} items 路 ${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
               : isTablet
-                ? `${total} items · ${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
-              : `${total} items · ${worksSource === "github" ? "GitHub API connected" : worksSource === "fallback" ? "using local data" : worksSource} · Arrow keys / swipe`}
+                ? `${total} items 路 ${worksSource === "github" ? "GitHub API" : worksSource === "fallback" ? "local data" : worksSource}`
+              : `${total} items 路 ${worksSource === "github" ? "GitHub 数据源" : worksSource === "fallback" ? "本地数据源" : worksSource} 路 键盘与触控支持`}
           </div>
         </div>
 
@@ -1544,7 +1514,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   opacity: viewMode === "carousel" ? 1 : 0.45,
                   transition: "all 0.18s ease",
                 }}
-                aria-label="Previous work"
+                aria-label="上一项作品"
                 title="Previous"
                 onMouseEnter={(e) => {
                   if (viewMode === "carousel") {
@@ -1896,7 +1866,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
               backdropFilter: "blur(8px)",
               transition: "all 0.18s ease",
             }}
-            aria-label="Previous"
+            aria-label="上一项"
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-50%) scale(1.03)";
               e.currentTarget.style.boxShadow =
@@ -1932,7 +1902,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
               backdropFilter: "blur(8px)",
               transition: "all 0.18s ease",
             }}
-            aria-label="Next"
+            aria-label="下一项"
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-50%) scale(1.03)";
               e.currentTarget.style.boxShadow =
@@ -1977,7 +1947,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   padding: 0,
                   transition: "transform 0.18s ease",
                 }}
-                aria-label={`Go to ${work.title}`}
+                aria-label={`切换到${work.title}`}
                 title={work.title}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = "translateY(-1px)";
@@ -2032,7 +2002,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
               textAlign: "center",
             }}
           >
-            Swipe left or right to browse works
+            左右滑动查看作品
           </div>
 
           <MobileWorkCard work={worksData[currentIndex]} />
@@ -2062,7 +2032,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 cursor: "pointer",
                 transition: "all 0.18s ease",
               }}
-              aria-label="Previous work"
+              aria-label="上一项作品"
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-1px)";
                 e.currentTarget.style.boxShadow =
@@ -2105,7 +2075,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                     justifyContent: "center",
                     transition: "transform 0.18s ease",
                   }}
-                  aria-label={`Go to ${work.title}`}
+                  aria-label={`切换到${work.title}`}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = "translateY(-1px)";
                   }}
@@ -2181,3 +2151,6 @@ export default function WorksCarousel({ isDarkMode = false }) {
     </div>
   );
 }
+
+
+

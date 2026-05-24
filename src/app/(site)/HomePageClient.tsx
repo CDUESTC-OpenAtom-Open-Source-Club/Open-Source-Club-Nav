@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
+﻿/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   CentralHub,
@@ -37,24 +36,13 @@ export default function HomePage() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [booted, setBooted] = useState(
-    () =>
-      typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY)),
-  );
-  const [fadeIn, setFadeIn] = useState(
-    () =>
-      typeof window !== "undefined" && Boolean(localStorage.getItem(STORAGE_KEY)),
-  );
+  const [booted, setBooted] = useState(false);
+  const [fadeIn, setFadeIn] = useState(false);
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [aboutOpen, setAboutOpen] = useState(false);
   const [activeAboutSection, setActiveAboutSection] = useState("mission");
-  const [themeMode, setThemeMode] = useState(() => {
-    if (typeof window === "undefined") return "auto";
-    const savedThemeMode = localStorage.getItem(THEME_MODE_STORAGE_KEY);
-    return savedThemeMode && VALID_THEME_MODES.has(savedThemeMode)
-      ? savedThemeMode
-      : "auto";
-  });
+  const [themeMode, setThemeMode] = useState("auto");
+  const [clientPrefsReady, setClientPrefsReady] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isTabletViewport, setIsTabletViewport] = useState(false);
@@ -100,19 +88,6 @@ export default function HomePage() {
     });
   }, [pathname, router, searchParams]);
 
-  const buildCategoryHref = useCallback((catId) => {
-    const nextParams = new URLSearchParams(searchParams.toString());
-    if (catId) {
-      nextParams.set("section", catId);
-    } else {
-      nextParams.delete("section");
-    }
-    const nextQuery = nextParams.toString();
-    return nextQuery
-      ? { pathname, query: Object.fromEntries(nextParams.entries()) }
-      : pathname;
-  }, [pathname, searchParams]);
-
   const handleHiddenAdminEntry = useCallback((event) => {
     event.preventDefault();
     setAdminTapCount((prev) => {
@@ -137,7 +112,7 @@ export default function HomePage() {
   }, [router]);
 
   const scrollToAboutSection = useCallback((sectionId) => {
-    // 閸忓厖绨鐟扮湴閸愬懘鍎存稉宥嗘Ц鐠侯垳鏁遍崚鍥ㄥ床閿涘矁鈧本妲稿姘З閸掓澘顕惔?section閵?
+    // 点击侧栏目录后，平滑滚动到对应章节
     const root = aboutScrollRef.current;
     const target = aboutSectionRefs.current[sectionId];
     if (!root || !target) return;
@@ -176,8 +151,29 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+
+    const hydrateId = window.setTimeout(() => {
+      const hasBooted = Boolean(localStorage.getItem(STORAGE_KEY));
+      if (hasBooted) {
+        setBooted(true);
+        setFadeIn(true);
+      }
+
+      const savedThemeMode = localStorage.getItem(THEME_MODE_STORAGE_KEY);
+      if (savedThemeMode && VALID_THEME_MODES.has(savedThemeMode)) {
+        setThemeMode(savedThemeMode);
+      }
+
+      setClientPrefsReady(true);
+    }, 0);
+
+    return () => window.clearTimeout(hydrateId);
+  }, []);
+
+  useEffect(() => {
+    if (!clientPrefsReady || typeof window === "undefined") return;
     localStorage.setItem(THEME_MODE_STORAGE_KEY, themeMode);
-  }, [themeMode]);
+  }, [clientPrefsReady, themeMode]);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -208,7 +204,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    // 视口断点同步到 React state
+    // 瑙嗗彛鏂偣鍚屾鍒?React state
     const syncViewport = () => {
       const width = window.innerWidth;
       setIsPhoneViewport(width <= 768);
@@ -295,74 +291,6 @@ export default function HomePage() {
       />
 
       <div
-        className="xl:hidden"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          padding: "8px 16px",
-          borderBottom: "1px solid #E5E7EB",
-          background: isDarkMode
-            ? "rgba(15,23,42,0.95)"
-            : "rgba(255,255,255,0.95)",
-          overflowX: "auto",
-          flexShrink: 0,
-        }}
-      >
-        {[
-          { id: null, label: "首页" },
-          { id: "intelligence", label: "情报" },
-          { id: "surface", label: "地表" },
-          { id: "armory", label: "武库" },
-        ].map((item) => (
-          <Link
-            key={item.id || "home"}
-            href={buildCategoryHref(item.id)}
-            replace
-            scroll={false}
-            data-ui-touch="true"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-              padding: "5px 12px",
-              borderRadius: 999,
-              border: `1px solid ${activeCategory === item.id
-                ? isDarkMode
-                  ? "#38BDF840"
-                  : "#0A84FF40"
-                : isDarkMode
-                  ? "#334155"
-                  : "#E5E7EB"
-                }`,
-              background:
-                activeCategory === item.id
-                  ? isDarkMode
-                    ? "rgba(10,132,255,0.18)"
-                    : "#EFF6FF"
-                  : "transparent",
-              fontSize: 12,
-              fontWeight: activeCategory === item.id ? 600 : 400,
-              color:
-                activeCategory === item.id
-                  ? "#0A84FF"
-                  : isDarkMode
-                    ? "#94A3B8"
-                    : "#64748B",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "all 0.15s",
-              textDecoration: "none",
-              touchAction: "manipulation",
-            }}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </div>
-
-      <div
         style={{
           flex: 1,
           display: "flex",
@@ -436,7 +364,7 @@ export default function HomePage() {
             style={{ color: "inherit", textDecoration: "none", cursor: "pointer", userSelect: "none" }}
             title={`连续点击 3 次可进入后台（当前 ${adminTapCount}/3）`}
           >
-            后台隐藏入口
+            开放原子开源社团
           </a>
         </span>
         <div
@@ -464,7 +392,7 @@ export default function HomePage() {
               (e.currentTarget.style.color = isDarkMode ? "#CBD5E1" : "#94A3B8")
             }
           >
-            关于社团
+            关于我们
           </button>
 
           {FOOTER_QUICK_LINKS.map((item) => (
@@ -589,17 +517,6 @@ export default function HomePage() {
                 >
                   关于社团
                 </div>
-                <div
-                  style={{
-                    marginTop: 4,
-                    fontSize: 12,
-                    color: "#64748B",
-                    letterSpacing: 0.15,
-                  }}
-                >
-                  社团使命 / 组织架构 / 开源协作 / 发展里程碑 / 社团章程 /
-                  积分制度 / 开发团队 / 致谢
-                </div>
               </div>
               <button
                 type="button"
@@ -634,37 +551,6 @@ export default function HomePage() {
 
             <div className="about-layout">
               <aside className="about-sidebar">
-                <div
-                  style={{
-                    border: "1px solid #DBEAFE",
-                    borderRadius: 14,
-                    background: "#FFFFFF",
-                    padding: "12px 12px 10px",
-                    marginBottom: 10,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#0A84FF",
-                      fontWeight: 700,
-                      letterSpacing: 1.2,
-                    }}
-                  >
-                    CONTENT NAVIGATION
-                  </div>
-                  <div
-                    style={{
-                      marginTop: 5,
-                      fontSize: 12,
-                      color: "#475569",
-                      lineHeight: 1.55,
-                    }}
-                  >
-                    点击右侧目录可快速定位章节；内容会随着滚动自动高亮当前章节。
-                  </div>
-                </div>
-
                 <div className="about-nav">
                   {ABOUT_SECTION_NAV.map((item) => {
                     const isActive = activeAboutSection === item.id;
@@ -676,7 +562,9 @@ export default function HomePage() {
                         onClick={() => scrollToAboutSection(item.id)}
                         style={{
                           width: "100%",
-                          border: `1px solid ${isActive ? "#93C5FD" : "#E5E7EB"}`,
+                          border: isActive
+                            ? "1px solid #93C5FD"
+                            : "1px solid #E5E7EB",
                           background: isActive
                             ? "#EFF6FF"
                             : "rgba(255,255,255,0.92)",
@@ -731,7 +619,7 @@ export default function HomePage() {
                   </div>
 
                   <div className="about-section-text">
-                    我们围绕开源协作、技术传播与社群共建持续推进导航生态建设，
+                    我们围绕开源协作、技术传播与社群共建，持续推进导航生态建设，
                     以开放共享与长期维护为核心，为开发者提供稳定、可信、可追踪的资源入口。
                   </div>
                   <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
@@ -860,7 +748,7 @@ export default function HomePage() {
                         积分制度说明
                       </div>
                       <div className="about-card-text">
-                        閻劌濮崝娑滅缁夘垰鍨庨敍宀€鏁ょ悰灞藉З鐠с垼宕崇懢澶堚偓?
+                        通过公开、透明、可追踪的积分体系，鼓励成员在内容建设、代码贡献与社群协作中持续投入。
                       </div>
                     </div>
 
@@ -957,7 +845,7 @@ export default function HomePage() {
                           <img
                             className="about-member-avatar-img"
                             src={avatarUrl}
-                            alt={`${member.name} GitHub 头像`}
+                            alt={`${member.name} GitHub 澶村儚`}
                             loading="lazy"
                           />
                           <div className="about-member-name">{member.name}</div>
@@ -990,7 +878,7 @@ export default function HomePage() {
                 >
                   <div className="about-section-head">
                     <span>08</span>
-                    <span>致谢</span>
+                    <span>鑷磋阿</span>
                   </div>
                   <div className="about-card-text" style={{ marginTop: 8 }}>
                     {ABOUT_ACKNOWLEDGEMENT_TEXT}

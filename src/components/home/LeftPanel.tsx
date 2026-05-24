@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import {
   Brain,
   MapPin,
@@ -7,9 +7,10 @@ import {
   ExternalLink,
   Gamepad2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { RESOURCE_CATEGORIES } from "@/data/resources";
 
-const ICON_MAP = { Brain, MapPin, Wrench };
+const ICON_MAP: Record<string, LucideIcon> = { Brain, MapPin, Wrench };
 
 const FRIEND_LINKS = [
   { title: "电子科技大学成都学院", url: "https://www.cduestc.fun/" },
@@ -89,7 +90,7 @@ export default function LeftPanel({
             whiteSpace: "nowrap",
           }}
         >
-          资源矩阵
+          璧勬簮鐭╅樀
         </span>
         <div style={{ flex: 1, height: 1, background: "#E5E7EB" }} />
       </div>
@@ -234,7 +235,7 @@ export default function LeftPanel({
             marginBottom: 6,
           }}
         >
-          友情链接
+          鍙嬫儏閾炬帴
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -318,7 +319,7 @@ export default function LeftPanel({
                   textOverflow: "ellipsis",
                 }}
               >
-                吃豆人小游戏
+                鍚冭眴浜哄皬娓告垙
               </span>
             </span>
             <ChevronRight size={12} color="#0A84FF" />

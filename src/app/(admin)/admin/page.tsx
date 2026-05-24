@@ -1,7 +1,8 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+const MOCK_MODE = true;
 
 type AdminUser = {
   id: number;
@@ -41,10 +42,40 @@ type LinkLog = {
 const baseSections = [
   { id: "overview", label: "首页" },
   { id: "links", label: "内容管理" },
-  { id: "popular", label: "热门分类" },
+  { id: "popular", label: "热门仓库" },
   { id: "health", label: "健康检测" },
   { id: "logs", label: "操作日志" },
 ] as const;
+
+const MOCK_USER = { id: 1, username: "demo-admin", role: "super" as const };
+const MOCK_LINKS: LinkItem[] = [
+  { id: 1, title: "React 官方文档", url: "https://react.dev", description: "React 学习入口", sort: 1, active: 1 },
+  { id: 2, title: "Next.js 官方文档", url: "https://nextjs.org/docs", description: "Next.js 文档", sort: 2, active: 1 },
+  { id: 3, title: "OpenAtom 开源社团仓库", url: "https://github.com/openatom", description: "社团相关项目", sort: 3, active: 1 },
+];
+const MOCK_USERS: AdminUser[] = [
+  { id: 1, username: "demo-admin", role: "super", created_at: "2026-05-01T09:00:00", last_login_at: "2026-05-24T09:42:12" },
+  { id: 2, username: "editor-a", role: "editor", created_at: "2026-05-10T14:20:00", last_login_at: "2026-05-23T20:30:02" },
+];
+const MOCK_STATS: StatDay[] = [
+  { stat_date: "2026-05-24", page_views: 1560, unique_visitors: 432, link_clicks: 318 },
+];
+const MOCK_TREND7 = [
+  { stat_date: "2026-05-18", link_clicks: 96 },
+  { stat_date: "2026-05-19", link_clicks: 112 },
+  { stat_date: "2026-05-20", link_clicks: 84 },
+  { stat_date: "2026-05-21", link_clicks: 138 },
+  { stat_date: "2026-05-22", link_clicks: 126 },
+  { stat_date: "2026-05-23", link_clicks: 174 },
+  { stat_date: "2026-05-24", link_clicks: 161 },
+];
+const MOCK_POPULAR = [
+  { category: "https://github.com/facebook/react", clicks: 174 },
+  { category: "https://nextjs.org/docs", clicks: 161 },
+  { category: "https://react.dev/learn", clicks: 126 },
+  { category: "https://github.com/openatom", clicks: 112 },
+  { category: "https://nodejs.org/docs/latest/api/", clicks: 84 },
+];
 
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
   const text = await res.text();
@@ -76,6 +107,53 @@ function formatLogDetail(detail: unknown): string {
     }
   }
   return String(detail);
+}
+
+function getActionTag(action: string): { text: string; fg: string; bg: string } {
+  const raw = String(action || "").toLowerCase();
+  if (raw.includes("create") || raw.includes("add") || raw.includes("新增")) {
+    return { text: "新增", fg: "#0F766E", bg: "#CCFBF1" };
+  }
+  if (raw.includes("update") || raw.includes("edit") || raw.includes("修改")) {
+    return { text: "修改", fg: "#1D4ED8", bg: "#DBEAFE" };
+  }
+  if (raw.includes("delete") || raw.includes("remove") || raw.includes("删除")) {
+    return { text: "删除", fg: "#B91C1C", bg: "#FEE2E2" };
+  }
+  if (raw.includes("disable") || raw.includes("禁用")) {
+    return { text: "禁用", fg: "#9A3412", bg: "#FFEDD5" };
+  }
+  if (raw.includes("enable") || raw.includes("启用")) {
+    return { text: "启用", fg: "#166534", bg: "#DCFCE7" };
+  }
+  if (raw.includes("login") || raw.includes("登录")) {
+    return { text: "登录", fg: "#334155", bg: "#E2E8F0" };
+  }
+  if (raw.includes("logout") || raw.includes("退出")) {
+    return { text: "退出", fg: "#334155", bg: "#E2E8F0" };
+  }
+  return { text: action || "-", fg: "#475569", bg: "#F1F5F9" };
+}
+
+function getRepoNameLabel(raw: string): string {
+  const text = String(raw || "").trim();
+  if (!text) return "-";
+  const cleaned = text.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
+  const parts = cleaned.split("/").filter(Boolean);
+  if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
+  return parts[0] || text;
+}
+
+function getPopularDisplayLabel(raw: string, links: LinkItem[]): string {
+  const key = String(raw || "").trim().toLowerCase();
+  if (!key) return "-";
+  const matched = links.find((l) => {
+    const title = String(l.title || "").toLowerCase();
+    const url = String(l.url || "").toLowerCase();
+    return title === key || url === key || url.includes(key) || key.includes(url);
+  });
+  if (matched) return matched.title || matched.url;
+  return raw;
 }
 
 export default function AdminPage() {
@@ -191,6 +269,13 @@ export default function AdminPage() {
   }, []);
 
   const loadStats = useCallback(async () => {
+    if (MOCK_MODE) {
+      setStats(MOCK_STATS);
+      setTrend7(MOCK_TREND7);
+      setPopular(MOCK_POPULAR);
+      markSectionLoaded("popular");
+      return;
+    }
     const statsRes = await fetch("/api/admin/stats");
     if (!statsRes.ok) throw new Error("加载统计失败");
     const statsData = await readJsonSafe<{
@@ -205,6 +290,10 @@ export default function AdminPage() {
   }, [markSectionLoaded]);
 
   const loadSystem = useCallback(async () => {
+    if (MOCK_MODE) {
+      setSystem({ uptimeSec: 73842, cpuCores: 8, mem: { usageRate: 42 } });
+      return;
+    }
     const sysRes = await fetch("/api/admin/system");
     if (!sysRes.ok) throw new Error("加载系统信息失败");
     const systemData = await readJsonSafe<SystemInfo>(sysRes);
@@ -217,6 +306,11 @@ export default function AdminPage() {
   }, [loadStats, loadSystem, markSectionLoaded]);
 
   const loadLinks = useCallback(async () => {
+    if (MOCK_MODE) {
+      setLinks(MOCK_LINKS);
+      markSectionLoaded("links");
+      return;
+    }
     const linksRes = await fetch("/api/admin/links");
     if (!linksRes.ok) throw new Error("加载链接失败");
     const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
@@ -225,6 +319,11 @@ export default function AdminPage() {
   }, [markSectionLoaded]);
 
   const loadUsers = useCallback(async () => {
+    if (MOCK_MODE) {
+      setUsers(MOCK_USERS);
+      markSectionLoaded("users");
+      return;
+    }
     const usersRes = await fetch("/api/admin/users");
     if (!usersRes.ok) throw new Error("加载用户失败");
     const usersData = await readJsonSafe<{ users?: AdminUser[] }>(usersRes);
@@ -233,6 +332,15 @@ export default function AdminPage() {
   }, [markSectionLoaded]);
 
   const loadHealth = useCallback(async () => {
+    if (MOCK_MODE) {
+      setHealth([
+        { link_id: 1, title: "React 官方文档", status_code: 200, is_ok: 1, message: "ok", checked_at: "2026-05-24T10:10:00" },
+        { link_id: 2, title: "Next.js 官方文档", status_code: 200, is_ok: 1, message: "ok", checked_at: "2026-05-24T10:10:10" },
+        { link_id: 3, title: "OpenAtom 开源社团仓库", status_code: 503, is_ok: 0, message: "Service Unavailable", checked_at: "2026-05-24T10:10:20" },
+      ]);
+      markSectionLoaded("health");
+      return;
+    }
     const healthRes = await fetch("/api/admin/link-health");
     if (!healthRes.ok) throw new Error("加载健康检测失败");
     const healthData = await readJsonSafe<{ health?: LinkHealth[] }>(healthRes);
@@ -241,6 +349,15 @@ export default function AdminPage() {
   }, [markSectionLoaded]);
 
   const loadLogs = useCallback(async () => {
+    if (MOCK_MODE) {
+      setLogs([
+        { id: 1, link_id: 1, action: "create link", actor_username: "demo-admin", actor_role: "super", created_at: "2026-05-24T09:15:00", detail: { title: "React 官方文档" } },
+        { id: 2, link_id: 3, action: "disable link", actor_username: "editor-a", actor_role: "editor", created_at: "2026-05-24T09:36:00", detail: { reason: "鎺㈡祴澶辫触" } },
+        { id: 3, link_id: 2, action: "update link", actor_username: "demo-admin", actor_role: "super", created_at: "2026-05-24T10:01:00", detail: { field: "description" } },
+      ]);
+      markSectionLoaded("logs");
+      return;
+    }
     const logRes = await fetch("/api/admin/logs");
     if (!logRes.ok) throw new Error("加载日志失败");
     const logsData = await readJsonSafe<{ logs?: LinkLog[] }>(logRes);
@@ -275,8 +392,15 @@ export default function AdminPage() {
   }, [loadHealth, loadLinks, loadLogs, loadOverview, loadStats, loadUsers]);
 
   useEffect(() => {
-    // 先确认当前登录态，再决定是否进入后台或跳转登录页。
+    // 鍏堢‘璁ゅ綋鍓嶇櫥褰曟€侊紝鍐嶅喅瀹氭槸鍚﹁繘鍏ュ悗鍙版垨璺宠浆鐧诲綍椤点€?
     const init = async () => {
+      if (MOCK_MODE) {
+        setUser(MOCK_USER);
+        await Promise.all([loadOverview(), loadLinks(), loadUsers(), loadHealth(), loadLogs()]);
+        setLoadedSections({ overview: true, popular: true, links: true, users: true, health: true, logs: true });
+        setChecking(false);
+        return;
+      }
       try {
         const meRes = await fetch("/api/admin/me");
         if (!meRes.ok) {
@@ -297,9 +421,10 @@ export default function AdminPage() {
       }
     };
     init();
-  }, [loadLinks, loadOverview, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 当前后台是“单页模块切换”模式，这里只切换可见模块，不走路由跳转。
+  // 当前后台为单页模块切换模式，这里只切换可见模块。
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
     if (!user || loadedSections[sectionId]) return;
@@ -309,12 +434,22 @@ export default function AdminPage() {
   };
 
   const logout = async () => {
+    if (MOCK_MODE) {
+      router.replace("/admin/login");
+      return;
+    }
     await fetch("/api/admin/logout", { method: "POST" }).catch(() => {});
     router.replace("/admin/login");
   };
 
   const submitLink = async (e: FormEvent) => {
     e.preventDefault();
+    if (MOCK_MODE) {
+      const nextId = links.length ? Math.max(...links.map((x) => x.id)) + 1 : 1;
+      setLinks((prev) => [...prev, { id: nextId, ...linkForm, active: 1 }]);
+      setLinkForm({ title: "", url: "", description: "", sort: 0 });
+      return;
+    }
     setError("");
     try {
       const res = await fetch("/api/admin/links", {
@@ -323,7 +458,7 @@ export default function AdminPage() {
         body: JSON.stringify(linkForm),
       });
       const data = await readJsonSafe<{ error?: string }>(res);
-      if (!res.ok) throw new Error(data?.error || "新增链接失败");
+      if (!res.ok) throw new Error(data?.error || "鏂板閾炬帴澶辫触");
       setLinkForm({ title: "", url: "", description: "", sort: 0 });
       await Promise.all([
         loadLinks(),
@@ -331,12 +466,16 @@ export default function AdminPage() {
         loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
       ]);
     } catch (err) {
-      setError(String((err as Error).message || "新增链接失败"));
+      setError(String((err as Error).message || "鏂板閾炬帴澶辫触"));
     }
   };
 
-  // 删除后会重新拉取列表，保证表格和统计区同步刷新。
+  // 删除后重新拉取列表，确保表格和统计区域同步刷新。
   const removeLink = async (id: number) => {
+    if (MOCK_MODE) {
+      setLinks((prev) => prev.filter((x) => x.id !== id));
+      return;
+    }
     await fetch(`/api/admin/links?id=${id}`, { method: "DELETE" });
     await Promise.all([
       loadLinks(),
@@ -345,8 +484,12 @@ export default function AdminPage() {
     ]);
   };
 
-  // 启用/禁用共用同一个更新入口，只切 active 字段。
+  // 启用/禁用共用同一个更新入口，仅切换 active 字段。
   const toggleActive = async (item: LinkItem) => {
+    if (MOCK_MODE) {
+      setLinks((prev) => prev.map((x) => (x.id === item.id ? { ...x, active: x.active ? 0 : 1 } : x)));
+      return;
+    }
     await fetch("/api/admin/links", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -362,6 +505,12 @@ export default function AdminPage() {
 
   const submitUser = async (e: FormEvent) => {
     e.preventDefault();
+    if (MOCK_MODE) {
+      const nextId = users.length ? Math.max(...users.map((x) => x.id)) + 1 : 1;
+      setUsers((prev) => [...prev, { id: nextId, username: userForm.username, role: userForm.role, created_at: new Date().toISOString(), last_login_at: null }]);
+      setUserForm({ username: "", password: "", role: "editor" });
+      return;
+    }
     setError("");
     try {
       const res = await fetch("/api/admin/users", {
@@ -378,6 +527,17 @@ export default function AdminPage() {
     }
   };
   const runHealthCheck = async () => {
+    if (MOCK_MODE) {
+      setHealthChecking(true);
+      setTimeout(() => {
+        setHealth((prev) => prev.map((h) => {
+          const ok = Math.random() > 0.2;
+          return { ...h, is_ok: ok ? 1 : 0, status_code: ok ? 200 : 503, checked_at: new Date().toISOString() };
+        }));
+        setHealthChecking(false);
+      }, 600);
+      return;
+    }
     setHealthChecking(true);
     try {
       const res = await fetch("/api/admin/link-health", { method: "POST" });
@@ -401,7 +561,7 @@ export default function AdminPage() {
       <div className="admin-console-layout">
         <aside className="admin-console-sidebar">
           <div className="admin-console-side-title">控制台</div>
-          {/* 左侧菜单只负责切换模块，不承载路由状态。 */}
+          {/* 宸︿晶鑿滃崟鍙礋璐ｅ垏鎹㈡ā鍧楋紝涓嶆壙杞借矾鐢辩姸鎬併€?*/}
           {sections.map((section) => (
             <button
               key={section.id}
@@ -415,37 +575,77 @@ export default function AdminPage() {
         </aside>
 
         <div className="admin-console-content">
-      {/* 这一块保留为后台统一头部，所有模块切换时都显示。 */}
+      {/* 杩欎竴鍧椾繚鐣欎负鍚庡彴缁熶竴澶撮儴锛屾墍鏈夋ā鍧楀垏鎹㈡椂閮芥樉绀恒€?*/}
       <div id="overview" className="admin-card admin-console-anchor-card" style={{ padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "rgba(226,238,252,0.94)", borderColor: "#93C5FD", boxShadow: "0 14px 34px rgba(37,99,235,0.18)" }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#0F172A" }}>
-            管理后台
-          </div>
-          <div style={{ fontSize: 12, color: "#64748B" }}>
-            当前用户：{user.username}（{user.role}）
-          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: "#0F172A" }}>管理后台</div>
+          <div style={{ fontSize: 12, color: "#64748B" }}>当前用户：{user.username}（{user.role}）</div>
         </div>
-        <button type="button" onClick={logout} className="admin-btn-ghost">
-          退出登录
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button type="button" onClick={() => router.push("/")} className="admin-btn-ghost">
+            返回首页
+          </button>
+          <button type="button" onClick={logout} className="admin-btn-ghost">
+            退出登录
+          </button>
+        </div>
       </div>
 
       {error ? (
         <div style={{ color: "#DC2626", fontSize: 12 }}>{error}</div>
       ) : null}
-      {/* 每次只渲染一个模块，减少信息堆叠，保持后台单页切换体验。 */}
+      {/* 姣忔鍙覆鏌撲竴涓ā鍧楋紝鍑忓皯淇℃伅鍫嗗彔锛屼繚鎸佸悗鍙板崟椤靛垏鎹綋楠屻€?*/}
       {activeSection === "overview" ? (
         <>
           <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
             <div className="admin-console-pagehead-title">首页总览</div>
             <div className="admin-console-pagehead-desc">查看系统运行状态、今日访问数据和后台全局摘要。</div>
           </div>
-          <div className="admin-card" style={{ padding: 12 }}>
-            <div style={{ fontWeight: 700, color: "#0F172A", marginBottom: 8 }}>服务器运行情况</div>
-            <div style={{ minHeight: 52, fontSize: 12, color: "#334155", display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
-              <span>Uptime: {system?.uptimeSec ?? 0}s</span>
-              <span>CPU: {system?.cpuCores ?? 0} cores</span>
-              <span>内存占用: {system?.mem?.usageRate ?? 0}%</span>
+          <div className="admin-card" style={{ padding: 16, background: "linear-gradient(135deg,#FFFFFF 0%,#F3F8FF 55%,#EEF6FF 100%)", border: "1px solid #DCE8F8", boxShadow: "0 14px 28px rgba(37,99,235,0.08)" }}>
+            <div style={{ fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>服务器运行情况</div>
+            <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 14, alignItems: "center" }}>
+              <div style={{ display: "grid", placeItems: "center" }}>
+                <div
+                  style={{
+                    width: 120,
+                    height: 120,
+                    borderRadius: "50%",
+                    background: `conic-gradient(#3B82F6 ${Math.min(100, Math.round((system?.uptimeSec ?? 0) / 1000))}%, #E2E8F0 0)`,
+                    display: "grid",
+                    placeItems: "center",
+                    boxShadow: "0 10px 24px rgba(59,130,246,0.25)",
+                  }}
+                >
+                  <div style={{ width: 90, height: 90, borderRadius: "50%", background: "#fff", border: "1px solid #DBEAFE", display: "grid", placeItems: "center", textAlign: "center" }}>
+                    <div style={{ fontSize: 11, color: "#64748B" }}>运行时长</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: "#1D4ED8" }}>{Math.floor((system?.uptimeSec ?? 0) / 3600)}h</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
+                    <span>CPU 核心数</span>
+                    <span>{system?.cpuCores ?? 0} cores</span>
+                  </div>
+                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, ((system?.cpuCores ?? 0) / 32) * 100)}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#60A5FA,#2563EB)" }} />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
+                    <span>内存占用</span>
+                    <span>{system?.mem?.usageRate ?? 0}%</span>
+                  </div>
+                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, system?.mem?.usageRate ?? 0)}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#22D3EE,#0EA5E9)" }} />
+                  </div>
+                </div>
+                <div style={{ marginTop: 2, fontSize: 12, color: "#64748B", display: "flex", justifyContent: "space-between" }}>
+                  <span>实例状态：运行中</span>
+                  <span>Uptime: {system?.uptimeSec ?? 0}s</span>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -458,8 +658,8 @@ export default function AdminPage() {
             }}
           >
             {[
-              { label: "今日客流量 (PV)", value: today.page_views },
-              { label: "今日客流量 (UV)", value: today.unique_visitors },
+              { label: "今日访问量 (PV)", value: today.page_views },
+              { label: "今日访客数 (UV)", value: today.unique_visitors },
               { label: "今日点击量", value: today.link_clicks },
             ].map((item) => (
               <div key={item.label} className="admin-card admin-console-kpi-card" style={{ padding: 12, background: "rgba(214,231,250,0.95)", borderColor: "#93C5FD", boxShadow: "0 10px 26px rgba(37,99,235,0.16)" }}>
@@ -475,8 +675,8 @@ export default function AdminPage() {
       {activeSection === "popular" ? (
       <>
       <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
-        <div className="admin-console-pagehead-title">热门分类</div>
-        <div className="admin-console-pagehead-desc">聚合查看近 7 天点击走势与分类热度表现。</div>
+        <div className="admin-console-pagehead-title">热门仓库</div>
+        <div className="admin-console-pagehead-desc">聚合查看近 7 天点击走势与仓库热度表现。</div>
       </div>
       <div id="popular" className="admin-card admin-console-chart-card admin-console-anchor-card" style={{ padding: 12 }}>
         <div style={{ fontWeight: 700, marginBottom: 8 }}>近7天点击走势</div>
@@ -640,92 +840,141 @@ export default function AdminPage() {
             <div style={{ fontSize: 12, color: "#64748B", marginTop: 8 }}>暂无 7 天点击数据，图表区域已预留。</div>
           ) : null}
         </div>
-        <div style={{ fontWeight: 700, margin: "12px 0 8px" }}>热门分类（域名）</div>
-        <div className="admin-console-chart-surface" style={{ minHeight: 140, border: "1px dashed #93C5FD", borderRadius: 10, padding: 10, background: "rgba(255,255,255,0.5)", display: "grid", gap: 6 }}>
+        <div style={{ fontWeight: 700, margin: "12px 0 8px" }}>热门仓库（点击量）</div>
+        <div className="admin-console-chart-surface" style={{ minHeight: 140, border: "1px dashed #93C5FD", borderRadius: 10, padding: 10, background: "rgba(255,255,255,0.5)", display: "grid", gap: 8 }}>
           {(popular.length
             ? popular
-            : Array.from({ length: 5 }).map((_, i) => ({ category: `分类${i + 1}`, clicks: 0 }))).map((p) => (
-            <div key={p.category} className="admin-console-popular-row" style={{ display: "grid", gridTemplateColumns: "140px 1fr 40px", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#334155", overflow: "hidden", textOverflow: "ellipsis" }}>{p.category}</span>
-              <div style={{ height: 8, background: "#DBEAFE", borderRadius: 999 }}>
-                <div style={{ width: `${Math.min(100, p.clicks * 10)}%`, height: "100%", background: "#2563EB", borderRadius: 999, opacity: p.clicks ? 1 : 0.25 }} />
+            : Array.from({ length: 5 }).map((_, i) => ({ category: `仓库${i + 1}`, clicks: 0 }))).map((p, idx, arr) => {
+            const maxClicks = Math.max(1, ...arr.map((x) => x.clicks || 0));
+            const ratio = (p.clicks || 0) / maxClicks;
+            const percent = Math.max(8, Math.round(ratio * 100));
+            return (
+            <div key={p.category} className="admin-console-popular-row" style={{ display: "grid", gridTemplateColumns: "220px 360px 46px", gap: 10, alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={String(p.category)}>
+                {getPopularDisplayLabel(String(p.category), links) || getRepoNameLabel(p.category)}
+              </span>
+              <div style={{ height: 10, width: 360, maxWidth: "100%", background: "#DBEAFE", borderRadius: 999, overflow: "hidden" }}>
+                <div
+                  style={{
+                    width: `${percent}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg, #60A5FA 0%, #2563EB 100%)",
+                    borderRadius: 999,
+                    opacity: p.clicks ? 1 : 0.25,
+                    transition: "width 0.3s ease",
+                  }}
+                />
               </div>
               <span style={{ fontSize: 12, textAlign: "right" }}>{p.clicks}</span>
             </div>
-          ))}
-          {!popular.length ? <div style={{ fontSize: 12, color: "#64748B" }}>暂无热门分类数据，图表区域已预留。</div> : null}
+          )})}
+          {!popular.length ? <div style={{ fontSize: 12, color: "#64748B" }}>暂无热门仓库数据，图表区域已预留。</div> : null}
         </div>
       </div>
       </>
       ) : null}
 
+      
       {activeSection === "links" ? (
       <>
       <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
         <div className="admin-console-pagehead-title">内容管理</div>
-        <div className="admin-console-pagehead-desc">维护导航链接内容，快速进行新增、启用、禁用和删除操作。</div>
+        <div className="admin-console-pagehead-desc">维护导航链接，支持新增、启用、禁用和删除。</div>
       </div>
-      <div id="links" className="admin-card admin-console-section-card admin-console-anchor-card" style={{ padding: 14, display: "grid", gap: 10, background: "rgba(224,237,253,0.95)", borderColor: "#93C5FD", boxShadow: "0 14px 34px rgba(37,99,235,0.16)" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>
-          链接管理（editor/super）
-        </div>
-        <form onSubmit={submitLink} style={{ display: "grid", gap: 8 }}>
-          <input
-            className="admin-input"
-            placeholder="标题"
-            value={linkForm.title}
-            onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
-          />
-          <input
-            className="admin-input"
-            placeholder="URL"
-            value={linkForm.url}
-            onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
-          />
-          <input
-            className="admin-input"
-            placeholder="描述"
-            value={linkForm.description}
-            onChange={(e) =>
-              setLinkForm({ ...linkForm, description: e.target.value })
-            }
-          />
-          <input
-            className="admin-input"
-            type="number"
-            placeholder="排序"
-            value={linkForm.sort}
-            onChange={(e) => setLinkForm({ ...linkForm, sort: Number(e.target.value || 0) })}
-            style={{ maxWidth: 140 }}
-          />
-          <button type="submit" className="admin-btn" style={{ width: 120 }}>
-            添加链接
-          </button>
+      <div id="links" className="admin-card" style={{ padding: 16, display: "grid", gap: 12 }}>
+        <form onSubmit={submitLink} style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1.2fr 1fr 120px 120px" }}>
+          <input className="admin-input" placeholder="标题" value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} />
+          <input className="admin-input" placeholder="URL" value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} />
+          <input className="admin-input" placeholder="描述" value={linkForm.description} onChange={(e) => setLinkForm({ ...linkForm, description: e.target.value })} />
+          <input className="admin-input" type="number" placeholder="排序" value={linkForm.sort} onChange={(e) => setLinkForm({ ...linkForm, sort: Number(e.target.value || 0) })} />
+          <button type="submit" className="admin-btn">添加链接</button>
         </form>
-
-        <div className="admin-console-table-shell" style={{ overflowX: "auto", background: "rgba(255,255,255,0.68)", border: "1px solid #BFDBFE", borderRadius: 10, padding: 6 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
-              <tr>
+              <tr style={{ background: "#F8FAFD" }}>
                 {["ID", "标题", "URL", "状态", "操作"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #93C5FD", padding: "8px 6px", color: "#1E3A8A", fontWeight: 700 }}>{h}</th>
+                  <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {links.map((item) => (
                 <tr key={item.id}>
-                  <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{item.id}</td>
-                  <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{item.title}</td>
-                  <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{item.url}</td>
-                  <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{item.active ? "启用" : "禁用"}</td>
-                  <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px", display: "flex", gap: 6 }}>
-                    <button type="button" onClick={() => toggleActive(item)} style={{ border: "1px solid #CBD5E1", background: "#fff", borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}>
-                      {item.active ? "禁用" : "启用"}
-                    </button>
-                    <button type="button" onClick={() => removeLink(item.id)} style={{ border: "1px solid #FCA5A5", background: "#fff", color: "#DC2626", borderRadius: 6, padding: "2px 8px", cursor: "pointer" }}>
-                      删除
-                    </button>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: item.active ? "#059669" : "#DC2626", fontWeight: 600 }}>{item.active ? "启用" : "禁用"}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => toggleActive(item)} className="admin-btn-ghost">{item.active ? "禁用" : "启用"}</button>
+                    <button type="button" onClick={() => removeLink(item.id)} className="admin-btn-ghost" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}>删除</button>
+                  </td>
+                </tr>
+              ))}
+              {!links.length ? (
+                <tr><td colSpan={5} style={{ padding: "14px", color: "#64748B" }}>暂无链接数据</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      </>
+      ) : null}
+
+      {activeSection === "health" ? (
+      <>
+      <div className="admin-card admin-console-pagehead" style={{ padding: 18, border: "1px solid #E6ECF5", background: "linear-gradient(180deg,#FFFFFF 0%,#F8FBFF 100%)" }}>
+        <div className="admin-console-pagehead-title">链接健康检测</div>
+        <div className="admin-console-pagehead-desc">监控链接可用性、异常比例与最近探测结果。</div>
+      </div>
+      <div id="health" className="admin-card" style={{ padding: 20, background: "#F3F6FA", border: "1px solid #E6ECF5", borderRadius: 12, display: "grid", gap: 16, boxShadow: "0 8px 24px rgba(15,23,42,0.04)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", gap: 12 }}>
+          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, boxShadow: "inset 0 0 0 1px rgba(24,144,255,0.06)" }}>
+            <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评分</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: "#1890FF" }}>
+              {health.length ? `${Math.round((health.filter((h) => h.is_ok).length / health.length) * 100)}%` : "100%"}
+            </div>
+          </div>
+          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 12, color: "#64748B" }}>总监控项</div>
+            <div style={{ fontSize: 22, fontWeight: 700 }}>{health.length}</div>
+          </div>
+          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 12, color: "#64748B" }}>正常</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#059669" }}>{health.filter((h) => h.is_ok).length}</div>
+          </div>
+          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
+            <div style={{ fontSize: 12, color: "#64748B" }}>异常</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#DC2626" }}>{health.filter((h) => !h.is_ok).length}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: "10px 12px" }}>
+          <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
+          <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 34, padding: "0 14px", borderRadius: 8 }} disabled={healthChecking}>
+            {healthChecking ? "探测中..." : "批量探测"}
+          </button>
+        </div>
+        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFD" }}>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>监控对象</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>探测状态</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>最近探测时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(health.length ? health : [{ link_id: 0, title: "暂无数据", status_code: null, is_ok: 1, message: "", checked_at: "-" }]).map((h) => (
+                <tr key={h.link_id} style={{ background: h.is_ok ? "#fff" : "#FFF1F0" }}>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>{h.title || `#${h.link_id}`}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    <span style={{ color: h.is_ok ? "#059669" : "#DC2626", fontWeight: 700 }}>
+                      {h.is_ok ? "● 运行正常" : "● 服务不可用"}
+                    </span>
+                    {!h.is_ok && h.status_code ? <span style={{ marginLeft: 8, fontSize: 12, background: "#F3F4F6", padding: "2px 8px", borderRadius: 999, color: "#475569" }}>HTTP {h.status_code}</span> : null}
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }} title={String(h.checked_at || "")}>
+                    {String(h.checked_at || "").replace("T", " ").slice(0, 19)}
                   </td>
                 </tr>
               ))}
@@ -735,154 +984,122 @@ export default function AdminPage() {
       </div>
       </>
       ) : null}
-      {activeSection === "health" ? (
+
+      {activeSection === "logs" ? (
       <>
-      <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
-        <div className="admin-console-pagehead-title">健康检测</div>
-        <div className="admin-console-pagehead-desc">检测链接可用性，集中查看异常状态和最近检测时间。</div>
+      <div className="admin-card admin-console-pagehead" style={{ padding: 18, border: "1px solid #E6ECF5", background: "linear-gradient(180deg,#FFFFFF 0%,#F9FBFF 100%)" }}>
+        <div className="admin-console-pagehead-title">操作日志</div>
+        <div className="admin-console-pagehead-desc">按时间、操作人、动作和目标追踪后台行为。</div>
       </div>
-      <div id="health" className="admin-card admin-console-section-card admin-console-anchor-card" style={{ padding: 14, display: "grid", gap: 8 }}>
-        <div className="admin-console-health-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <div style={{ fontWeight: 700 }}>链接健康检测</div>
-          <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 30, padding: "0 10px" }} disabled={healthChecking}>
-            {healthChecking ? "检测中..." : "立即检测"}
-          </button>
-        </div>
-        <div style={{ overflowX: "auto", minHeight: 170 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-            <thead><tr><th style={{ textAlign: "left" }}>链接</th><th style={{ textAlign: "left" }}>状态</th><th style={{ textAlign: "left" }}>检测时间</th></tr></thead>
+      <div className="admin-card" style={{ padding: 16, background: "#F5F7FA", border: "1px solid #E6ECF5", borderRadius: 12 }}>
+        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 920 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFD" }}>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>时间</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>操作人</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>角色</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>动作</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>对象</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>详情</th>
+              </tr>
+            </thead>
             <tbody>
-              {(health.length ? health : [{ link_id: 0, title: "暂无检测数据", status_code: null, is_ok: 1, message: "", checked_at: "-" }]).map((h) => (
-                <tr key={h.link_id} style={{ background: h.is_ok ? "transparent" : "rgba(254,202,202,0.35)" }}>
-                  <td style={{ padding: "6px 4px" }}>{h.title || `#${h.link_id}`}</td>
-                  <td style={{ padding: "6px 4px", color: h.is_ok ? "#059669" : "#DC2626", fontWeight: 700 }}>{h.is_ok ? "正常" : `异常 ${h.status_code ?? ""}`}</td>
-                  <td style={{ padding: "6px 4px" }}>{String(h.checked_at || "").replace("T", " ").slice(0, 19)}</td>
+              {(logs.length ? logs : [{ id: 0, link_id: null, action: "暂无操作日志", actor_username: "-", actor_role: "-", created_at: "-" }]).map((l) => (
+                <tr key={l.id}>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155", whiteSpace: "nowrap" }}>
+                    {String(l.created_at || "").replace("T", " ").slice(0, 19)}
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A", fontWeight: 600 }}>
+                    {l.actor_username || "-"}
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    <span style={{ fontSize: 12, color: "#475569", background: "#F1F5F9", borderRadius: 999, padding: "2px 8px" }}>
+                      {l.actor_role || "-"}
+                    </span>
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        borderRadius: 999,
+                        padding: "2px 10px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: getActionTag(l.action).fg,
+                        background: getActionTag(l.action).bg,
+                      }}
+                      title={l.action || "-"}
+                    >
+                      {getActionTag(l.action).text}
+                    </span>
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }}>
+                    {l.link_id ? `link#${l.link_id}` : "-"}
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#64748B", maxWidth: 360, wordBreak: "break-all", lineHeight: 1.5 }}>
+                    {"detail" in l ? formatLogDetail((l as LinkLog).detail) : "-"}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-        <div
-          style={{
-            marginTop: 4,
-            borderTop: "1px dashed #CBD5E1",
-            paddingTop: 10,
-            display: "grid",
-            gap: 6,
-            fontSize: 12,
-            color: "#475569",
-            lineHeight: 1.65,
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "#0F172A" }}>检测标准说明</div>
-          <div>1. 只检测当前处于“启用”状态的友情链接，已禁用链接不会参与探测。</div>
-          <div>2. 检测方式为向目标链接发送 `HEAD` 请求，并自动跟随跳转。</div>
-          <div>3. 返回状态码在 `200-299` 范围内记为“正常”，其余状态码记为“异常”。</div>
-          <div>4. 如果请求超时、域名无法访问、证书异常或网络报错，也会记为“异常”。</div>
-          <div>5. 表格展示的是最近一次检测结果，异常行会高亮，便于优先排查。</div>
-        </div>
-      </div>
-      </>
-      ) : null}
-      {activeSection === "logs" ? (
-      <>
-      <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
-        <div className="admin-console-pagehead-title">操作日志</div>
-        <div className="admin-console-pagehead-desc">追踪后台操作记录，便于审计和问题回溯。</div>
-      </div>
-      <div id="logs" className="admin-card admin-console-section-card admin-console-anchor-card" style={{ padding: 14 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>操作日志</div>
-        <div style={{ maxHeight: 220, minHeight: 220, overflow: "auto", fontSize: 12 }}>
-          {(logs.length ? logs : [{ id: 0, link_id: null, action: "暂无操作日志", actor_username: "-", actor_role: "-", created_at: "-" }]).map((l) => (
-            <div key={l.id} style={{ padding: "6px 0", borderBottom: "1px solid #E2E8F0", display: "grid", gap: 4 }}>
-              <div>
-                {String(l.created_at).replace("T", " ").slice(0, 19)} - {l.actor_username}({l.actor_role}) {l.action} link#{l.link_id ?? "-"}
-              </div>
-              {"detail" in l ? (
-                <div style={{ color: "#64748B", fontSize: 11, wordBreak: "break-all", lineHeight: 1.45 }}>
-                  detail: {formatLogDetail((l as LinkLog).detail)}
-                </div>
-              ) : null}
-            </div>
-          ))}
         </div>
       </div>
       </>
       ) : null}
 
       {user.role === "super" && activeSection === "users" ? (
-        <>
-        <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
-          <div className="admin-console-pagehead-title">用户管理</div>
-          <div className="admin-console-pagehead-desc">管理后台账号、角色权限和最近登录情况。</div>
-        </div>
-        <div id="users" className="admin-card admin-console-section-card admin-console-anchor-card" style={{ padding: 14, display: "grid", gap: 10, background: "rgba(224,237,253,0.95)", borderColor: "#93C5FD", boxShadow: "0 14px 34px rgba(37,99,235,0.16)" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#0F172A" }}>
-            用户管理（super）
-          </div>
-          <form onSubmit={submitUser} style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <input
-              className="admin-input"
-              placeholder="用户名"
-              value={userForm.username}
-              onChange={(e) => setUserForm({ ...userForm, username: e.target.value })}
-            />
-            <input
-              className="admin-input"
-              type="password"
-              placeholder="密码"
-              value={userForm.password}
-              onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
-            />
-            <select
-              className="admin-input"
-              value={userForm.role}
-              onChange={(e) =>
-                setUserForm({ ...userForm, role: e.target.value as "super" | "editor" })
-              }
-            >
-              <option value="editor">editor</option>
-              <option value="super">super</option>
-            </select>
-            <button type="submit" className="admin-btn" style={{ padding: "0 12px" }}>
-              创建用户
-            </button>
-          </form>
-
-          <div className="admin-console-table-shell" style={{ overflowX: "auto", background: "rgba(255,255,255,0.68)", border: "1px solid #BFDBFE", borderRadius: 10, padding: 6 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
-              <thead>
-                <tr>
-                  {["ID", "用户名", "角色", "创建时间", "最近登录"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", borderBottom: "1px solid #93C5FD", padding: "8px 6px", color: "#1E3A8A", fontWeight: 700 }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{u.id}</td>
-                    <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{u.username}</td>
-                    <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{u.role}</td>
-                    <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>{String(u.created_at || "").replace("T", " ").slice(0, 19)}</td>
-                    <td style={{ borderBottom: "1px solid #F1F5F9", padding: "8px 6px" }}>
-                      {u.last_login_at
-                        ? String(u.last_login_at).replace("T", " ").slice(0, 19)
-                        : "-"}
-                    </td>
-                  </tr>
+      <>
+      <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
+        <div className="admin-console-pagehead-title">用户管理</div>
+        <div className="admin-console-pagehead-desc">管理后台账号、角色权限和最近登录时间。</div>
+      </div>
+      <div id="users" className="admin-card" style={{ padding: 16, display: "grid", gap: 12 }}>
+        <form onSubmit={submitUser} style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr 140px 120px" }}>
+          <input className="admin-input" placeholder="用户名" value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} />
+          <input className="admin-input" type="password" placeholder="密码" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} />
+          <select className="admin-input" value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value as "super" | "editor" })}>
+            <option value="editor">editor</option>
+            <option value="super">super</option>
+          </select>
+          <button type="submit" className="admin-btn">创建用户</button>
+        </form>
+        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: "#F8FAFD" }}>
+                {["ID", "用户名", "角色", "创建时间", "最近登录"].map((h) => (
+                  <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.id}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.username}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.role}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{String(u.created_at || "").replace("T", " ").slice(0, 19)}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.last_login_at ? String(u.last_login_at).replace("T", " ").slice(0, 19) : "-"}</td>
+                </tr>
+              ))}
+              {!users.length ? (
+                <tr><td colSpan={5} style={{ padding: "14px", color: "#64748B" }}>暂无用户数据</td></tr>
+              ) : null}
+            </tbody>
+          </table>
         </div>
-        </>
+      </div>
+      </>
       ) : null}
         </div>
       </div>
     </div>
   );
 }
+
 
 
 
