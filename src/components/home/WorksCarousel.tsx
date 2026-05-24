@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useRef, useState } from "react";
 import {
   Star,
@@ -66,14 +66,14 @@ const PACMAN_LEVEL_TEMPLATES = [
   ],
 ];
 
-const PACMAN_DIR = {
+const PACMAN_DIR: Record<string, { dx: number; dy: number; label: string; angle: number }> = {
   up: { dx: 0, dy: -1, label: "↑", angle: 270 },
   down: { dx: 0, dy: 1, label: "↓", angle: 90 },
   left: { dx: -1, dy: 0, label: "←", angle: 180 },
   right: { dx: 1, dy: 0, label: "→", angle: 0 },
 };
 
-const PACMAN_GHOST_META = {
+const PACMAN_GHOST_META: Record<string, { id: string; color: string; corner: { x: number; y: number } }> = {
   B: { id: "blinky", color: "#EF4444", corner: { x: 9, y: 1 } },
   K: { id: "pinky", color: "#EC4899", corner: { x: 1, y: 1 } },
   I: { id: "inky", color: "#22D3EE", corner: { x: 9, y: 9 } },
@@ -87,22 +87,22 @@ const OPPOSITE_DIR = {
   right: "left",
 };
 
-const wrapX = (x, width) => {
+const wrapX = (x: number, width: number): number => {
   if (x < 0) return width - 1;
   if (x >= width) return 0;
   return x;
 };
 
-const isWall = (board, x, y) => {
+const isWall = (board: string[][], x: number, y: number): boolean => {
   if (y < 0 || y >= board.length) return true;
   const wx = wrapX(x, board[0].length);
   return board[y][wx] === "#";
 };
 
-const countPellets = (board) =>
+const countPellets = (board: string[][]): number =>
   board.flat().filter((c) => c === "." || c === "o").length;
 
-const manhattan = (a, b, width) => {
+const manhattan = (a: { x: number; y: number }, b: { x: number; y: number }, width: number): number => {
   const dx = Math.abs(a.x - b.x);
   const wrapDx = Math.min(dx, width - dx);
   return wrapDx + Math.abs(a.y - b.y);
@@ -165,14 +165,14 @@ const createPacmanRound = ({
   };
 };
 
-const resetPacmanActors = (state) => ({
+const resetPacmanActors = (state: any): any => ({
   ...state,
   pac: { ...state.pacSpawn },
   dir: "left",
   nextDir: "left",
   frightenedTicks: 0,
   ghostCombo: 0,
-  ghosts: (state.ghosts || []).map((ghost) => ({
+  ghosts: (state.ghosts || []).map((ghost: any) => ({
     ...ghost,
     x: ghost.spawnX,
     y: ghost.spawnY,
@@ -181,7 +181,14 @@ const resetPacmanActors = (state) => ({
   })),
 });
 
-const chooseGhostDirection = (ghost, pac, pacDir, board, frightened, tick) => {
+const chooseGhostDirection = (
+  ghost: any,
+  pac: any,
+  pacDir: string,
+  board: string[][],
+  frightened: boolean,
+  tick: number
+): string => {
   const width = board[0].length;
   const options = Object.entries(PACMAN_DIR)
     .map(([key, step]) => ({
@@ -195,7 +202,7 @@ const chooseGhostDirection = (ghost, pac, pacDir, board, frightened, tick) => {
 
   const filtered =
     options.length > 1
-      ? options.filter((option) => option.key !== OPPOSITE_DIR[ghost.dir])
+      ? options.filter((option) => option.key !== OPPOSITE_DIR[ghost.dir as keyof typeof OPPOSITE_DIR])
       : options;
 
   if (frightened) {
@@ -203,7 +210,7 @@ const chooseGhostDirection = (ghost, pac, pacDir, board, frightened, tick) => {
     return filtered[idx].key;
   }
 
-  const forward = PACMAN_DIR[pacDir] || PACMAN_DIR.left;
+  const forward = PACMAN_DIR[pacDir as keyof typeof PACMAN_DIR] || PACMAN_DIR.left;
   let target = { ...pac };
   if (ghost.id === "pinky") {
     target = {
@@ -229,7 +236,50 @@ const chooseGhostDirection = (ghost, pac, pacDir, board, frightened, tick) => {
   return filtered[0].key;
 };
 
-function CardBody({ work }) {
+function getContributorsForWork(work: any, repoContributors: Record<string, any[]> = {}) {
+  // 优先使用 GitHub API 异步获取的真实贡献者
+  if (work.projectUrl && repoContributors[work.projectUrl] && repoContributors[work.projectUrl].length > 0) {
+    return repoContributors[work.projectUrl];
+  }
+
+  const basePool = [
+    { login: "muzimu217", avatar: "https://github.com/muzimu217.png", url: "https://github.com/muzimu217", contributions: 42 },
+    { login: "LRXZH", avatar: "https://github.com/LRXZH.png", url: "https://github.com/LRXZH", contributions: 28 },
+    { login: "CDUESTC-OpenAtom-Open-Source-Club", avatar: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club.png", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club", contributions: 12 }
+  ];
+
+  if (work.author === "Zhang Wei" || work.author === "CDUESTC-OpenAtom-Open-Source-Club") {
+    return [
+      { login: "muzimu217", avatar: "https://github.com/muzimu217.png", url: "https://github.com/muzimu217", contributions: 42 },
+      { login: "LRXZH", avatar: "https://github.com/LRXZH.png", url: "https://github.com/LRXZH", contributions: 28 },
+      { login: "CDUESTC-OpenAtom-Open-Source-Club", avatar: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club.png", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club", contributions: 12 }
+    ];
+  }
+  if (work.author === "Liu Fang" || work.author === "Chen Hao") {
+    return [
+      { login: "LRXZH", avatar: "https://github.com/LRXZH.png", url: "https://github.com/LRXZH", contributions: 28 },
+      { login: "muzimu217", avatar: "https://github.com/muzimu217.png", url: "https://github.com/muzimu217", contributions: 15 },
+      { login: "CDUESTC-OpenAtom-Open-Source-Club", avatar: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club.png", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club", contributions: 8 }
+    ];
+  }
+  return basePool;
+}
+
+function CardBody({
+  work,
+  isDarkMode = false,
+  isCenter = false,
+  hoveredRole = null,
+  setHoveredRole = () => {},
+  repoContributors = {}
+}: {
+  work: any;
+  isDarkMode?: boolean;
+  isCenter?: boolean;
+  hoveredRole?: any;
+  setHoveredRole?: (role: any) => void;
+  repoContributors?: Record<string, any[]>;
+}) {
   return (
     <>
       <div
@@ -238,6 +288,7 @@ function CardBody({ work }) {
           background: `${work.color}CC`,
           borderRadius: 3,
           marginBottom: 3,
+          flexShrink: 0
         }}
       />
 
@@ -247,6 +298,7 @@ function CardBody({ work }) {
           justifyContent: "space-between",
           alignItems: "center",
           gap: 8,
+          flexShrink: 0
         }}
       >
         <div
@@ -257,8 +309,8 @@ function CardBody({ work }) {
               width: 22,
               height: 22,
               borderRadius: "50%",
-              background: `${work.color}10`,
-              border: `1px solid ${work.color}2E`,
+              background: isDarkMode ? "rgba(255,255,255,0.06)" : `${work.color}10`,
+              border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.15)" : `${work.color}2E`}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -273,7 +325,7 @@ function CardBody({ work }) {
           <span
             style={{
               fontSize: 9,
-              color: "#9AA8B5",
+              color: isDarkMode ? "#94A3B8" : "#64748B",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -288,9 +340,9 @@ function CardBody({ work }) {
             fontSize: 8,
             padding: "1px 6px",
             borderRadius: 999,
-            border: "1px solid #D7E5F5",
-            color: "#2F7DD4",
-            background: "#F7FBFF",
+            border: isDarkMode ? "1px solid #334155" : "1px solid #D7E5F5",
+            color: isDarkMode ? "#93C5FD" : "#2F7DD4",
+            background: isDarkMode ? "rgba(30,41,59,0.4)" : "#F7FBFF",
             flexShrink: 0,
             maxWidth: 62,
             overflow: "hidden",
@@ -303,12 +355,12 @@ function CardBody({ work }) {
         </span>
       </div>
 
-      <div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1, minWidth: 0 }}>
         <div
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: "#1E293B",
+            color: isDarkMode ? "#F8FAFC" : "#1E293B",
             lineHeight: 1.25,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -320,34 +372,118 @@ function CardBody({ work }) {
         <div
           style={{
             fontSize: 10,
-            color: "#718096",
-            marginTop: 3,
+            color: isDarkMode ? "#94A3B8" : "#718096",
+            marginTop: 1,
             lineHeight: 1.35,
             overflow: "hidden",
             display: "-webkit-box",
             WebkitBoxOrient: "vertical",
-            WebkitLineClamp: 2,
+            WebkitLineClamp: isCenter ? 2 : 3, // 激活卡片由网格压缩空间
           }}
         >
           {work.desc}
         </div>
+
+        {/* 激活卡片内部：新增 GitHub Contribution Graph 极小发光全息网格 */}
+        {isCenter && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 7, borderTop: isDarkMode ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.03)", paddingTop: 6, flexShrink: 0 }}>
+            <div style={{ 
+              fontSize: 7.5, 
+              color: isDarkMode ? "#64748B" : "#94A3B8", 
+              letterSpacing: 0.5, 
+              textTransform: "uppercase", 
+              fontFamily: '"Courier New", monospace',
+              fontWeight: 700 
+            }}>
+              CONTRIBUTIONS // ACTIVE CURVE
+            </div>
+            <div style={{ display: "flex", gap: 2.5, marginTop: 1 }}>
+              {(() => {
+                const contributors = getContributorsForWork(work, repoContributors);
+                const totalCommits = contributors.reduce((sum, c: any) => sum + (c.contributions || 0), 0);
+
+                return Array.from({ length: 14 }).map((_, colIdx) => (
+                  <div key={colIdx} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    {Array.from({ length: 3 }).map((_, rowIdx) => {
+                      const index = colIdx * 3 + rowIdx;
+                      let hash = totalCommits * (index + 7);
+                      contributors.forEach((c: any) => {
+                        for (let i = 0; i < c.login.length; i++) {
+                          hash += c.login.charCodeAt(i) * (i + 1);
+                        }
+                      });
+                      
+                      const activeVal = hash % 100;
+                      // 提交数越多，绿墙越密越亮。提交较少时稀疏。
+                      const densityThreshold = Math.min(85, Math.max(25, 20 + totalCommits / 2));
+                      const isActive = activeVal <= densityThreshold;
+                      const level = isActive ? (activeVal % 3) + 1 : 0; // 0, 1, 2, 3
+
+                      const bg = level === 0 
+                        ? (isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)")
+                        : level === 1 
+                          ? `${work.color}22` 
+                          : level === 2
+                            ? `${work.color}66`
+                            : `${work.color}cc`;
+
+                      return (
+                        <div
+                          key={rowIdx}
+                          style={{
+                            width: 4.5,
+                            height: 4.5,
+                            borderRadius: 0.8,
+                            background: bg,
+                            boxShadow: level === 3 ? `0 0 4px ${work.color}` : "none",
+                          }}
+                        />
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
       </div>
 
+      {/* 技术栈 Tag 墙 */}
       <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: "auto" }}
+        style={{ 
+          display: "flex", 
+          flexWrap: "wrap", 
+          gap: 4, 
+          marginTop: isCenter ? 6 : "auto",
+          flexShrink: 0 
+        }}
       >
-        {work.tags.slice(0, 3).map((tag) => (
+        {work.tags.slice(0, 3).map((tag: string) => (
           <span
             key={tag}
             style={{
               fontSize: 8,
-              padding: "1px 6px",
-              borderRadius: 999,
-              border: "1px solid #E6EDF5",
-              color: "#728095",
-              background: "#F8FBFF",
+              fontWeight: 600,
+              padding: "2px 6px",
+              borderRadius: 6,
+              border: isDarkMode ? "1px solid #334155" : "1px solid #E6EDF5",
+              color: isDarkMode ? "#CBD5E1" : "#728095",
+              background: isDarkMode ? "rgba(15,23,42,0.4)" : "#F8FBFF",
+              display: "inline-flex",
+              alignItems: "center"
             }}
           >
+            {isCenter && (
+              <span style={{ 
+                width: 3.5, 
+                height: 3.5, 
+                borderRadius: "50%", 
+                background: work.color, 
+                marginRight: 4, 
+                display: "inline-block", 
+                boxShadow: `0 0 4px ${work.color}` 
+              }} />
+            )}
             {tag}
           </span>
         ))}
@@ -357,28 +493,126 @@ function CardBody({ work }) {
         style={{
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 4,
           paddingTop: 5,
-          borderTop: "1px solid #EDF2F7",
+          borderTop: isDarkMode ? "1px solid #334155" : "1px solid #EDF2F7",
+          flexShrink: 0,
+          position: "relative"
         }}
       >
-        <Star size={10} color="#F59E0B" fill="#F59E0B" />
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 600,
-            color: "#475569",
-            fontFamily: '"Courier New", monospace',
-          }}
-        >
-          {work.stars}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+          <Star size={10} color="#F59E0B" fill="#F59E0B" />
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 600,
+              color: isDarkMode ? "#94A3B8" : "#475569",
+              fontFamily: '"Courier New", monospace',
+            }}
+          >
+            {work.stars}
+          </span>
+        </div>
+
+        {/* 贡献者 Avatar 头像精密堆叠 */}
+        {isCenter && (
+          <div style={{ display: "flex", alignItems: "center", position: "relative" }}>
+            {getContributorsForWork(work, repoContributors).map((c: any, idx: number, arr: any[]) => (
+              <a
+                key={c.login}
+                href={c.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                onMouseEnter={() => setHoveredRole({ login: c.login, contributions: c.contributions })}
+                onMouseLeave={() => setHoveredRole(null)}
+                style={{
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  border: isDarkMode ? "1px solid #1E293B" : "1px solid #FFFFFF",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: 0,
+                  background: isDarkMode ? "#0F172A" : "#E2E8F0",
+                  cursor: "pointer",
+                  marginLeft: idx === 0 ? 0 : -4,
+                  zIndex: arr.length - idx,
+                  transition: "all 0.22s ease",
+                  overflow: "hidden",
+                  textDecoration: "none",
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1.5px)";
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
+                <img
+                  src={c.avatar}
+                  alt={c.login}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </a>
+            ))}
+
+            {/* 卡片内部浮空微型 Tooltip */}
+            {hoveredRole && (
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 20,
+                  right: 0,
+                  background: isDarkMode ? "rgba(15,23,42,0.96)" : "#FFFFFF",
+                  border: `1px solid ${work.color}bb`,
+                  borderRadius: 4,
+                  padding: "3px 6px",
+                  fontSize: 7.5,
+                  color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                  whiteSpace: "nowrap",
+                  zIndex: 999,
+                  boxShadow: `0 2px 10px rgba(0,0,0,0.35)`,
+                  backdropFilter: "blur(6px)",
+                  pointerEvents: "none"
+                }}
+              >
+                {hoveredRole.login}
+                {hoveredRole.contributions !== undefined && (
+                  <span style={{ marginLeft: 4, opacity: 0.8, color: work.color }}>
+                    ({hoveredRole.contributions} contributions)
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
 }
 
-function WorkCard({ work, style, isCenter, onClick }) {
+function WorkCard({
+  work,
+  style,
+  isCenter,
+  onClick,
+  isDarkMode = false,
+  hoveredRole = null,
+  setHoveredRole = () => {},
+  repoContributors = {}
+}: {
+  work: any;
+  style?: React.CSSProperties;
+  isCenter: boolean;
+  onClick: () => void;
+  isDarkMode?: boolean;
+  hoveredRole?: any;
+  setHoveredRole?: (role: any) => void;
+  repoContributors?: Record<string, any[]>;
+}) {
   return (
     <button
       onClick={onClick}
@@ -388,19 +622,21 @@ function WorkCard({ work, style, isCenter, onClick }) {
         position: "absolute",
         left: "50%",
         top: "50%",
-        width: 210,
-        marginLeft: -105,
-        marginTop: -109,
-        height: 218,
-        background: "rgba(255,255,255,0.92)",
-        border: `1px solid ${isCenter ? work.color + "38" : "#E5EDF5"}`,
+        width: 196,
+        marginLeft: -98,
+        marginTop: -108,
+        height: 216,
+        background: isDarkMode ? "rgba(15,23,42,0.24)" : "rgba(255,255,255,0.4)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        border: `1px solid ${isCenter ? work.color + "55" : isDarkMode ? "#334155" : "#E5EDF5"}`,
         borderRadius: 14,
         padding: "10px 10px",
         cursor: "pointer",
         transition:
           "transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.35s ease, box-shadow 0.25s ease, border-color 0.2s ease",
         boxShadow: isCenter
-          ? `0 0 16px ${work.color}12, 0 6px 14px rgba(148,163,184,0.16)`
+          ? (isDarkMode ? `0 0 16px ${work.color}24, 0 6px 14px rgba(0,0,0,0.4)` : `0 0 16px ${work.color}12, 0 6px 14px rgba(148,163,184,0.16)`)
           : "none",
         display: "flex",
         flexDirection: "column",
@@ -412,12 +648,19 @@ function WorkCard({ work, style, isCenter, onClick }) {
       aria-label={`Focus ${work.title}`}
       title={isCenter ? work.desc : "查看详情"}
     >
-      <CardBody work={work} />
+      <CardBody 
+        work={work} 
+        isDarkMode={isDarkMode} 
+        isCenter={isCenter}
+        hoveredRole={hoveredRole}
+        setHoveredRole={setHoveredRole}
+        repoContributors={repoContributors}
+      />
     </button>
   );
 }
 
-function MobileWorkCard({ work }) {
+function MobileWorkCard({ work }: { work: any }) {
   return (
     <div
       style={{
@@ -439,7 +682,7 @@ function MobileWorkCard({ work }) {
     </div>
   );
 }
-function ListRow({ work }) {
+function ListRow({ work }: { work: any }) {
   return (
     <button
       type="button"
@@ -510,7 +753,7 @@ function ListRow({ work }) {
       </div>
 
       <div style={{ display: "flex", gap: 3 }}>
-        {work.tags.slice(0, 2).map((t) => (
+        {work.tags.slice(0, 2).map((t: string) => (
           <span
             key={t}
             style={{
@@ -545,27 +788,28 @@ function ListRow({ work }) {
   );
 }
 
-function InsightCard({ icon: Icon, label, value, tint }) {
+function InsightCard({ icon: Icon, label, value, tint, isDarkMode = false }: any) {
   return (
     <div
       style={{
-        border: `1px solid ${tint}24`,
-        background: "#FFFFFF",
+        border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.06)" : `${tint}24`}`,
+        background: isDarkMode ? "rgba(15,23,42,0.24)" : "#FFFFFF",
+        backdropFilter: isDarkMode ? "blur(12px)" : "none",
+        WebkitBackdropFilter: isDarkMode ? "blur(12px)" : "none",
         borderRadius: 11,
         padding: "8px 9px",
         display: "flex",
         alignItems: "center",
-        gap: 7,
-        minHeight: 44,
+        gap: 10,
+        boxShadow: isDarkMode ? "none" : "0 4px 6px rgba(148,163,184,0.05)",
       }}
     >
       <div
         style={{
-          width: 22,
-          height: 22,
-          borderRadius: 7,
-          border: `1px solid ${tint}33`,
-          background: `${tint}14`,
+          width: 24,
+          height: 24,
+          borderRadius: 8,
+          background: `${tint}15`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -574,18 +818,25 @@ function InsightCard({ icon: Icon, label, value, tint }) {
       >
         <Icon size={12} color={tint} />
       </div>
-
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 9, color: "#94A3B8", lineHeight: 1.2 }}>
+        <div
+          style={{
+            fontSize: 7.5,
+            color: isDarkMode ? "#64748B" : "#94A3B8",
+            letterSpacing: 0.2,
+            textTransform: "uppercase",
+            fontWeight: 700,
+          }}
+        >
           {label}
         </div>
         <div
           style={{
-            fontSize: 12,
-            color: "#1E293B",
+            fontSize: 11,
             fontWeight: 700,
-            lineHeight: 1.2,
-            marginTop: 2,
+            color: isDarkMode ? "#F8FAFC" : "#1E293B",
+            fontFamily: '"Courier New", monospace',
+            marginTop: 1,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -601,7 +852,7 @@ function InsightCard({ icon: Icon, label, value, tint }) {
 export function PacmanMiniGame({ compact = false, standalone = false }) {
   const [game, setGame] = useState(() => createPacmanRound());
   const [best, setBest] = useState(0);
-  const panelRef = useRef(null);
+  const panelRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -622,7 +873,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
     return () => clearTimeout(id);
   }, [best, game.score]);
 
-  const setDirection = (dir) => {
+  const setDirection = (dir: string) => {
     setGame((prev) => {
       if (prev.finished || prev.lives <= 0) return prev;
       return {
@@ -640,7 +891,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
   };
 
   useEffect(() => {
-    const keyToDir = {
+    const keyToDir: Record<string, string> = {
       ArrowUp: "up",
       ArrowDown: "down",
       ArrowLeft: "left",
@@ -655,7 +906,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
       D: "right",
     };
 
-    const onKeyDown = (e) => {
+    const onKeyDown = (e: any) => {
       const dir = keyToDir[e.key];
       if (!dir) return;
       e.preventDefault();
@@ -696,7 +947,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         let ghostCombo = frightenedTicks > 0 ? Number(prev.ghostCombo) || 0 : 0;
         let dir = PACMAN_DIR[prev.dir] ? prev.dir : "left";
 
-        const canMove = (x, y, direction) => {
+        const canMove = (x: number, y: number, direction: string): boolean => {
           const step = PACMAN_DIR[direction] || PACMAN_DIR.left;
           return !isWall(board, wrapX(x + step.dx, width), y + step.dy);
         };
@@ -918,7 +1169,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
     : compact
       ? 146
       : 168;
-  const handleBoardPointer = (x, y) => {
+  const handleBoardPointer = (x: number, y: number) => {
     const dx = x - safePac.x;
     const dy = y - safePac.y;
     if (Math.abs(dx) <= 0 && Math.abs(dy) <= 0) return;
@@ -1059,7 +1310,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
                         ? frightenedBlink
                           ? "#F8FAFC"
                           : "#60A5FA"
-                        : ghost.color,
+                        : (ghost?.color || "#EF4444"),
                       boxShadow: ghostFrightened
                         ? "0 0 7px rgba(96,165,250,0.7)"
                         : "0 0 6px rgba(248,250,252,0.25)",
@@ -1269,8 +1520,58 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const [isShortViewport, setIsShortViewport] = useState(false);
   const [worksData, setWorksData] = useState(WORKS);
   const [worksSource, setWorksSource] = useState("fallback");
-  const autoRef = useRef(null);
-  const touchStartRef = useRef(null);
+  const [hoveredRole, setHoveredRole] = useState(null);
+  const [repoContributors, setRepoContributors] = useState({});
+
+  useEffect(() => {
+    const repos = new Set<string>();
+    worksData.forEach((w: any) => {
+      if (w.projectUrl && w.projectUrl.includes("github.com/")) {
+        repos.add(w.projectUrl);
+      }
+    });
+
+    const abortController = new AbortController();
+
+    const fetchRepoContributors = async (url: string) => {
+      try {
+        const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
+        if (!match) return;
+        const owner = match[1];
+        const repo = match[2].replace(/\.git$/, "");
+        
+        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contributors`, {
+          signal: abortController.signal
+        });
+        if (!res.ok) throw new Error("GitHub API Error");
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          const list = data.slice(0, 5).map(c => ({
+            login: c.login,
+            avatar: c.avatar_url,
+            url: c.html_url,
+            contributions: c.contributions
+          }));
+          setRepoContributors(prev => ({
+            ...prev,
+            [url]: list
+          }));
+        }
+      } catch (err) {
+        // Fallback silently if API rate limited
+      }
+    };
+
+    repos.forEach(url => {
+      fetchRepoContributors(url);
+    });
+
+    return () => {
+      abortController.abort();
+    };
+  }, [worksData]);
+  const autoRef = useRef<any>(null);
+  const touchStartRef = useRef<number | null>(null);
 
   useEffect(() => {
     const abortRef = new AbortController();
@@ -1280,7 +1581,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
         .then((res) => (res.ok ? res.json() : null))
         .then((payload) => {
           if (!abortRef.signal.aborted && Array.isArray(payload?.works) && payload.works.length > 0) {
-            const mapped = payload.works.map((w) => ({
+            const mapped = payload.works.map((w: any) => ({
               id: w.id,
               title: w.title || "untitled",
               desc: w.description || "",
@@ -1315,16 +1616,16 @@ export default function WorksCarousel({ isDarkMode = false }) {
 
   const total = worksData.length;
   const focused = worksData[currentIndex];
-    const totalStars = worksData.reduce((sum, w) => sum + w.stars, 0);
+  const totalStars = worksData.reduce((sum: number, w: any) => sum + w.stars, 0);
   const avgStars = Math.round(totalStars / Math.max(1, total));
-  const onlineCount = worksData.filter((w) => w.status.includes("已上线")).length;
+  const onlineCount = worksData.filter((w: any) => w.status.includes("已上线")).length;
   const topTags = Object.entries(
-    worksData.reduce((acc, work) => {
-      work.tags.forEach((tag) => {
+    worksData.reduce((acc: Record<string, number>, work: any) => {
+      work.tags.forEach((tag: string) => {
         acc[tag] = (acc[tag] || 0) + 1;
       });
       return acc;
-    }, {}),
+    }, {} as Record<string, number>),
   )
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5);
@@ -1348,10 +1649,10 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const controlBtnIconColor = isDarkMode ? "#CBD5E1" : "#7A8EA5";
   const controlBtnActiveIconColor = isDarkMode ? "#93C5FD" : "#3B9CD7";
   const controlDividerColor = isDarkMode ? "#334155" : "#E2EAF2";
-  const stageMinHeight = isDenseDesktop ? 150 : isTablet ? 200 : 240;
+  const stageMinHeight = isDenseDesktop ? 180 : isTablet ? 230 : 280;
   const stageBottomGap = isDenseDesktop ? 8 : 10;
 
-  const go = (dir) => {
+  const go = (dir: number) => {
     setCurrentIndex((i) => (i + dir + total) % total);
   };
 
@@ -1380,42 +1681,35 @@ export default function WorksCarousel({ isDarkMode = false }) {
   }, [isMobile]);
 
   useEffect(() => {
-    clearInterval(autoRef.current);
+    if (autoRef.current) clearInterval(autoRef.current);
 
     if (viewMode !== "carousel" || !autoPlay || isInteracting || isMobile) {
-      return () => clearInterval(autoRef.current);
+      return () => {
+        if (autoRef.current) clearInterval(autoRef.current);
+      };
     }
 
     autoRef.current = setInterval(() => {
       setCurrentIndex((i) => (i + 1) % total);
-    }, 3500);
+    }, 3500) as any;
 
-    return () => clearInterval(autoRef.current);
+    return () => {
+      if (autoRef.current) clearInterval(autoRef.current);
+    };
   }, [viewMode, autoPlay, isInteracting, isMobile, total]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return undefined;
 
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") {
-        closeDetail();
-      }
-    };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  const getCardStyle = (idx) => {
+  const getCardStyle = (idx: number) => {
     const diff = (idx - currentIndex + total) % total;
     const normalized = diff > total / 2 ? diff - total : diff;
     const absD = Math.abs(normalized);
 
     if (absD > 2) return null;
 
-    const rotateStep = isDenseDesktop ? 12 : isTablet ? 14 : 16;
-    const depthStep = isDenseDesktop ? 70 : isTablet ? 84 : 100;
-    const spreadStep = isDenseDesktop ? 78 : isTablet ? 86 : 100;
+    const rotateStep = isDenseDesktop ? 8 : isTablet ? 9 : 10;
+    const depthStep = isDenseDesktop ? 60 : isTablet ? 75 : 90;
+    const spreadStep = isDenseDesktop ? 90 : isTablet ? 110 : 125;
     const centerScale = isDenseDesktop ? 1 : isTablet ? 1.02 : 1.06;
     const sideBaseScale = isDenseDesktop ? 0.88 : isTablet ? 0.9 : 0.92;
     const sideScaleLoss = isDenseDesktop ? 0.04 : isTablet ? 0.05 : 0.06;
@@ -1423,7 +1717,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
     const z = absD === 0 ? 12 : -depthStep * absD;
     const tx = normalized * spreadStep;
     const scale = absD === 0 ? centerScale : sideBaseScale - absD * sideScaleLoss;
-    const opacity = absD === 0 ? 1 : 0.74 - absD * 0.1;
+    const opacity = absD === 0 ? 1 : 0.64 - absD * 0.12;
 
     return {
       transform: `translateX(${tx}px) translateZ(${z}px) rotateY(${rotY}deg) scale(${scale})`,
@@ -1432,7 +1726,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
     };
   };
 
-  const onKeyDown = (e) => {
+  const onKeyDown = (e: any) => {
     if (e.key === "ArrowLeft") {
       e.preventDefault();
       go(-1);
@@ -1680,24 +1974,28 @@ export default function WorksCarousel({ isDarkMode = false }) {
           label="Total Stars"
           value={totalStars.toLocaleString()}
           tint="#0A84FF"
+          isDarkMode={isDarkMode}
         />
         <InsightCard
           icon={Layers}
           label="Projects Online"
           value={`${onlineCount}/${total}`}
           tint="#10B981"
+          isDarkMode={isDarkMode}
         />
         <InsightCard
           icon={Radar}
           label="Avg Stars"
           value={`${avgStars} / project`}
           tint="#F59E0B"
+          isDarkMode={isDarkMode}
         />
         <InsightCard
           icon={Sparkles}
           label="Focused"
           value={focused?.title || "N/A"}
           tint={focused?.color || "#64748B"}
+          isDarkMode={isDarkMode}
         />
       </div>
 
@@ -1827,6 +2125,10 @@ export default function WorksCarousel({ isDarkMode = false }) {
                     work={work}
                     style={cardStyle}
                     isCenter={isCenter}
+                    isDarkMode={isDarkMode}
+                    hoveredRole={hoveredRole}
+                    setHoveredRole={setHoveredRole}
+                    repoContributors={repoContributors}
                     onClick={() => {
                       if (isCenter) {
                         window.open(work.projectUrl, "_blank");
@@ -2151,6 +2453,5 @@ export default function WorksCarousel({ isDarkMode = false }) {
     </div>
   );
 }
-
 
 

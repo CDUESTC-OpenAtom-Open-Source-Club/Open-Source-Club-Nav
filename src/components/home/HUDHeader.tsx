@@ -1,6 +1,7 @@
-﻿"use client";
+"use client";
 import { useEffect, useRef, useState } from "react";
-import { Clock, Radio, Sun, Moon, Monitor, Wifi } from "lucide-react";
+import { Clock, Radio } from "lucide-react";
+import styled from "styled-components";
 
 const TYPEWRITER_MESSAGES = [
   "KCOS 开放原子开源社团 · 探索、共创、分享",
@@ -22,12 +23,6 @@ const THEME_MODES: Array<{ key: ThemeMode; label: string }> = [
   { key: "auto", label: "自动" },
 ];
 
-const THEME_MODE_ICONS: Record<ThemeMode, typeof Sun> = {
-  light: Sun,
-  dark: Moon,
-  auto: Monitor,
-};
-
 type ThemeModeSwitchProps = {
   compact: boolean;
   isDarkMode: boolean;
@@ -42,11 +37,103 @@ type HUDHeaderProps = {
   onThemeModeChange?: (mode: ThemeMode) => void;
 };
 
-type NetInfo = {
-  online: boolean;
-  typeText: string;
-  qualityText: string;
-};
+const StyledWrapper = styled.div`
+  /* Theme Switch */
+  /* The switch - the box around the slider */
+  .switch {
+    font-size: inherit;
+    position: relative;
+    display: inline-block;
+    width: 4em;
+    height: 2.2em;
+    border-radius: 30px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+  }
+
+  /* Hide default HTML checkbox */
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+
+  /* The slider */
+  .slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #2a2a2a;
+    transition: 0.4s;
+    border-radius: 30px;
+    overflow: hidden;
+  }
+
+  .slider:before {
+    position: absolute;
+    content: "";
+    height: 1.2em;
+    width: 1.2em;
+    border-radius: 20px;
+    left: 0.5em;
+    bottom: 0.5em;
+    transition: 0.4s;
+    transition-timing-function: cubic-bezier(0.81, -0.04, 0.38, 1.5);
+    box-shadow: inset 8px -4px 0px 0px #fff;
+  }
+
+  .switch input:checked + .slider {
+    background-color: #00a6ff;
+  }
+
+  .switch input:checked + .slider:before {
+    transform: translateX(1.8em);
+    box-shadow: inset 15px -4px 0px 15px #ffcf48;
+  }
+
+  .star {
+    background-color: #fff;
+    border-radius: 50%;
+    position: absolute;
+    width: 5px;
+    transition: all 0.4s;
+    height: 5px;
+  }
+
+  .star_1 {
+    left: 2.5em;
+    top: 0.5em;
+  }
+
+  .star_2 {
+    left: 2.2em;
+    top: 1.2em;
+  }
+
+  .star_3 {
+    left: 3em;
+    top: 0.9em;
+  }
+
+  .switch input:checked ~ .slider .star {
+    opacity: 0;
+  }
+
+  .cloud {
+    width: 3.5em;
+    position: absolute;
+    bottom: -1.4em;
+    left: -1.1em;
+    opacity: 0;
+    transition: all 0.4s;
+  }
+
+  .switch input:checked ~ .slider .cloud {
+    opacity: 1;
+  }
+`;
 
 function ThemeModeSwitch({
   compact,
@@ -55,56 +142,33 @@ function ThemeModeSwitch({
   onThemeModeChange,
 }: ThemeModeSwitchProps) {
   return (
-    <div
+    <StyledWrapper
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: compact ? "2px" : "3px",
-        borderRadius: 999,
-        border: `1px solid ${isDarkMode ? "#334155" : "#E2E8F0"}`,
-        background: isDarkMode
-          ? "rgba(15,23,42,0.88)"
-          : "rgba(255,255,255,0.92)",
+        fontSize: compact ? "11px" : "15px",
+        display: "inline-block",
+        verticalAlign: "middle",
       }}
     >
-      {THEME_MODES.map((mode) => {
-        const selected = themeMode === mode.key;
-        const ModeIcon = THEME_MODE_ICONS[mode.key];
-        return (
-          <button
-            key={mode.key}
-            type="button"
-            data-ui-touch="true"
-            onClick={() => onThemeModeChange(mode.key)}
-            style={{
-              border: "none",
-              borderRadius: 999,
-              width: compact ? 24 : 28,
-              height: compact ? 24 : 28,
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              color: selected ? "#0A84FF" : isDarkMode ? "#94A3B8" : "#64748B",
-              background: selected
-                ? isDarkMode
-                  ? "rgba(56,189,248,0.2)"
-                  : "#DBEAFE"
-                : "transparent",
-              boxShadow: selected
-                ? "inset 0 0 0 1px rgba(59,130,246,0.25)"
-                : "none",
-              transition: "all 0.18s ease",
-            }}
-            aria-label={`切换主题为${mode.label}`}
-            title={mode.label}
-          >
-            <ModeIcon size={compact ? 13 : 14} />
-          </button>
-        );
-      })}
-    </div>
+      <label className="switch">
+        <input
+          type="checkbox"
+          checked={!isDarkMode}
+          onChange={() => onThemeModeChange(isDarkMode ? "light" : "dark")}
+        />
+        <span className="slider">
+          <span className="star star_1" />
+          <span className="star star_2" />
+          <span className="star star_3" />
+          <svg viewBox="0 0 16 16" className="cloud_1 cloud">
+            <path
+              transform="matrix(.77976 0 0 .78395-299.99-418.63)"
+              fill="#fff"
+              d="m391.84 540.91c-.421-.329-.949-.524-1.523-.524-1.351 0-2.451 1.084-2.485 2.435-1.395.526-2.388 1.88-2.388 3.466 0 1.874 1.385 3.423 3.182 3.667v.034h12.73v-.006c1.775-.104 3.182-1.584 3.182-3.395 0-1.747-1.309-3.186-2.994-3.379.007-.106.011-.214.011-.322 0-2.707-2.271-4.901-5.072-4.901-2.073 0-3.856 1.202-4.643 2.925"
+            />
+          </svg>
+        </span>
+      </label>
+    </StyledWrapper>
   );
 }
 
@@ -114,14 +178,9 @@ export default function HUDHeader({
   themeMode = "auto",
   onThemeModeChange = () => {},
 }: HUDHeaderProps) {
-  const [sessionUptimeText, setSessionUptimeText] = useState("00:00:00");
-  const [currentTimeText, setCurrentTimeText] = useState("--:--:--");
-  const [netInfo, setNetInfo] = useState<NetInfo>({
-    online: true,
-    typeText: "未知网络",
-    qualityText: "--",
-  });
-  const sessionStartMsRef = useRef<number | null>(null);
+  const [uptimeText, setUptimeText] = useState("--");
+  const uptimeBaseSecRef = useRef(0);
+  const uptimeAnchorMsRef = useRef(0);
   const [typeText, setTypeText] = useState("");
   const [msgIdx, setMsgIdx] = useState(0);
   const [charIdx, setCharIdx] = useState(0);
@@ -136,76 +195,38 @@ export default function HUDHeader({
     return `${days}天 ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   };
 
-  const formatClockTime = (date: Date) => {
-    const hh = String(date.getHours()).padStart(2, "0");
-    const mm = String(date.getMinutes()).padStart(2, "0");
-    const ss = String(date.getSeconds()).padStart(2, "0");
-    return `${hh}:${mm}:${ss}`;
-  };
-
   useEffect(() => {
-    if (sessionStartMsRef.current === null) {
-      sessionStartMsRef.current = Date.now();
-    }
-
     const tick = () => {
-      const now = new Date();
-      const startMs = sessionStartMsRef.current ?? now.getTime();
-      const elapsedSec = Math.floor(
-        (now.getTime() - startMs) / 1000,
-      );
-      setSessionUptimeText(formatDuration(elapsedSec));
-      setCurrentTimeText(formatClockTime(now));
+      if (uptimeAnchorMsRef.current <= 0) return;
+      const elapsedSec =
+        uptimeBaseSecRef.current +
+        Math.floor((Date.now() - uptimeAnchorMsRef.current) / 1000);
+      setUptimeText(formatDuration(elapsedSec));
+    };
+
+    const syncSystemTime = async () => {
+      try {
+        const res = await fetch("/api/system", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { uptimeSec?: number };
+        const nextUptime = Number(data?.uptimeSec || 0);
+        uptimeBaseSecRef.current = Number.isFinite(nextUptime) ? nextUptime : 0;
+        uptimeAnchorMsRef.current = Date.now();
+        setUptimeText(formatDuration(uptimeBaseSecRef.current));
+      } catch {
+        // keep previous text
+      }
     };
 
     tick();
+    void syncSystemTime();
     const id = setInterval(tick, 1000);
+    const refreshId = setInterval(() => {
+      void syncSystemTime();
+    }, 60000);
     return () => {
       clearInterval(id);
-    };
-  }, []);
-
-  useEffect(() => {
-    const readConnection = () => {
-      const nav = navigator as Navigator & {
-        connection?: {
-          effectiveType?: string;
-          downlink?: number;
-          rtt?: number;
-        };
-      };
-
-      const online = navigator.onLine;
-      const conn = nav.connection;
-      const effectiveType = conn?.effectiveType || "";
-      const downlink = typeof conn?.downlink === "number" ? conn.downlink : null;
-      const rtt = typeof conn?.rtt === "number" ? conn.rtt : null;
-
-      const typeText = effectiveType
-        ? `${effectiveType.toUpperCase()}`
-        : "网络已连接";
-      const qualityText =
-        downlink !== null
-          ? `${downlink.toFixed(1)}Mb/s`
-          : rtt !== null
-            ? `${rtt}ms`
-            : "--";
-
-      setNetInfo({
-        online,
-        typeText: online ? typeText : "离线",
-        qualityText: online ? qualityText : "--",
-      });
-    };
-
-    readConnection();
-    window.addEventListener("online", readConnection);
-    window.addEventListener("offline", readConnection);
-    const id = window.setInterval(readConnection, 5000);
-    return () => {
-      window.removeEventListener("online", readConnection);
-      window.removeEventListener("offline", readConnection);
-      window.clearInterval(id);
+      clearInterval(refreshId);
     };
   }, []);
 
@@ -269,9 +290,9 @@ export default function HUDHeader({
       >
         <div
           style={{
-            width: compact ? 34 : 46,
-            height: compact ? 30 : 40,
-            borderRadius: 10,
+            width: compact ? 32 : 38,
+            height: compact ? 32 : 38,
+            borderRadius: "50%",
             border: `1px solid ${isDarkMode ? "#475569" : "#BFDBFE"}`,
             display: "flex",
             alignItems: "center",
@@ -285,7 +306,15 @@ export default function HUDHeader({
           <img
             src="/images/brand/club-logo-user.jpg"
             alt="开放原子开源社团 Logo"
-            style={{ width: "100%", height: "100%", objectFit: "contain" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              position: "relative",
+              left: "1.5px",
+              top: "1.5px",
+              transform: "scale(1.08)",
+            }}
           />
         </div>
         <div>
@@ -352,75 +381,47 @@ export default function HUDHeader({
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: "clamp(10px, 1vw, 16px)",
               minWidth: RIGHT_BLOCK_MIN_WIDTH,
               justifyContent: "flex-end",
             }}
           >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "stretch",
-                gap: 6,
-                padding: "6px",
-                borderRadius: 12,
-                border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-                background: isDarkMode
-                  ? "rgba(15,23,42,0.76)"
-                  : "rgba(255,255,255,0.82)",
-                boxShadow: "0 10px 22px rgba(15,23,42,0.08)",
-                backdropFilter: "blur(8px)",
-                minWidth: 236,
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", padding: "0 2px" }}>
-                <ThemeModeSwitch
-                  compact={false}
-                  isDarkMode={isDarkMode}
-                  themeMode={themeMode}
-                  onThemeModeChange={onThemeModeChange}
-                />
+            <ThemeModeSwitch
+              compact={false}
+              isDarkMode={isDarkMode}
+              themeMode={themeMode}
+              onThemeModeChange={onThemeModeChange}
+            />
+            <div style={{ textAlign: "right" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  justifyContent: "flex-end",
+                }}
+              >
+                <Clock size={10} color="#10B981" />
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: "#10B981",
+                    fontFamily: '"Courier New", monospace',
+                  }}
+                >
+                  {uptimeText}
+                </span>
               </div>
               <div
                 style={{
-                  width: 1,
-                  alignSelf: "stretch",
-                  background: isDarkMode ? "#334155" : "#E5E7EB",
-                  opacity: 0.8,
+                  fontSize: 9,
+                  color: isDarkMode ? "#94A3B8" : "#64748B",
+                  textAlign: "right",
+                  letterSpacing: 0.5,
                 }}
-              />
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 4px 2px 2px", minWidth: 124 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <Clock size={10} color="#10B981" />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#10B981", fontFamily: '"Courier New", monospace' }}>
-                    {sessionUptimeText}
-                  </span>
-                </div>
-                <div style={{ width: 1, height: 14, background: isDarkMode ? "#334155" : "#E5E7EB" }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <Clock size={10} color={isDarkMode ? "#93C5FD" : "#0A84FF"} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: isDarkMode ? "#93C5FD" : "#0A84FF", fontFamily: '"Courier New", monospace' }}>
-                    {currentTimeText}
-                  </span>
-                </div>
-                <div style={{ width: 1, height: 14, background: isDarkMode ? "#334155" : "#E5E7EB" }} />
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Wifi size={10} color={netInfo.online ? "#10B981" : "#EF4444"} />
-                  <span
-                    style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: netInfo.online ? "#10B981" : "#EF4444",
-                      boxShadow: netInfo.online
-                        ? "0 0 8px rgba(16,185,129,0.45)"
-                        : "0 0 8px rgba(239,68,68,0.45)",
-                    }}
-                  />
-                  <span style={{ fontSize: 10, color: isDarkMode ? "#94A3B8" : "#64748B", fontFamily: '"Courier New", monospace' }}>
-                    {netInfo.typeText} / {netInfo.qualityText}
-                  </span>
-                </div>
+              >
+                项目运行时长
               </div>
             </div>
           </div>
@@ -443,23 +444,8 @@ export default function HUDHeader({
             themeMode={themeMode}
             onThemeModeChange={onThemeModeChange}
           />
-          <span>本次打开时长</span>
-          <span style={{ color: "#10B981", fontWeight: 700 }}>
-            {sessionUptimeText}
-          </span>
-          <span>当前时间</span>
-          <span style={{ color: isDarkMode ? "#93C5FD" : "#0A84FF", fontWeight: 700 }}>
-            {currentTimeText}
-          </span>
-          <span>设备信号</span>
-          <span
-            style={{
-              color: netInfo.online ? "#10B981" : "#EF4444",
-              fontWeight: 700,
-            }}
-          >
-            {netInfo.typeText} / {netInfo.qualityText}
-          </span>
+          <span>项目运行时长</span>
+          <span style={{ color: "#10B981", fontWeight: 700 }}>{uptimeText}</span>
         </div>
       )}
 

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import {
   Brain,
   MapPin,
@@ -14,7 +14,7 @@ const ICON_MAP: Record<string, LucideIcon> = { Brain, MapPin, Wrench };
 
 const FRIEND_LINKS = [
   { title: "电子科技大学成都学院", url: "https://www.cduestc.fun/" },
-  { title: "相关技术社区", url: "https://github.com/CDUESTC-OpenAtom-Club" },
+  { title: "科成星球", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club" },
 ];
 
 const PANEL_WIDTH = "clamp(214px, 16vw, 252px)";
@@ -33,16 +33,18 @@ const resetCategoryHoverStyle = (target: HTMLElement) => {
   target.style.boxShadow = "none";
 };
 
-const applyFriendLinkHoverStyle = (target: HTMLElement) => {
+const applyFriendLinkHoverStyle = (target: HTMLElement, isDark: boolean = false) => {
   target.style.transform = "translateY(-1px)";
-  target.style.boxShadow = "0 5px 10px rgba(15,23,42,0.08)";
-  target.style.borderColor = "#BFDBFE";
+  target.style.boxShadow = isDark
+    ? "0 5px 10px rgba(0,0,0,0.3)"
+    : "0 5px 10px rgba(15,23,42,0.08)";
+  target.style.borderColor = isDark ? "#3B82F6" : "#BFDBFE";
 };
 
-const resetFriendLinkHoverStyle = (target: HTMLElement) => {
+const resetFriendLinkHoverStyle = (target: HTMLElement, isDark: boolean = false) => {
   target.style.transform = "translateY(0)";
   target.style.boxShadow = "none";
-  target.style.borderColor = "#E5E7EB";
+  target.style.borderColor = isDark ? "#334155" : "#E5E7EB";
 };
 
 type LeftPanelProps = {
@@ -90,7 +92,7 @@ export default function LeftPanel({
             whiteSpace: "nowrap",
           }}
         >
-          璧勬簮鐭╅樀
+          资源矩阵
         </span>
         <div style={{ flex: 1, height: 1, background: "#E5E7EB" }} />
       </div>
@@ -235,7 +237,7 @@ export default function LeftPanel({
             marginBottom: 6,
           }}
         >
-          鍙嬫儏閾炬帴
+          友情链接
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
@@ -250,9 +252,9 @@ export default function LeftPanel({
               data-ui-touch="true"
               style={{
                 textDecoration: "none",
-                border: "1px solid #E5E7EB",
+                border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
                 borderRadius: 8,
-                background: "#FFFFFF",
+                background: isDarkMode ? "rgba(30,41,59,0.5)" : "#FFFFFF",
                 padding: "6px 8px",
                 display: "flex",
                 alignItems: "center",
@@ -260,13 +262,13 @@ export default function LeftPanel({
                 gap: 8,
                 transition: "all 0.18s ease",
               }}
-              onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget)}
-              onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget)}
+              onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
+              onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
             >
               <span
                 style={{
                   fontSize: 10,
-                  color: "#334155",
+                  color: isDarkMode ? "#E2E8F0" : "#334155",
                   overflow: "hidden",
                   whiteSpace: "nowrap",
                   textOverflow: "ellipsis",
@@ -294,9 +296,9 @@ export default function LeftPanel({
             data-ui-touch="true"
             style={{
               textDecoration: "none",
-              border: "1px solid #BFDBFE",
+              border: `1px solid ${isDarkMode ? "#334155" : "#BFDBFE"}`,
               borderRadius: 10,
-              background: "linear-gradient(180deg, #FFFFFF, #F8FBFF)",
+              background: isDarkMode ? "linear-gradient(180deg, #1E293B, #0F172A)" : "linear-gradient(180deg, #FFFFFF, #F8FBFF)",
               padding: "8px 9px",
               display: "flex",
               alignItems: "center",
@@ -304,8 +306,8 @@ export default function LeftPanel({
               gap: 8,
               transition: "all 0.18s ease",
             }}
-            onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget)}
-            onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget)}
+            onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
+            onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
           >
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
               <Gamepad2 size={12} color="#0A84FF" />
@@ -313,13 +315,13 @@ export default function LeftPanel({
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
-                  color: "#0F172A",
+                  color: isDarkMode ? "#F8FAFC" : "#0F172A",
                   overflow: "hidden",
                   whiteSpace: "nowrap",
                   textOverflow: "ellipsis",
                 }}
               >
-                鍚冭眴浜哄皬娓告垙
+                吃豆人小游戏
               </span>
             </span>
             <ChevronRight size={12} color="#0A84FF" />

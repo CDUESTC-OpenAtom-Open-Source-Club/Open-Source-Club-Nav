@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -352,7 +352,7 @@ export default function AdminPage() {
     if (MOCK_MODE) {
       setLogs([
         { id: 1, link_id: 1, action: "create link", actor_username: "demo-admin", actor_role: "super", created_at: "2026-05-24T09:15:00", detail: { title: "React 官方文档" } },
-        { id: 2, link_id: 3, action: "disable link", actor_username: "editor-a", actor_role: "editor", created_at: "2026-05-24T09:36:00", detail: { reason: "鎺㈡祴澶辫触" } },
+        { id: 2, link_id: 3, action: "disable link", actor_username: "editor-a", actor_role: "editor", created_at: "2026-05-24T09:36:00", detail: { reason: "探测失败" } },
         { id: 3, link_id: 2, action: "update link", actor_username: "demo-admin", actor_role: "super", created_at: "2026-05-24T10:01:00", detail: { field: "description" } },
       ]);
       markSectionLoaded("logs");
@@ -458,7 +458,7 @@ export default function AdminPage() {
         body: JSON.stringify(linkForm),
       });
       const data = await readJsonSafe<{ error?: string }>(res);
-      if (!res.ok) throw new Error(data?.error || "鏂板閾炬帴澶辫触");
+      if (!res.ok) throw new Error(data?.error || "新增链接失败");
       setLinkForm({ title: "", url: "", description: "", sort: 0 });
       await Promise.all([
         loadLinks(),
@@ -466,7 +466,7 @@ export default function AdminPage() {
         loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
       ]);
     } catch (err) {
-      setError(String((err as Error).message || "鏂板閾炬帴澶辫触"));
+      setError(String((err as Error).message || "新增链接失败"));
     }
   };
 
@@ -561,7 +561,7 @@ export default function AdminPage() {
       <div className="admin-console-layout">
         <aside className="admin-console-sidebar">
           <div className="admin-console-side-title">控制台</div>
-          {/* 宸︿晶鑿滃崟鍙礋璐ｅ垏鎹㈡ā鍧楋紝涓嶆壙杞借矾鐢辩姸鎬併€?*/}
+          {/* 左侧菜单只负责切换模块，不承载路由状态。 */}
           {sections.map((section) => (
             <button
               key={section.id}
@@ -575,7 +575,7 @@ export default function AdminPage() {
         </aside>
 
         <div className="admin-console-content">
-      {/* 杩欎竴鍧椾繚鐣欎负鍚庡彴缁熶竴澶撮儴锛屾墍鏈夋ā鍧楀垏鎹㈡椂閮芥樉绀恒€?*/}
+      {/* 这一块保留为后台统一头部，所有模块切换时都显示。 */}
       <div id="overview" className="admin-card admin-console-anchor-card" style={{ padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "rgba(226,238,252,0.94)", borderColor: "#93C5FD", boxShadow: "0 14px 34px rgba(37,99,235,0.18)" }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#0F172A" }}>管理后台</div>
@@ -594,7 +594,7 @@ export default function AdminPage() {
       {error ? (
         <div style={{ color: "#DC2626", fontSize: 12 }}>{error}</div>
       ) : null}
-      {/* 姣忔鍙覆鏌撲竴涓ā鍧楋紝鍑忓皯淇℃伅鍫嗗彔锛屼繚鎸佸悗鍙板崟椤靛垏鎹綋楠屻€?*/}
+      {/* 每次只渲染一个模块，减少信息堆叠，保持后台单页切换体验。 */}
       {activeSection === "overview" ? (
         <>
           <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>

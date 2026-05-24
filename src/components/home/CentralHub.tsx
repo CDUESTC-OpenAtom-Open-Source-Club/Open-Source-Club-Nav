@@ -47,6 +47,115 @@ const CLUB_OVERVIEW_ITEMS = [
   },
 ];
 
+function HoverRevealCard({ item, direction, delay = 0, isDarkMode }) {
+  const isLeft = direction === "left";
+  const [isExpanded, setIsExpanded] = useState(false);
+  const collapsedWidth = 110;
+
+  return (
+    <div
+      className="hover-reveal-card"
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
+      style={{
+        position: "relative",
+        width: isExpanded ? 220 : collapsedWidth,
+        minHeight: isExpanded ? 108 : 54,
+        padding: isExpanded ? "14px 18px 16px" : "0",
+        borderRadius: 16,
+        background: isExpanded
+          ? isDarkMode
+            ? "rgba(15, 23, 42, 0.35)"
+            : "rgba(255, 255, 255, 0.4)"
+          : "transparent",
+        backdropFilter: isExpanded ? "blur(20px)" : "none",
+        WebkitBackdropFilter: isExpanded ? "blur(20px)" : "none",
+        border: isExpanded
+          ? isDarkMode
+            ? "1px solid rgba(255, 255, 255, 0.12)"
+            : "1px solid rgba(255, 255, 255, 0.5)"
+          : "1px solid transparent",
+        boxShadow: isExpanded
+          ? "0 22px 46px rgba(15, 23, 42, 0.14)"
+          : "none",
+        overflow: "visible",
+        cursor: "default",
+        zIndex: isExpanded ? 30 : 1,
+        transition:
+          "width 0.26s ease, min-height 0.26s ease, padding 0.24s ease, transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease, border-color 0.22s ease",
+        transform: isExpanded ? "translateY(-2px) scale(1.01)" : "translateY(0) scale(1)",
+        animation: `${isLeft ? "fadeInLeft" : "fadeInRight"} 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}s both`,
+      }}
+    >
+      <div
+        className="hover-reveal-card__chip"
+        style={{
+          fontSize: 11,
+          color: item.color,
+          fontWeight: 700,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "6px 10px",
+          borderRadius: 10,
+          background: isDarkMode
+            ? "rgba(15,23,42,0.38)"
+            : "rgba(255,255,255,0.7)",
+          border: `1px solid ${item.color}33`,
+          boxShadow: `0 0 0 1px ${item.color}10 inset`,
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          transition: "transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease",
+          transform: "translateY(0) scale(1)",
+          boxShadow: isExpanded
+            ? "0 12px 28px rgba(15, 23, 42, 0.12)"
+            : `0 0 0 1px ${item.color}10 inset`,
+          background: isExpanded
+            ? "rgba(255, 255, 255, 0.9)"
+            : isDarkMode
+              ? "rgba(15,23,42,0.38)"
+              : "rgba(255,255,255,0.7)",
+          width: "fit-content",
+          marginLeft: isLeft ? 10 : "auto",
+          marginRight: isLeft ? "auto" : 10,
+        }}
+      >
+        <div
+          className="hover-reveal-card__spark"
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: "50%",
+            background: item.color,
+            boxShadow: `0 0 8px ${item.color}`,
+          }}
+        />
+        {item.title}
+      </div>
+
+      <div
+        className="hover-reveal-card__body"
+        style={{
+          fontSize: 11,
+          color: isDarkMode ? "#94A3B8" : "#64748B",
+          lineHeight: 1.5,
+          opacity: isExpanded ? 1 : 0,
+          maxHeight: isExpanded ? 90 : 0,
+          overflow: "hidden",
+          filter: isExpanded ? "blur(0)" : "blur(4px)",
+          whiteSpace: "normal",
+          marginTop: isExpanded ? 10 : 0,
+          transform: isExpanded ? "translateY(0)" : "translateY(-8px)",
+          transition:
+            "opacity 0.2s ease, max-height 0.26s ease, margin-top 0.24s ease, transform 0.24s ease, filter 0.24s ease",
+        }}
+      >
+        {item.value}
+      </div>
+    </div>
+  );
+}
+
 const HOME_INFO_CARDS = [
   {
     title: "社团域名",
@@ -1129,7 +1238,7 @@ export default function CentralHub({
         background: isDarkMode
           ? "rgba(15,23,42,0.68)"
           : "rgba(255,255,255,0.7)",
-        overflow: "hidden",
+        overflow: "visible",
       }}
     >
       <div
@@ -1208,6 +1317,8 @@ export default function CentralHub({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                overflow: "visible",
+                zIndex: 4,
               }}
             >
               {/* 左侧 HUD 面板 */}
@@ -1217,33 +1328,20 @@ export default function CentralHub({
                   left: "-320px",
                   display: viewportMode === "desktop" ? "flex" : "none",
                   flexDirection: "column",
+                  alignItems: "flex-start",
                   gap: 16,
-                  zIndex: 2,
+                  zIndex: 8,
+                  overflow: "visible",
                 }}
               >
                 {CLUB_OVERVIEW_ITEMS.slice(0, 2).map((item, idx) => (
-                  <div
+                  <HoverRevealCard
                     key={item.title}
-                    style={{
-                      width: 220,
-                      padding: "16px 18px",
-                      borderRadius: 16,
-                      background: isDarkMode ? "rgba(15, 23, 42, 0.35)" : "rgba(255, 255, 255, 0.4)",
-                      backdropFilter: "blur(20px)",
-                      WebkitBackdropFilter: "blur(20px)",
-                      border: isDarkMode ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.5)",
-                      boxShadow: "0 15px 35px rgba(0,0,0,0.12)",
-                      animation: `fadeInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 0.15}s both`,
-                    }}
-                  >
-                    <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, boxShadow: `0 0 8px ${item.color}` }} />
-                      {item.title}
-                    </div>
-                    <div style={{ fontSize: 11, color: isDarkMode ? "#94A3B8" : "#64748B", lineHeight: 1.5 }}>
-                      {item.value}
-                    </div>
-                  </div>
+                    item={item}
+                    direction="left"
+                    delay={idx * 0.15}
+                    isDarkMode={isDarkMode}
+                  />
                 ))}
               </div>
 
@@ -1256,36 +1354,46 @@ export default function CentralHub({
                   right: "-320px",
                   display: viewportMode === "desktop" ? "flex" : "none",
                   flexDirection: "column",
+                  alignItems: "flex-end",
                   gap: 16,
-                  zIndex: 2,
+                  zIndex: 8,
+                  overflow: "visible",
                 }}
               >
                 {CLUB_OVERVIEW_ITEMS.slice(2, 4).map((item, idx) => (
-                  <div
+                  <HoverRevealCard
                     key={item.title}
-                    style={{
-                      width: 220,
-                      padding: "16px 18px",
-                      borderRadius: 16,
-                      background: isDarkMode ? "rgba(15, 23, 42, 0.35)" : "rgba(255, 255, 255, 0.4)",
-                      backdropFilter: "blur(20px)",
-                      WebkitBackdropFilter: "blur(20px)",
-                      border: isDarkMode ? "1px solid rgba(255, 255, 255, 0.12)" : "1px solid rgba(255, 255, 255, 0.5)",
-                      boxShadow: "0 15px 35px rgba(0,0,0,0.12)",
-                      animation: `fadeInRight 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${idx * 0.15}s both`,
-                    }}
-                  >
-                    <div style={{ fontSize: 11, color: item.color, fontWeight: 700, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: item.color, boxShadow: `0 0 8px ${item.color}` }} />
-                      {item.title}
-                    </div>
-                    <div style={{ fontSize: 11, color: isDarkMode ? "#94A3B8" : "#64748B", lineHeight: 1.5 }}>
-                      {item.value}
-                    </div>
-                  </div>
+                    item={item}
+                    direction="right"
+                    delay={idx * 0.15}
+                    isDarkMode={isDarkMode}
+                  />
                 ))}
               </div>
             </div>
+
+            <style>{`
+              .hover-reveal-card__spark {
+                animation: sparkBlink 1.25s ease-in-out infinite;
+              }
+
+              .hover-reveal-card:hover .hover-reveal-card__spark {
+                animation-duration: 0.7s;
+              }
+
+              @keyframes sparkBlink {
+                0%, 100% {
+                  opacity: 0.45;
+                  transform: scale(0.92);
+                  filter: brightness(0.95);
+                }
+                50% {
+                  opacity: 1;
+                  transform: scale(1.35);
+                  filter: brightness(1.2);
+                }
+              }
+            `}</style>
 
             <div style={{ textAlign: "center", marginTop: -12 }}>
               <div

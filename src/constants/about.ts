@@ -256,6 +256,6 @@ export const FOOTER_QUICK_LINKS = [
   { label: "社团官网", href: "https://opensouce-club.top/" },
   {
     label: "GitHub",
-    href: "https://github.com/CDUESTC-OpenAtom-Club/OpenAtom-Club-Nav",
+    href: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club/Open-Source-Club-Nav",
   },
 ];

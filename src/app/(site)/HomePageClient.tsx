@@ -1,4 +1,4 @@
-﻿/* eslint-disable @typescript-eslint/ban-ts-comment */
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
@@ -90,26 +90,26 @@ export default function HomePage() {
 
   const handleHiddenAdminEntry = useCallback((event) => {
     event.preventDefault();
-    setAdminTapCount((prev) => {
-      const next = prev + 1;
-      if (next >= 3) {
-        if (adminTapTimerRef.current) {
-          window.clearTimeout(adminTapTimerRef.current);
-          adminTapTimerRef.current = null;
-        }
-        router.push("/admin/login");
-        return 0;
-      }
+    if (adminTapTimerRef.current) {
+      window.clearTimeout(adminTapTimerRef.current);
+    }
+    setAdminTapCount((prev) => prev + 1);
+    adminTapTimerRef.current = window.setTimeout(() => {
+      setAdminTapCount(0);
+      adminTapTimerRef.current = null;
+    }, 1800);
+  }, []);
+
+  useEffect(() => {
+    if (adminTapCount >= 3) {
       if (adminTapTimerRef.current) {
         window.clearTimeout(adminTapTimerRef.current);
-      }
-      adminTapTimerRef.current = window.setTimeout(() => {
-        setAdminTapCount(0);
         adminTapTimerRef.current = null;
-      }, 1800);
-      return next;
-    });
-  }, [router]);
+      }
+      setAdminTapCount(0);
+      router.push("/admin/login");
+    }
+  }, [adminTapCount, router]);
 
   const scrollToAboutSection = useCallback((sectionId) => {
     // 点击侧栏目录后，平滑滚动到对应章节
@@ -204,7 +204,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    // 瑙嗗彛鏂偣鍚屾鍒?React state
+    // 视口断点同步到 React state
     const syncViewport = () => {
       const width = window.innerWidth;
       setIsPhoneViewport(width <= 768);

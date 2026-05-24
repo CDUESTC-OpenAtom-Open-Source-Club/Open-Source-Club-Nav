@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   GitCommit,
@@ -216,7 +216,7 @@ function ActivityCard({
             {item.actor.avatar}
           </div>
           <span style={{ fontSize: 10, color: "#94A3B8" }}>{item.actor.login}</span>
-          <span style={{ fontSize: 10, color: isDarkMode ? "#64748B" : "#CBD5E1" }}>路</span>
+          <span style={{ fontSize: 10, color: isDarkMode ? "#64748B" : "#CBD5E1" }}>•</span>
           <span
             style={{
               fontSize: 10,
@@ -356,7 +356,7 @@ export default function RightPanel({ isDarkMode = false }) {
   }, [refresh]);
 
   const diffLabel = getDiffLabel(lastUpdated, nowTs);
-  const sourceLabel = source === "github" ? "实时数据" : "";
+  const sourceLabel = source === "github" ? "LIVE" : "";
 
   const stats = useMemo(() => {
     const commits = activity.reduce((sum, item) => sum + (item.commits || 0), 0);
@@ -399,7 +399,7 @@ export default function RightPanel({ isDarkMode = false }) {
             成员动态
           </div>
           <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 2, letterSpacing: 0.5 }}>
-            更新于 {diffLabel} 路 {sourceLabel}
+            更新于 {diffLabel} • {sourceLabel}
           </div>
         </div>
         <button
