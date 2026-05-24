@@ -276,7 +276,13 @@ const getDiffLabel = (updatedAt: Date, nowTs: number) => {
   return `${diffMin} 分钟前`;
 };
 
-export default function RightPanel({ isDarkMode = false }) {
+export default function RightPanel({
+  isDarkMode = false,
+  embedded = false,
+}: {
+  isDarkMode?: boolean;
+  embedded?: boolean;
+}) {
   const [activity, setActivity] = useState<ActivityItem[]>(
     MOCK_ACTIVITY as ActivityItem[],
   );
@@ -371,13 +377,15 @@ export default function RightPanel({ isDarkMode = false }) {
   return (
     <aside
       style={{
-        width: PANEL_WIDTH,
-        minWidth: PANEL_WIDTH,
+        width: embedded ? "100%" : PANEL_WIDTH,
+        minWidth: embedded ? "100%" : PANEL_WIDTH,
         background: isDarkMode ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.9)",
-        borderLeft: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+        borderLeft: embedded ? "none" : `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+        borderTop: embedded ? `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}` : "none",
         display: "flex",
         flexDirection: "column",
         overflowY: "auto",
+        borderRadius: embedded ? 16 : 0,
       }}
     >
       <div
@@ -388,7 +396,7 @@ export default function RightPanel({ isDarkMode = false }) {
           alignItems: "center",
           justifyContent: "space-between",
           position: "sticky",
-          top: 0,
+          top: embedded ? -1 : 0,
           background: isDarkMode ? "rgba(15,23,42,0.95)" : "rgba(255,255,255,0.95)",
           backdropFilter: "blur(8px)",
           zIndex: 10,

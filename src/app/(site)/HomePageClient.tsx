@@ -47,6 +47,8 @@ export default function HomePage() {
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isTabletViewport, setIsTabletViewport] = useState(false);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileActivityOpen, setMobileActivityOpen] = useState(false);
   const [githubUserProfiles, setGithubUserProfiles] = useState({});
   const [adminTapCount, setAdminTapCount] = useState(0);
   const adminTapTimerRef = useRef(null);
@@ -229,6 +231,13 @@ export default function HomePage() {
   }, [aboutOpen]);
 
   useEffect(() => {
+    if (!isMobileViewport) {
+      setMobileMenuOpen(false);
+      setMobileActivityOpen(false);
+    }
+  }, [isMobileViewport]);
+
+  useEffect(() => {
     if (!aboutOpen) return undefined;
 
     // 打开关于弹层后，默认定位到 mission 并同步章节高亮
@@ -288,6 +297,8 @@ export default function HomePage() {
         isDarkMode={isDarkMode}
         themeMode={themeMode}
         onThemeModeChange={setThemeMode}
+        mobileMenuOpen={mobileMenuOpen}
+        onToggleMobileMenu={() => setMobileMenuOpen((open) => !open)}
       />
 
       <div
@@ -301,7 +312,7 @@ export default function HomePage() {
       >
         <div
           className="hidden xl:flex"
-          style={{ display: "flex", flexShrink: 0 }}
+          style={{ display: isMobileViewport ? "none" : "flex", flexShrink: 0 }}
         >
           <LeftPanel
             activeCategory={activeCategory}
@@ -313,22 +324,98 @@ export default function HomePage() {
         <div
           style={{
             flex: 1,
-            overflow: "hidden",
+            overflow: isMobileViewport && mobileMenuOpen ? "hidden" : "hidden",
             display: "flex",
             flexDirection: "column",
+            pointerEvents: isMobileViewport && mobileMenuOpen ? "none" : "auto",
           }}
         >
+          {isMobileViewport && mobileMenuOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 50,
+                background: "rgba(2, 6, 23, 0.55)",
+                backdropFilter: "blur(10px)",
+                padding: 12,
+                overflowY: "auto",
+                pointerEvents: "auto",
+              }}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gap: 12,
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <LeftPanel
+                  activeCategory={activeCategory}
+                  onCategorySelect={(category) => {
+                    handleCategorySelect(category);
+                    setMobileMenuOpen(false);
+                  }}
+                  isDarkMode={isDarkMode}
+                />
+                <RightPanel isDarkMode={isDarkMode} embedded />
+              </div>
+            </div>
+          )}
           <CentralHub
             activeCategory={activeCategory}
             parallax={parallax}
             onClosePanel={() => handleCategorySelect(null)}
             isDarkMode={isDarkMode}
           />
+          {isMobileViewport && !mobileMenuOpen && (
+            <div
+              style={{
+                borderTop: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                background: isDarkMode
+                  ? "rgba(15,23,42,0.88)"
+                  : "rgba(255,255,255,0.92)",
+                backdropFilter: "blur(10px)",
+                padding: "10px 12px 12px",
+                display: "grid",
+                gap: 10,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setMobileActivityOpen((open) => !open)}
+                style={{
+                  width: "100%",
+                  borderRadius: 12,
+                  border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                  background: isDarkMode ? "#0F172A" : "#F8FAFC",
+                  padding: "10px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  color: isDarkMode ? "#E2E8F0" : "#0F172A",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                }}
+              >
+                <span>成员动态</span>
+                <span style={{ fontSize: 11, color: "#94A3B8" }}>
+                  {mobileActivityOpen ? "收起" : "展开"}
+                </span>
+              </button>
+              {mobileActivityOpen && <RightPanel isDarkMode={isDarkMode} embedded />}
+            </div>
+          )}
         </div>
 
         <div
           className="hidden xl:flex"
-          style={{ display: "flex", flexShrink: 0 }}
+          style={{ display: isMobileViewport ? "none" : "flex", flexShrink: 0 }}
         >
           <RightPanel isDarkMode={isDarkMode} />
         </div>

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Clock, Radio } from "lucide-react";
+import { Clock, Menu, Radio, X } from "lucide-react";
 import styled from "styled-components";
 
 const TYPEWRITER_MESSAGES = [
@@ -35,6 +35,8 @@ type HUDHeaderProps = {
   isDarkMode?: boolean;
   themeMode?: ThemeMode;
   onThemeModeChange?: (mode: ThemeMode) => void;
+  mobileMenuOpen?: boolean;
+  onToggleMobileMenu?: () => void;
 };
 
 const StyledWrapper = styled.div`
@@ -177,6 +179,8 @@ export default function HUDHeader({
   isDarkMode = false,
   themeMode = "auto",
   onThemeModeChange = () => {},
+  mobileMenuOpen = false,
+  onToggleMobileMenu = () => {},
 }: HUDHeaderProps) {
   const [uptimeText, setUptimeText] = useState("--");
   const uptimeBaseSecRef = useRef(0);
@@ -430,22 +434,54 @@ export default function HUDHeader({
         <div
           style={{
             marginLeft: "auto",
-            display: "grid",
-            gap: 2,
-            justifyItems: "end",
-            color: isDarkMode ? "#94A3B8" : "#64748B",
-            fontSize: 10,
-            fontFamily: '"Courier New", monospace',
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
           }}
         >
-          <ThemeModeSwitch
-            compact={true}
-            isDarkMode={isDarkMode}
-            themeMode={themeMode}
-            onThemeModeChange={onThemeModeChange}
-          />
-          <span>项目运行时长</span>
-          <span style={{ color: "#10B981", fontWeight: 700 }}>{uptimeText}</span>
+          <div
+            style={{
+              display: "grid",
+              gap: 2,
+              justifyItems: "end",
+              color: isDarkMode ? "#94A3B8" : "#64748B",
+              fontSize: 10,
+              fontFamily: '"Courier New", monospace',
+            }}
+          >
+            <ThemeModeSwitch
+              compact={true}
+              isDarkMode={isDarkMode}
+              themeMode={themeMode}
+              onThemeModeChange={onThemeModeChange}
+            />
+            <span>项目运行时长</span>
+            <span style={{ color: "#10B981", fontWeight: 700 }}>{uptimeText}</span>
+          </div>
+          <button
+            type="button"
+            onClick={onToggleMobileMenu}
+            data-ui-touch="true"
+            aria-label={mobileMenuOpen ? "关闭移动菜单" : "打开移动菜单"}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 10,
+              border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+              background: isDarkMode ? "#111827" : "#FFFFFF",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {mobileMenuOpen ? (
+              <X size={16} color={isDarkMode ? "#CBD5E1" : "#334155"} />
+            ) : (
+              <Menu size={16} color={isDarkMode ? "#CBD5E1" : "#334155"} />
+            )}
+          </button>
         </div>
       )}
 

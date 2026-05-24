@@ -1524,47 +1524,40 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const [repoContributors, setRepoContributors] = useState({});
 
   useEffect(() => {
-    const repos = new Set<string>();
+    const repoMap = new Map<string, string>();
     worksData.forEach((w: any) => {
       if (w.projectUrl && w.projectUrl.includes("github.com/")) {
-        repos.add(w.projectUrl);
+        const match = w.projectUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
+        if (!match) return;
+        const owner = match[1];
+        const repo = match[2].replace(/\.git$/, "");
+        repoMap.set(w.projectUrl, `${owner}/${repo}`);
       }
     });
 
     const abortController = new AbortController();
-
-    const fetchRepoContributors = async (url: string) => {
+    const fetchRepoContributors = async () => {
       try {
-        const match = url.match(/github\.com\/([^/]+)\/([^/]+)/);
-        if (!match) return;
-        const owner = match[1];
-        const repo = match[2].replace(/\.git$/, "");
-        
-        const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contributors`, {
-          signal: abortController.signal
+        const repos = Array.from(repoMap.values());
+        if (!repos.length) return;
+        const res = await fetch(`/api/github-contributors?repos=${encodeURIComponent(repos.join(","))}`, {
+          signal: abortController.signal,
+          cache: "no-store",
         });
-        if (!res.ok) throw new Error("GitHub API Error");
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const list = data.slice(0, 5).map(c => ({
-            login: c.login,
-            avatar: c.avatar_url,
-            url: c.html_url,
-            contributions: c.contributions
-          }));
-          setRepoContributors(prev => ({
-            ...prev,
-            [url]: list
-          }));
-        }
-      } catch (err) {
-        // Fallback silently if API rate limited
+        if (!res.ok) throw new Error("GitHub contributors API error");
+        const payload = await res.json();
+        const contributors = payload?.contributors || {};
+        const nextMap: Record<string, any[]> = {};
+        repoMap.forEach((repoKey, url) => {
+          nextMap[url] = Array.isArray(contributors[repoKey]) ? contributors[repoKey] : [];
+        });
+        setRepoContributors(nextMap);
+      } catch {
+        // Fallback silently if API unavailable
       }
     };
 
-    repos.forEach(url => {
-      fetchRepoContributors(url);
-    });
+    void fetchRepoContributors();
 
     return () => {
       abortController.abort();
@@ -2453,5 +2446,4 @@ export default function WorksCarousel({ isDarkMode = false }) {
     </div>
   );
 }
-
 
