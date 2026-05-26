@@ -1,0 +1,6 @@
+bin
+*.log
+config.local.yaml
+config.yaml
+Dockerfile
+.dockerignore

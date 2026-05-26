@@ -1,0 +1,125 @@
+definitions:
+  model.NavItem:
+    properties:
+      content:
+        type: string
+      coverUrl:
+        type: string
+      createdAt:
+        type: string
+      id:
+        type: integer
+      linkUrl:
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  model.User:
+    properties:
+      createdAt:
+        type: string
+      deletedAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      password:
+        type: string
+      passwordHash:
+        type: string
+      role:
+        type: string
+      updatedAt:
+        type: string
+      username:
+        type: string
+    type: object
+info:
+  contact: {}
+paths:
+  /backend/admin/list:
+    get:
+      description: 查看所有管理员账号
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 管理员列表
+          schema:
+            items:
+              $ref: '#/definitions/model.User'
+            type: array
+      summary: 获取管理员列表
+      tags:
+      - 管理员
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: 账号密码登录，获取Token
+      parameters:
+      - description: 登录信息
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: token
+          schema:
+            type: string
+      summary: 用户登录
+      tags:
+      - 用户
+  /nav/search:
+    get:
+      consumes:
+      - application/json
+      description: 搜索导航标题或描述含关键词的站点
+      parameters:
+      - description: 搜索关键词
+        in: query
+        name: keyword
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 搜索结果列表
+          schema:
+            items:
+              $ref: '#/definitions/model.NavItem'
+            type: array
+      summary: 搜索导航站点
+      tags:
+      - 导航站
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: 新用户注册，创建账号
+      parameters:
+      - description: 注册信息
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/model.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 注册成功
+          schema:
+            type: string
+      summary: 用户注册
+      tags:
+      - 用户
+swagger: "2.0"

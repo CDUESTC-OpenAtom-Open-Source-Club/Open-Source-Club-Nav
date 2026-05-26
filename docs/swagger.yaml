@@ -1,0 +1,90 @@
+definitions:
+  main.User:
+    type: object
+info:
+  contact: {}
+  description: 项目API文档
+  title: 你的项目API文档
+  version: "1.0"
+paths:
+  /backend/test:
+    get:
+      description: 需要admin权限的接口
+      parameters:
+      - description: Bearer Token
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      responses:
+        "200":
+          description: admin接口访问成功
+          schema:
+            type: string
+        "401":
+          description: 未登录或权限不足
+          schema:
+            type: string
+      summary: 管理员接口
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: 账号登录，获取JWT Token
+      parameters:
+      - description: 登录信息
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/main.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 登录成功
+          schema:
+            type: string
+        "400":
+          description: 参数错误
+          schema:
+            type: string
+        "401":
+          description: 账号或密码错误
+          schema:
+            type: string
+      summary: 用户登录
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: 新用户注册，创建账号
+      parameters:
+      - description: 注册信息
+        in: body
+        name: user
+        required: true
+        schema:
+          $ref: '#/definitions/main.User'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 注册成功
+          schema:
+            type: string
+        "400":
+          description: 参数错误
+          schema:
+            type: string
+        "500":
+          description: 注册失败
+          schema:
+            type: string
+      summary: 用户注册
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
