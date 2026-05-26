@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { WORKS } from "@/data/works";
 import TechBackground from "./TechBackground";
+import { trackOutboundClick } from "@/lib/track-outbound";
 
 const PACMAN_BEST_KEY = "kcos_pacman_best";
 const PACMAN_EASY = {
@@ -718,7 +719,14 @@ function ListRow({
   return (
     <button
       type="button"
-      onClick={() => window.open(work.projectUrl, "_blank")}
+      onClick={() => {
+        trackOutboundClick({
+          targetUrl: work.projectUrl,
+          targetLabel: work.title,
+          sourceContext: "works-carousel:list-row",
+        });
+        window.open(work.projectUrl, "_blank");
+      }}
       data-ui-touch="true"
       style={{
         width: "100%",
@@ -2159,6 +2167,11 @@ export default function WorksCarousel({ isDarkMode = false }) {
                     repoContributors={repoContributors}
                     onClick={() => {
                       if (isCenter) {
+                        trackOutboundClick({
+                          targetUrl: work.projectUrl,
+                          targetLabel: work.title,
+                          sourceContext: "works-carousel:carousel-card",
+                        });
                         window.open(work.projectUrl, "_blank");
                       } else {
                         go(

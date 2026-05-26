@@ -2,3 +2,4 @@ backend/config.local.yaml
 backend/config.yaml
 backend/bin/
 fronted/apps/web/dist-prod/
+.playwright-mcp/

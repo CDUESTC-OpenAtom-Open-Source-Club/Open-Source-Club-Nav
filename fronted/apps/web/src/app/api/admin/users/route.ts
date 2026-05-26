@@ -38,7 +38,7 @@ export async function GET() {
     if (session.role !== "super") return forbidden();
 
     const [rows] = await pool.query(
-      "SELECT id, username, role, created_at, last_login_at FROM admin_users ORDER BY id ASC",
+      "SELECT id, username, role, created_at, last_login_at FROM users WHERE role IN ('super', 'editor') ORDER BY id ASC",
     );
     return Response.json({ users: rows });
   } catch {
@@ -83,12 +83,14 @@ export async function POST(request: Request) {
 
     const passwordHash = hashPassword(password);
     await pool.query(
-      "INSERT INTO admin_users (username, password_hash, role, created_by) VALUES (?, ?, ?, ?)",
-      [username, passwordHash, role, session.userId],
+      `INSERT INTO users
+        (email, username, password_hash, role, status, created_by, password, password_changed_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 1, ?, '', NOW(), NOW(3), NOW(3))`,
+      ["", username, passwordHash, role, session.userId],
     );
 
     const [rows] = await pool.query(
-      "SELECT id, username, role, created_at, last_login_at FROM admin_users WHERE username = ? LIMIT 1",
+      "SELECT id, username, role, created_at, last_login_at FROM users WHERE username = ? LIMIT 1",
       [username],
     );
     return Response.json({ user: (rows as Array<unknown>)[0] }, { status: 201 });

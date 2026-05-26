@@ -38,9 +38,9 @@ export async function GET() {
   if (!session) return Response.json({ error: "未登录" }, { status: 401 });
 
   const [rows] = await pool.query(
-    `SELECT h.link_id, h.url, h.status_code, h.is_ok, h.checked_at, h.message, f.title
-     FROM admin_link_health h
-     LEFT JOIN friend_links f ON f.id = h.link_id
+    `SELECT h.nav_item_id AS link_id, h.url, h.status_code, h.is_ok, h.checked_at, h.message, n.title
+     FROM nav_item_health h
+     LEFT JOIN nav_items n ON n.id = h.nav_item_id
      ORDER BY h.checked_at DESC
      LIMIT 200`,
   );
@@ -58,7 +58,7 @@ export async function POST() {
   if (!session) return Response.json({ error: "未登录" }, { status: 401 });
 
   const [links] = await pool.query(
-    "SELECT id, url FROM friend_links WHERE active = 1 ORDER BY id ASC",
+    "SELECT id, link_url AS url FROM nav_items WHERE active = 1 ORDER BY id ASC",
   );
   const list = links as Array<{ id: number; url: string }>;
 
@@ -92,7 +92,7 @@ export async function POST() {
     }
 
     await pool.query(
-      `INSERT INTO admin_link_health (link_id, url, status_code, is_ok, checked_at, message)
+      `INSERT INTO nav_item_health (nav_item_id, url, status_code, is_ok, checked_at, message)
        VALUES (?, ?, ?, ?, NOW(), ?)
        ON DUPLICATE KEY UPDATE
          url = VALUES(url),

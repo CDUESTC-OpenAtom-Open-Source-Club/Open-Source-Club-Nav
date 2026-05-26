@@ -46,7 +46,7 @@ func RegisterHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败"})
 		return
 	}
-	reqUser.Password = string(hashedPwd)
+	reqUser.PasswordHash = string(hashedPwd)
 	reqUser.Role = "user" // 默认普通用户
 
 	// 4. 写入数据库
@@ -92,7 +92,7 @@ func LoginHandler(c *gin.Context) {
 	}
 
 	// 验证密码
-	if err := bcrypt.CompareHashAndPassword([]byte(dbUser.Password), []byte(reqUser.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(dbUser.PasswordHash), []byte(reqUser.Password)); err != nil {
 		utils.Logger.Warn("密码错误", zap.String("username", reqUser.Username))
 		c.JSON(http.StatusUnauthorized, gin.H{"msg": "账号或密码错误"})
 		return

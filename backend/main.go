@@ -2,7 +2,9 @@
 package main
 
 import (
+	"context"
 	"open-source-club-nav/backend/config"
+	"open-source-club-nav/backend/db/migrate"
 	_ "open-source-club-nav/backend/docs"
 	"open-source-club-nav/backend/router"
 	"open-source-club-nav/backend/utils"
@@ -24,6 +26,9 @@ func main() {
 	db, err := gorm.Open(mysql.Open(cfg.MySQL.DSN), &gorm.Config{})
 	if err != nil {
 		utils.Logger.Fatal("数据库连接失败", zap.Error(err))
+	}
+	if err := migrate.Run(context.Background(), db); err != nil {
+		utils.Logger.Fatal("数据库迁移失败", zap.Error(err))
 	}
 
 	// 初始化路由

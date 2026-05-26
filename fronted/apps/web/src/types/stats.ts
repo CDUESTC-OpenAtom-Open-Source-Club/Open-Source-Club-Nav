@@ -6,8 +6,14 @@ export interface DailyStatRow {
 }
 
 export interface PopularCategory {
-  category: string;
+  repo: string;
+  url: string;
   clicks: number;
+  trend7: Array<{
+    stat_date: string;
+    clicks: number;
+  }>;
+  isValid: boolean | null;
 }
 
 export interface StatsResponse {

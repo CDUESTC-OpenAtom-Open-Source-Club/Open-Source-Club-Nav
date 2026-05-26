@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-const MOCK_MODE = true;
+const MOCK_MODE = process.env.NEXT_PUBLIC_USE_MOCK_MODE === "true";
 
 type AdminUser = {
   id: number;
@@ -70,11 +70,11 @@ const MOCK_TREND7 = [
   { stat_date: "2026-05-24", link_clicks: 161 },
 ];
 const MOCK_POPULAR = [
-  { category: "https://github.com/facebook/react", clicks: 174 },
-  { category: "https://nextjs.org/docs", clicks: 161 },
-  { category: "https://react.dev/learn", clicks: 126 },
-  { category: "https://github.com/openatom", clicks: 112 },
-  { category: "https://nodejs.org/docs/latest/api/", clicks: 84 },
+  { repo: "facebook/react", url: "https://github.com/facebook/react", clicks: 174, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 18 }, { stat_date: "2026-05-19", clicks: 22 }, { stat_date: "2026-05-20", clicks: 25 }, { stat_date: "2026-05-21", clicks: 19 }, { stat_date: "2026-05-22", clicks: 27 }, { stat_date: "2026-05-23", clicks: 30 }, { stat_date: "2026-05-24", clicks: 33 }] },
+  { repo: "vercel/next.js", url: "https://github.com/vercel/next.js", clicks: 161, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 14 }, { stat_date: "2026-05-19", clicks: 20 }, { stat_date: "2026-05-20", clicks: 18 }, { stat_date: "2026-05-21", clicks: 24 }, { stat_date: "2026-05-22", clicks: 26 }, { stat_date: "2026-05-23", clicks: 28 }, { stat_date: "2026-05-24", clicks: 31 }] },
+  { repo: "reactjs/react.dev", url: "https://github.com/reactjs/react.dev", clicks: 126, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 10 }, { stat_date: "2026-05-19", clicks: 12 }, { stat_date: "2026-05-20", clicks: 15 }, { stat_date: "2026-05-21", clicks: 18 }, { stat_date: "2026-05-22", clicks: 20 }, { stat_date: "2026-05-23", clicks: 24 }, { stat_date: "2026-05-24", clicks: 27 }] },
+  { repo: "openatom", url: "https://github.com/openatom", clicks: 112, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 9 }, { stat_date: "2026-05-19", clicks: 11 }, { stat_date: "2026-05-20", clicks: 13 }, { stat_date: "2026-05-21", clicks: 15 }, { stat_date: "2026-05-22", clicks: 18 }, { stat_date: "2026-05-23", clicks: 22 }, { stat_date: "2026-05-24", clicks: 24 }] },
+  { repo: "nodejs/node", url: "https://github.com/nodejs/node", clicks: 84, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 6 }, { stat_date: "2026-05-19", clicks: 8 }, { stat_date: "2026-05-20", clicks: 11 }, { stat_date: "2026-05-21", clicks: 12 }, { stat_date: "2026-05-22", clicks: 14 }, { stat_date: "2026-05-23", clicks: 15 }, { stat_date: "2026-05-24", clicks: 18 }] },
 ];
 
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
@@ -135,25 +135,46 @@ function getActionTag(action: string): { text: string; fg: string; bg: string } 
   return { text: action || "-", fg: "#475569", bg: "#F1F5F9" };
 }
 
-function getRepoNameLabel(raw: string): string {
-  const text = String(raw || "").trim();
-  if (!text) return "-";
-  const cleaned = text.replace(/^https?:\/\//i, "").replace(/^www\./i, "");
-  const parts = cleaned.split("/").filter(Boolean);
-  if (parts.length >= 2) return `${parts[0]}/${parts[1]}`;
-  return parts[0] || text;
-}
+function RepoTrendSparkline({
+  points,
+}: {
+  points: Array<{ stat_date: string; clicks: number }>;
+}) {
+  const width = 132;
+  const height = 34;
+  const safePoints = points.length
+    ? points
+    : Array.from({ length: 7 }).map((_, index) => ({
+        stat_date: `D${index + 1}`,
+        clicks: 0,
+      }));
+  const maxValue = Math.max(1, ...safePoints.map((item) => item.clicks || 0));
+  const stepX = safePoints.length > 1 ? width / (safePoints.length - 1) : width / 2;
+  const mapped = safePoints.map((item, index) => ({
+    ...item,
+    x: safePoints.length === 1 ? width / 2 : index * stepX,
+    y: height - ((item.clicks || 0) / maxValue) * (height - 8) - 4,
+  }));
+  const linePath = mapped.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
+  const areaPath = mapped.length
+    ? `${linePath} L ${mapped[mapped.length - 1].x.toFixed(2)} ${height} L ${mapped[0].x.toFixed(2)} ${height} Z`
+    : "";
 
-function getPopularDisplayLabel(raw: string, links: LinkItem[]): string {
-  const key = String(raw || "").trim().toLowerCase();
-  if (!key) return "-";
-  const matched = links.find((l) => {
-    const title = String(l.title || "").toLowerCase();
-    const url = String(l.url || "").toLowerCase();
-    return title === key || url === key || url.includes(key) || key.includes(url);
-  });
-  if (matched) return matched.title || matched.url;
-  return raw;
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: 132, height: 34, display: "block" }} aria-label="近7天点击曲线">
+      <defs>
+        <linearGradient id="repoTrendFill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#60A5FA" stopOpacity="0.24" />
+          <stop offset="100%" stopColor="#60A5FA" stopOpacity="0.03" />
+        </linearGradient>
+      </defs>
+      {areaPath ? <path d={areaPath} fill="url(#repoTrendFill)" /> : null}
+      {linePath ? <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" /> : null}
+      {mapped.map((point) => (
+        <circle key={`${point.stat_date}-${point.x}`} cx={point.x} cy={point.y} r="2.4" fill="#FFFFFF" stroke="#2563EB" strokeWidth="1.5" />
+      ))}
+    </svg>
+  );
 }
 
 export default function AdminPage() {
@@ -168,12 +189,17 @@ export default function AdminPage() {
   const [health, setHealth] = useState<LinkHealth[]>([]);
   const [logs, setLogs] = useState<LinkLog[]>([]);
   const [trend7, setTrend7] = useState<Array<{ stat_date: string; link_clicks: number }>>([]);
-  const [popular, setPopular] = useState<Array<{ category: string; clicks: number }>>([]);
+  const [popular, setPopular] = useState<Array<{ repo: string; url: string; clicks: number; trend7: Array<{ stat_date: string; clicks: number }>; isValid: boolean | null }>>([]);
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
   const [hoveredTrendIndex, setHoveredTrendIndex] = useState<number | null>(null);
   const [trendHovered, setTrendHovered] = useState(false);
   const [healthChecking, setHealthChecking] = useState(false);
+  const [autoDetectDialogOpen, setAutoDetectDialogOpen] = useState(false);
+  const [autoDetectEnabled, setAutoDetectEnabled] = useState(false);
+  const [autoDetectIntervalMinutes, setAutoDetectIntervalMinutes] = useState(15);
+  const [autoDetectDraftMinutes, setAutoDetectDraftMinutes] = useState("15");
+  const [lastAutoDetectAt, setLastAutoDetectAt] = useState<string | null>(null);
 
   const [linkForm, setLinkForm] = useState({
     title: "",
@@ -186,6 +212,9 @@ export default function AdminPage() {
     password: "",
     role: "editor" as "editor" | "super",
   });
+  const AUTO_DETECT_ENABLED_KEY = "kcos_admin_auto_detect_enabled";
+  const AUTO_DETECT_INTERVAL_KEY = "kcos_admin_auto_detect_interval_minutes";
+  const AUTO_DETECT_LAST_RUN_KEY = "kcos_admin_auto_detect_last_run_at";
 
   // 顶部 KPI 默认取最新一天，没有数据时回退到空统计。
   const today = useMemo(
@@ -281,7 +310,7 @@ export default function AdminPage() {
     const statsData = await readJsonSafe<{
       days?: StatDay[];
       trend7?: Array<{ stat_date: string; link_clicks: number }>;
-      popularCategories?: Array<{ category: string; clicks: number }>;
+      popularCategories?: Array<{ repo: string; url: string; clicks: number; trend7: Array<{ stat_date: string; clicks: number }>; isValid: boolean | null }>;
     }>(statsRes);
     setStats(statsData?.days || []);
     setTrend7(statsData?.trend7 || []);
@@ -527,6 +556,7 @@ export default function AdminPage() {
     }
   };
   const runHealthCheck = async () => {
+    if (healthChecking) return;
     if (MOCK_MODE) {
       setHealthChecking(true);
       setTimeout(() => {
@@ -534,6 +564,8 @@ export default function AdminPage() {
           const ok = Math.random() > 0.2;
           return { ...h, is_ok: ok ? 1 : 0, status_code: ok ? 200 : 503, checked_at: new Date().toISOString() };
         }));
+        const nowIso = new Date().toISOString();
+        setLastAutoDetectAt(nowIso);
         setHealthChecking(false);
       }, 600);
       return;
@@ -544,11 +576,73 @@ export default function AdminPage() {
       const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "检测失败");
       await loadHealth();
+      const nowIso = new Date().toISOString();
+      setLastAutoDetectAt(nowIso);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(AUTO_DETECT_LAST_RUN_KEY, nowIso);
+      }
     } catch (err) {
       setError(String((err as Error).message || "检测失败"));
     } finally {
       setHealthChecking(false);
     }
+  };
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storedEnabled = window.localStorage.getItem(AUTO_DETECT_ENABLED_KEY);
+    const storedMinutes = window.localStorage.getItem(AUTO_DETECT_INTERVAL_KEY);
+    const storedLastRun = window.localStorage.getItem(AUTO_DETECT_LAST_RUN_KEY);
+    if (storedEnabled === "true") {
+      setAutoDetectEnabled(true);
+    }
+    if (storedMinutes) {
+      const parsed = Number(storedMinutes);
+      if (Number.isFinite(parsed) && parsed >= 1) {
+        setAutoDetectIntervalMinutes(parsed);
+        setAutoDetectDraftMinutes(String(parsed));
+      }
+    }
+    if (storedLastRun) {
+      setLastAutoDetectAt(storedLastRun);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!autoDetectEnabled || autoDetectIntervalMinutes < 1) return;
+    const intervalId = window.setInterval(() => {
+      void runHealthCheck();
+    }, autoDetectIntervalMinutes * 60 * 1000);
+    return () => window.clearInterval(intervalId);
+  }, [autoDetectEnabled, autoDetectIntervalMinutes, healthChecking]);
+
+  const openAutoDetectDialog = () => {
+    setAutoDetectDraftMinutes(String(autoDetectIntervalMinutes));
+    setAutoDetectDialogOpen(true);
+  };
+
+  const saveAutoDetectSettings = () => {
+    const nextMinutes = Number(autoDetectDraftMinutes);
+    if (!Number.isFinite(nextMinutes) || nextMinutes < 1) {
+      setError("自动探测时间必须是大于等于 1 的分钟数");
+      return;
+    }
+    setError("");
+    setAutoDetectIntervalMinutes(nextMinutes);
+    setAutoDetectEnabled(true);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(AUTO_DETECT_ENABLED_KEY, "true");
+      window.localStorage.setItem(AUTO_DETECT_INTERVAL_KEY, String(nextMinutes));
+    }
+    setAutoDetectDialogOpen(false);
+  };
+
+  const stopAutoDetect = () => {
+    setAutoDetectEnabled(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(AUTO_DETECT_ENABLED_KEY, "false");
+    }
+    setAutoDetectDialogOpen(false);
   };
 
   if (checking) {
@@ -841,34 +935,72 @@ export default function AdminPage() {
           ) : null}
         </div>
         <div style={{ fontWeight: 700, margin: "12px 0 8px" }}>热门仓库（点击量）</div>
-        <div className="admin-console-chart-surface" style={{ minHeight: 140, border: "1px dashed #93C5FD", borderRadius: 10, padding: 10, background: "rgba(255,255,255,0.5)", display: "grid", gap: 8 }}>
-          {(popular.length
-            ? popular
-            : Array.from({ length: 5 }).map((_, i) => ({ category: `仓库${i + 1}`, clicks: 0 }))).map((p, idx, arr) => {
-            const maxClicks = Math.max(1, ...arr.map((x) => x.clicks || 0));
-            const ratio = (p.clicks || 0) / maxClicks;
-            const percent = Math.max(8, Math.round(ratio * 100));
-            return (
-            <div key={p.category} className="admin-console-popular-row" style={{ display: "grid", gridTemplateColumns: "220px 360px 46px", gap: 10, alignItems: "center" }}>
-              <span style={{ fontSize: 12, color: "#334155", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={String(p.category)}>
-                {getPopularDisplayLabel(String(p.category), links) || getRepoNameLabel(p.category)}
-              </span>
-              <div style={{ height: 10, width: 360, maxWidth: "100%", background: "#DBEAFE", borderRadius: 999, overflow: "hidden" }}>
-                <div
-                  style={{
-                    width: `${percent}%`,
-                    height: "100%",
-                    background: "linear-gradient(90deg, #60A5FA 0%, #2563EB 100%)",
-                    borderRadius: 999,
-                    opacity: p.clicks ? 1 : 0.25,
-                    transition: "width 0.3s ease",
-                  }}
-                />
-              </div>
-              <span style={{ fontSize: 12, textAlign: "right" }}>{p.clicks}</span>
-            </div>
-          )})}
-          {!popular.length ? <div style={{ fontSize: 12, color: "#64748B" }}>暂无热门仓库数据，图表区域已预留。</div> : null}
+        <div className="admin-console-chart-surface" style={{ minHeight: 140, border: "1px dashed #93C5FD", borderRadius: 10, padding: 10, background: "rgba(255,255,255,0.5)" }}>
+          <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: "#F8FAFD" }}>
+                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>仓库名</th>
+                  <th style={{ textAlign: "right", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天总点击量</th>
+                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天点击量统计图</th>
+                  <th style={{ textAlign: "center", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>当前状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(popular.length
+                  ? popular
+                  : Array.from({ length: 5 }).map((_, i) => ({ repo: `仓库${i + 1}`, url: "", clicks: 0, trend7: [], isValid: null }))).map((p, idx) => (
+                  <tr key={`${p.repo}-${idx}`}>
+                    <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155", fontWeight: 700, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={String(p.repo)}>
+                      {p.repo || "-"}
+                    </td>
+                    <td
+                      style={{
+                        padding: "11px 14px",
+                        borderBottom: "1px solid #F1F5F9",
+                        textAlign: "center",
+                        color: "#1D4ED8",
+                        fontWeight: 700,
+                        fontVariantNumeric: "tabular-nums",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {p.clicks}
+                    </td>
+                    <td style={{ padding: "8px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                      <RepoTrendSparkline points={p.trend7 || []} />
+                    </td>
+                    <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", textAlign: "center" }}>
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: 88,
+                          padding: "4px 10px",
+                          borderRadius: 999,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: p.isValid === true ? "#166534" : p.isValid === false ? "#B91C1C" : "#64748B",
+                          background: p.isValid === true ? "#DCFCE7" : p.isValid === false ? "#FEE2E2" : "#F1F5F9",
+                          border: `1px solid ${p.isValid === true ? "#86EFAC" : p.isValid === false ? "#FCA5A5" : "#CBD5E1"}`,
+                        }}
+                      >
+                        {p.isValid === true ? "有效仓库" : p.isValid === false ? "链接异常" : "待检测"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {!popular.length ? (
+                  <tr>
+                    <td colSpan={4} style={{ padding: "14px", color: "#64748B" }}>
+                      暂无热门仓库数据，图表区域已预留。
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
       </>
@@ -949,10 +1081,27 @@ export default function AdminPage() {
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: "10px 12px" }}>
-          <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
-          <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 34, padding: "0 14px", borderRadius: 8 }} disabled={healthChecking}>
-            {healthChecking ? "探测中..." : "批量探测"}
-          </button>
+          <div style={{ display: "grid", gap: 4 }}>
+            <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>
+              {autoDetectEnabled
+                ? `自动探测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
+                : "自动探测未开启"}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={openAutoDetectDialog}
+              className="admin-btn-ghost"
+              style={{ height: 34, padding: "0 14px", borderRadius: 8, borderColor: autoDetectEnabled ? "#86EFAC" : "#CBD5E1", color: autoDetectEnabled ? "#166534" : "#334155" }}
+            >
+              自动探测
+            </button>
+            <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 34, padding: "0 14px", borderRadius: 8 }} disabled={healthChecking}>
+              {healthChecking ? "探测中..." : "全量探测"}
+            </button>
+          </div>
         </div>
         <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -1096,6 +1245,75 @@ export default function AdminPage() {
       ) : null}
         </div>
       </div>
+
+      {autoDetectDialogOpen ? (
+        <div
+          onClick={() => setAutoDetectDialogOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.45)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            zIndex: 140,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "min(420px, 100%)",
+              background: "#FFFFFF",
+              border: "1px solid #E2E8F0",
+              borderRadius: 14,
+              boxShadow: "0 24px 48px rgba(15,23,42,0.18)",
+              padding: 18,
+              display: "grid",
+              gap: 14,
+            }}
+          >
+            <div style={{ display: "grid", gap: 4 }}>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>自动探测设置</div>
+              <div style={{ fontSize: 13, color: "#64748B" }}>
+                设定定期触发的分钟间隔。开启后将在当前控制台会话中自动执行全量探测，并持久化到浏览器本地。
+              </div>
+            </div>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span style={{ fontSize: 13, color: "#334155", fontWeight: 600 }}>每隔多少分钟自动探测一次</span>
+              <input
+                className="admin-input"
+                type="number"
+                min={1}
+                step={1}
+                value={autoDetectDraftMinutes}
+                onChange={(e) => setAutoDetectDraftMinutes(e.target.value)}
+                placeholder="例如 15"
+              />
+            </label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <button
+                type="button"
+                onClick={stopAutoDetect}
+                className="admin-btn-ghost"
+                style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}
+              >
+                关闭自动探测
+              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="button" onClick={() => setAutoDetectDialogOpen(false)} className="admin-btn-ghost">
+                  取消
+                </button>
+                <button type="button" onClick={saveAutoDetectSettings} className="admin-btn">
+                  保存并开启
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

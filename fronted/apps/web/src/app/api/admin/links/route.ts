@@ -40,8 +40,8 @@ async function writeLinkLog(
   if (USE_MOCK) return;
 
   await pool.query(
-    `INSERT INTO admin_link_logs
-      (link_id, action, actor_user_id, actor_username, actor_role, detail)
+    `INSERT INTO nav_item_logs
+      (nav_item_id, action, actor_user_id, actor_username, actor_role, detail)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [linkId, action, session.userId, session.username, session.role, JSON.stringify(detail || {})],
   );

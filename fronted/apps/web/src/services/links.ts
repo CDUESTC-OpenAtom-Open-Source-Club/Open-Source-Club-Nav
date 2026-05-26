@@ -9,7 +9,18 @@ export async function getLinks(): Promise<{ links: FriendLink[]; source: string 
 
   try {
     const [rows] = await pool.query(
-      "SELECT * FROM friend_links WHERE active = 1 ORDER BY sort ASC, id ASC"
+      `SELECT
+         id,
+         title,
+         link_url AS url,
+         description,
+         sort,
+         active,
+         created_at,
+         updated_at
+       FROM nav_items
+       WHERE active = 1
+       ORDER BY sort ASC, id ASC`
     );
     return { links: rows as FriendLink[], source: "mysql" };
   } catch {
@@ -22,17 +33,51 @@ export async function getAllLinks(): Promise<FriendLink[]> {
     const { MOCK_ADMIN_LINKS } = await import("@/data/mock/links");
     return MOCK_ADMIN_LINKS as FriendLink[];
   }
-  const [rows] = await pool.query("SELECT * FROM friend_links ORDER BY sort ASC, id ASC");
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       title,
+       link_url AS url,
+       description,
+       sort,
+       active,
+       created_at,
+       updated_at
+     FROM nav_items
+     ORDER BY sort ASC, id ASC`,
+  );
   return rows as FriendLink[];
 }
 
 export async function createLink(input: LinkCreateInput): Promise<FriendLink> {
   const [result] = await pool.query(
-    "INSERT INTO friend_links (title, url, description, sort, active) VALUES (?, ?, ?, ?, ?)",
-    [input.title, input.url, input.description || "", input.sort || 0, input.active ?? 1]
+    `INSERT INTO nav_items
+      (title, content, cover_url, link_url, description, sort, active, created_at, updated_at)
+     VALUES (?, ?, '', ?, ?, ?, ?, NOW(3), NOW(3))`,
+    [
+      input.title,
+      input.description || "",
+      input.url,
+      input.description || "",
+      input.sort || 0,
+      input.active ?? 1,
+    ],
   );
   const insertId = (result as { insertId: number }).insertId;
-  const [rows] = await pool.query("SELECT * FROM friend_links WHERE id = ?", [insertId]);
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       title,
+       link_url AS url,
+       description,
+       sort,
+       active,
+       created_at,
+       updated_at
+     FROM nav_items
+     WHERE id = ?`,
+    [insertId],
+  );
   return (rows as FriendLink[])[0];
 }
 
@@ -43,18 +88,36 @@ export async function updateLink(input: LinkUpdateInput): Promise<FriendLink | n
 
   for (const key of allowed) {
     if (input[key] !== undefined) {
-      fields.push(`${key} = ?`);
-      values.push(input[key] as string | number);
+      if (key === "url") {
+        fields.push("link_url = ?");
+        values.push(input[key] as string | number);
+      } else {
+        fields.push(`${key} = ?`);
+        values.push(input[key] as string | number);
+      }
     }
   }
   if (fields.length === 0) return null;
 
   values.push(input.id);
-  await pool.query(`UPDATE friend_links SET ${fields.join(", ")} WHERE id = ?`, values);
-  const [rows] = await pool.query("SELECT * FROM friend_links WHERE id = ?", [input.id]);
+  await pool.query(`UPDATE nav_items SET ${fields.join(", ")}, updated_at = NOW(3) WHERE id = ?`, values);
+  const [rows] = await pool.query(
+    `SELECT
+       id,
+       title,
+       link_url AS url,
+       description,
+       sort,
+       active,
+       created_at,
+       updated_at
+     FROM nav_items
+     WHERE id = ?`,
+    [input.id],
+  );
   return (rows as FriendLink[])[0] || null;
 }
 
 export async function deleteLink(id: number): Promise<void> {
-  await pool.query("UPDATE friend_links SET active = 0 WHERE id = ?", [id]);
+  await pool.query("UPDATE nav_items SET active = 0, updated_at = NOW(3) WHERE id = ?", [id]);
 }

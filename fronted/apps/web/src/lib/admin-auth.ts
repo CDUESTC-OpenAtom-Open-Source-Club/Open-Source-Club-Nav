@@ -18,6 +18,10 @@ function getAuthSecret(): string {
   return process.env.ADMIN_AUTH_SECRET || "kcos-admin-dev-secret-change-me";
 }
 
+export function isAdminBypassEnabled(): boolean {
+  return process.env.ADMIN_BYPASS_LOGIN !== "false";
+}
+
 function base64UrlEncode(input: Buffer | string): string {
   return Buffer.from(input)
     .toString("base64")
@@ -90,7 +94,7 @@ export async function setAdminSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: ADMIN_SESSION_TTL_SECONDS,
@@ -101,7 +105,7 @@ export async function clearAdminSessionCookie(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(ADMIN_SESSION_COOKIE, "", {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
     secure: process.env.NODE_ENV === "production",
     path: "/",
     maxAge: 0,
@@ -110,7 +114,7 @@ export async function clearAdminSessionCookie(): Promise<void> {
 
 export async function getAdminSessionFromCookies(): Promise<AdminSession | null> {
   // 开发阶段默认允许 bypass，方便在无数据库时进入后台联调。
-  if (process.env.ADMIN_BYPASS_LOGIN !== "false") {
+  if (isAdminBypassEnabled()) {
     return {
       userId: 0,
       username: "bypass-admin",

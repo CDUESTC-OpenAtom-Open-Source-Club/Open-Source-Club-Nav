@@ -10,6 +10,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [cubeMotions, setCubeMotions] = useState(() =>
     Array.from({ length: 5 }).map((_, i) => ({
       id: i,
@@ -30,6 +31,24 @@ export default function AdminLoginPage() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const checkSession = async () => {
+      try {
+        const res = await fetch("/api/admin/me", { cache: "no-store" });
+        if (!cancelled && res.ok) {
+          router.replace("/admin");
+        }
+      } catch {
+        // Ignore bootstrap check errors on login page.
+      }
+    };
+    checkSession();
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   useEffect(() => {
@@ -113,14 +132,32 @@ export default function AdminLoginPage() {
     return () => cancelAnimationFrame(frameId);
   }, []);
 
-  const canSubmit = !loading;
+  const canSubmit = !loading && username.trim().length > 0 && password.length > 0;
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!canSubmit) return;
+    setError("");
     setLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 260));
-    router.replace("/admin");
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        throw new Error(payload?.error || "登录失败，请稍后重试");
+      }
+      router.replace("/admin");
+    } catch (err) {
+      setError(String((err as Error)?.message || "登录失败，请稍后重试"));
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -207,6 +244,24 @@ export default function AdminLoginPage() {
             <div className="admin-login-pro-card__eyebrow">OPENATOM CONSOLE</div>
             <h1 className="admin-login-pro-card__title">开放原子开源社团后台</h1>
             <p className="admin-login-pro-card__desc">请输入账号信息后登录管理后台。</p>
+
+            {error ? (
+              <div
+                role="alert"
+                style={{
+                  marginBottom: 16,
+                  border: "1px solid rgba(248, 113, 113, 0.45)",
+                  background: "rgba(127, 29, 29, 0.22)",
+                  color: "#FECACA",
+                  borderRadius: 14,
+                  padding: "12px 14px",
+                  fontSize: 13,
+                  lineHeight: 1.5,
+                }}
+              >
+                {error}
+              </div>
+            ) : null}
 
             <label className="admin-login-pro-field">
               <span>用户名</span>
