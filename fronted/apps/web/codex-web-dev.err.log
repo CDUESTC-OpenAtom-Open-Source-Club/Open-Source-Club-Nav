@@ -1,2 +1,0 @@
-$ react-router dev --port "5173"
-serveStatic: root path 'build/client' is not found, are you sure it's correct?
