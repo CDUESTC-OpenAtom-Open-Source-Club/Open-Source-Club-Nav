@@ -2,7 +2,6 @@
 package router
 
 import (
-	"net/http"                             // 导入日志工具
 	"open-source-club-nav/backend/handler" // 导入handler里的接口
 
 	"gorm.io/gorm"
@@ -24,7 +23,8 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 	})
 
 	// 2. 原main.go里的swagger路由
-	r.GET("/debug/pprof/*any", gin.WrapH(http.DefaultServeMux))
+	// 注意：不再把 net/http DefaultServeMux 暴露在 /debug/pprof，
+	// 避免一旦引入 net/http/pprof 即出现无鉴权的公开性能剖析端点。
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// 3. 原main.go里的“公开接口”
@@ -34,7 +34,8 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 
 	// 4. 原main.go里的“管理员接口（带权限）”
 	backendGroup := r.Group("/backend")
-	backendGroup.Use(handler.AuthMiddleware()) // 权限中间件（要移到handler里）
+	backendGroup.Use(handler.AuthMiddleware())              // 登录校验
+	backendGroup.Use(handler.RequireRole("admin", "super")) // 管理员角色校验（RBAC）
 	{
 		backendGroup.GET("/admin/list", handler.GetAdminListHandler) // 关联管理员接口
 	}
