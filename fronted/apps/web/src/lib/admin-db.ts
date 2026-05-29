@@ -7,7 +7,15 @@ export async function ensureAdminTables(): Promise<void> {
   // 同一进程内只初始化一次，避免每个后台请求都重复建表。
   if (initialized) return;
 
-  // 后台功能依赖的表统一在这里兜底创建，方便本地首次启动。
+  // Schema 的唯一权威来源是 Go 迁移（backend/db/migrate/migrations，带 checksum 版本管理）。
+  // 生产环境一律以迁移为准，这里不再兜底建表，避免「双来源」导致的结构漂移；
+  // 仅在非生产环境保留以下兜底建表，方便本地在未运行 Go 迁移时直接联调。
+  if (process.env.NODE_ENV === "production") {
+    initialized = true;
+    return;
+  }
+
+  // 后台功能依赖的表（开发态兜底创建，结构需与上述 Go 迁移保持一致）。
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
       id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -169,6 +177,12 @@ export async function ensureBootstrapSuperUser(): Promise<void> {
   await ensureAdminTables();
   const username = (process.env.ADMIN_BOOTSTRAP_USERNAME || "admin").trim();
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD || "admin123456";
+  // 生产环境若仍在使用内置默认口令，存在被预测爆破的风险，显式告警提醒尽快修改。
+  if (!process.env.ADMIN_BOOTSTRAP_PASSWORD && process.env.NODE_ENV === "production") {
+    console.warn(
+      "[admin] 警告：正在使用内置默认超管口令，请尽快设置 ADMIN_BOOTSTRAP_PASSWORD 并修改默认账号口令。",
+    );
+  }
   const passwordHash = hashPassword(password);
   const [existingRows] = await pool.query(
     "SELECT id, password_hash, role FROM users WHERE username = ? LIMIT 1",
