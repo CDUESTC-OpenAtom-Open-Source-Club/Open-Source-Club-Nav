@@ -1,9 +1,9 @@
-import { getAdminSessionFromCookies } from "@/lib/admin-auth";
+import { getAdminSessionFromCookies, isAdminBypassEnabled } from "@/lib/admin-auth";
 import { ensureBootstrapSuperUser } from "@/lib/admin-db";
 
 export async function GET() {
-  // 首次启动且未关闭引导时，先确保默认超级管理员账号存在。
-  if (process.env.ADMIN_BYPASS_LOGIN === "false") {
+  // 非绕过模式下，确保默认超级管理员账号存在。
+  if (!isAdminBypassEnabled()) {
     await ensureBootstrapSuperUser();
   }
 

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"open-source-club-nav/backend/model"
 	"open-source-club-nav/backend/utils"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -27,7 +28,22 @@ func RegisterHandler(c *gin.Context) {
 	var reqUser model.User
 	if err := c.ShouldBindJSON(&reqUser); err != nil {
 		utils.Logger.Warn("注册参数错误", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误"})
+		return
+	}
+
+	// 1.1 基础输入校验
+	reqUser.Username = strings.TrimSpace(reqUser.Username)
+	if reqUser.Username == "" || reqUser.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "用户名和密码不能为空"})
+		return
+	}
+	if len(reqUser.Username) > 64 {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "用户名长度不能超过64"})
+		return
+	}
+	if len(reqUser.Password) < 6 || len(reqUser.Password) > 256 {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "密码长度需在6-256位之间"})
 		return
 	}
 
@@ -52,7 +68,7 @@ func RegisterHandler(c *gin.Context) {
 	// 4. 写入数据库
 	if err := gormDB.Create(&reqUser).Error; err != nil {
 		utils.Logger.Error("注册失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败"})
 		return
 	}
 
@@ -99,7 +115,7 @@ func LoginHandler(c *gin.Context) {
 	}
 
 	// 生成Token
-	token, err := utils.GenerateToken(dbUser.Username)
+	token, err := utils.GenerateToken(dbUser.Username, dbUser.Role)
 	if err != nil {
 		utils.Logger.Error("Token生成失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "登录失败"})
@@ -124,7 +140,7 @@ func GetAdminListHandler(c *gin.Context) {
 	}
 	gormDB := db.(*gorm.DB)
 	var admins []model.User
-	if err := gormDB.Where("role = ?", "admin").Find(&admins).Error; err != nil {
+	if err := gormDB.Where("role IN ?", []string{"admin", "super"}).Find(&admins).Error; err != nil {
 		utils.Logger.Error("查询管理员失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "查询失败"})
 		return
