@@ -37,6 +37,7 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 	r.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler) // 关联handler里的注册接口
 	r.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler)       // 关联handler里的登录接口
 	r.GET("/nav/search", handler.SearchNavItem)                                      // 关联handler里的导航搜索接口
+	r.GET("/healthz", handler.HealthzHandler)                                        // 健康检查（Docker/负载均衡器探活）
 
 	// 4. 原main.go里的“管理员接口（带权限）”
 	// 角色口径与 Next BFF 统一为 super/editor/user；管理员清单仅 super 可见。
