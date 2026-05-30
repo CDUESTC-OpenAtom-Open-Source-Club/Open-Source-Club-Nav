@@ -12,8 +12,6 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  WEB_IMAGE_BASE: ghcr.io/${{ github.repository }}-web
-  BACKEND_IMAGE_BASE: ghcr.io/${{ github.repository }}-backend
 
 jobs:
   # ── 变更检测 ──────────────────────────────────────────────────────────────────
@@ -24,10 +22,19 @@ jobs:
       backend_changed: ${{ steps.diff.outputs.backend_changed }}
       db_changed: ${{ steps.diff.outputs.db_changed }}
       should_deploy: ${{ steps.diff.outputs.should_deploy }}
+      web_image_base: ${{ steps.images.outputs.web_image_base }}
+      backend_image_base: ${{ steps.images.outputs.backend_image_base }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Compute image names
+        id: images
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "web_image_base=ghcr.io/${REPO_LOWER}-web" >> "$GITHUB_OUTPUT"
+          echo "backend_image_base=ghcr.io/${REPO_LOWER}-backend" >> "$GITHUB_OUTPUT"
 
       - name: Detect changes
         id: diff
@@ -177,8 +184,8 @@ jobs:
           context: fronted/apps/web
           push: true
           tags: |
-            ${{ env.WEB_IMAGE_BASE }}:${{ github.sha }}
-            ${{ env.WEB_IMAGE_BASE }}:main
+            ${{ needs.detect.outputs.web_image_base }}:${{ github.sha }}
+            ${{ needs.detect.outputs.web_image_base }}:main
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -208,8 +215,8 @@ jobs:
           context: backend
           push: true
           tags: |
-            ${{ env.BACKEND_IMAGE_BASE }}:${{ github.sha }}
-            ${{ env.BACKEND_IMAGE_BASE }}:main
+            ${{ needs.detect.outputs.backend_image_base }}:${{ github.sha }}
+            ${{ needs.detect.outputs.backend_image_base }}:main
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -246,8 +253,8 @@ jobs:
           FRONTEND_CHANGED: ${{ needs.detect.outputs.frontend_changed }}
           BACKEND_CHANGED: ${{ needs.detect.outputs.backend_changed }}
           DB_CHANGED: ${{ needs.detect.outputs.db_changed }}
-          WEB_IMAGE: ghcr.io/${{ github.repository }}-web:${{ github.sha }}
-          BACKEND_IMAGE: ghcr.io/${{ github.repository }}-backend:${{ github.sha }}
+          WEB_IMAGE: ${{ needs.detect.outputs.web_image_base }}:${{ github.sha }}
+          BACKEND_IMAGE: ${{ needs.detect.outputs.backend_image_base }}:${{ github.sha }}
         run: |
           ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "${DEPLOY_PATH}/deploy.sh" \
