@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"open-source-club-nav/backend/model"
 	"open-source-club-nav/backend/utils"
-
-	"golang.org/x/crypto/bcrypt"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -27,7 +26,22 @@ func RegisterHandler(c *gin.Context) {
 	var reqUser model.User
 	if err := c.ShouldBindJSON(&reqUser); err != nil {
 		utils.Logger.Warn("注册参数错误", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误: " + err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误"})
+		return
+	}
+
+	// 1.1 基础输入校验
+	reqUser.Username = strings.TrimSpace(reqUser.Username)
+	if reqUser.Username == "" || reqUser.Password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "用户名和密码不能为空"})
+		return
+	}
+	if len(reqUser.Username) > 64 {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "用户名长度不能超过64"})
+		return
+	}
+	if len(reqUser.Password) < 6 || len(reqUser.Password) > 256 {
+		c.JSON(http.StatusBadRequest, gin.H{"msg": "密码长度需在6-256位之间"})
 		return
 	}
 
@@ -39,20 +53,20 @@ func RegisterHandler(c *gin.Context) {
 	}
 	gormDB := db.(*gorm.DB)
 
-	// 3. 密码加密
-	hashedPwd, err := bcrypt.GenerateFromPassword([]byte(reqUser.Password), bcrypt.DefaultCost)
+	// 3. 密码加密（与 Next BFF 一致的 scrypt 格式，保证两层互通）
+	hashed, err := utils.HashPassword(reqUser.Password)
 	if err != nil {
 		utils.Logger.Error("密码加密失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败"})
 		return
 	}
-	reqUser.PasswordHash = string(hashedPwd)
+	reqUser.PasswordHash = hashed
 	reqUser.Role = "user" // 默认普通用户
 
 	// 4. 写入数据库
 	if err := gormDB.Create(&reqUser).Error; err != nil {
 		utils.Logger.Error("注册失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败"})
 		return
 	}
 
@@ -91,15 +105,24 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// 验证密码
-	if err := bcrypt.CompareHashAndPassword([]byte(dbUser.PasswordHash), []byte(reqUser.Password)); err != nil {
+	// 验证密码（兼容历史 bcrypt 哈希，校验通过后自动重哈希为 scrypt）
+	ok, legacy := utils.VerifyPassword(reqUser.Password, dbUser.PasswordHash)
+	if !ok {
 		utils.Logger.Warn("密码错误", zap.String("username", reqUser.Username))
 		c.JSON(http.StatusUnauthorized, gin.H{"msg": "账号或密码错误"})
 		return
 	}
+	if legacy {
+		if newHash, herr := utils.HashPassword(reqUser.Password); herr == nil {
+			if uerr := gormDB.Model(&model.User{}).Where("id = ?", dbUser.ID).
+				Update("password_hash", newHash).Error; uerr != nil {
+				utils.Logger.Warn("历史口令重哈希失败", zap.Error(uerr))
+			}
+		}
+	}
 
 	// 生成Token
-	token, err := utils.GenerateToken(dbUser.Username)
+	token, err := utils.GenerateToken(dbUser.Username, dbUser.Role)
 	if err != nil {
 		utils.Logger.Error("Token生成失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "登录失败"})
@@ -124,7 +147,7 @@ func GetAdminListHandler(c *gin.Context) {
 	}
 	gormDB := db.(*gorm.DB)
 	var admins []model.User
-	if err := gormDB.Where("role = ?", "admin").Find(&admins).Error; err != nil {
+	if err := gormDB.Where("role IN ?", []string{"super", "editor"}).Find(&admins).Error; err != nil {
 		utils.Logger.Error("查询管理员失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"msg": "查询失败"})
 		return

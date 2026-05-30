@@ -2,8 +2,17 @@
 // POST /api/works/sync - 手动触发同步所有 GITHUB 类型作品的 stars 和 description
 
 import pool from "@/lib/db";
+import { getAdminSessionFromCookies } from "@/lib/admin-auth";
+import { ensureAdminTables } from "@/lib/admin-db";
 
 export async function POST() {
+  await ensureAdminTables();
+  const session = await getAdminSessionFromCookies();
+  if (!session) return Response.json({ error: "未登录" }, { status: 401 });
+  if (session.role !== "editor" && session.role !== "super") {
+    return Response.json({ error: "无权限" }, { status: 403 });
+  }
+
   try {
     const [rows] = await pool.query(
       "SELECT id, repo_url FROM works WHERE type = 'GITHUB' AND repo_url IS NOT NULL"
