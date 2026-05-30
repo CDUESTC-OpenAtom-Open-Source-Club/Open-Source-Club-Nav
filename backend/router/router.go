@@ -2,9 +2,8 @@
 package router
 
 import (
-	"time"
-
-	"open-source-club-nav/backend/handler" // 导入handler里的接口
+	"open-source-club-nav/backend/handler"
+	"open-source-club-nav/backend/middleware"
 
 	"gorm.io/gorm"
 
@@ -18,34 +17,32 @@ import (
 func InitRouter(db *gorm.DB) *gin.Engine {
 	r := gin.Default()
 
-	// 1. 注入DB到Context（让handler能拿到数据库连接）
+	// 1. 注入DB到Context（全局中间件，所有接口都能拿到DB）
 	r.Use(func(c *gin.Context) {
 		c.Set("db", db)
 		c.Next()
 	})
 
-	// 2. 原main.go里的swagger路由
-	// 注意：不再把 net/http DefaultServeMux 暴露在 /debug/pprof，
-	// 避免一旦引入 net/http/pprof 即出现无鉴权的公开性能剖析端点。
-	// 生产环境（GIN_MODE=release）不暴露 swagger，避免泄露完整 API 清单。
+	// 2. Swagger路由（非生产环境开放）
 	if gin.Mode() != gin.ReleaseMode {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	// 3. 原main.go里的“公开接口”
-	// 注册/登录各自独立的 IP 限流桶，缓解暴力尝试与批量注册（互不影响）。
-	r.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler) // 关联handler里的注册接口
-	r.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler)       // 关联handler里的登录接口
-	r.GET("/nav/search", handler.SearchNavItem)                                      // 关联handler里的导航搜索接口
-	r.GET("/healthz", handler.HealthzHandler)                                        // 健康检查（Docker/负载均衡器探活）
-
-	// 4. 原main.go里的“管理员接口（带权限）”
-	// 角色口径与 Next BFF 统一为 super/editor/user；管理员清单仅 super 可见。
-	backendGroup := r.Group("/backend")
-	backendGroup.Use(handler.AuthMiddleware())     // 登录校验
-	backendGroup.Use(handler.RequireRole("super")) // 管理员角色校验（RBAC）
+	// -------------------------- 公共接口（不需要鉴权） --------------------------
+	publicGroup := r.Group("/")
 	{
-		backendGroup.GET("/admin/list", handler.GetAdminListHandler) // 关联管理员接口
+		// 这里放不需要鉴权的接口，比如注册、登录
+		publicGroup.POST("/register", handler.RegisterHandler)
+		publicGroup.POST("/login", handler.LoginHandler)
+	}
+
+	// -------------------------- 私有接口（需要鉴权） --------------------------
+	privateGroup := r.Group("/")
+	privateGroup.Use(middleware.SignAuth()) // 只给私有接口加鉴权
+	{
+		// 新增管理员列表接口路由
+
+		privateGroup.GET("/backend/admin/list", handler.GetAdminListHandler)
 	}
 
 	return r
