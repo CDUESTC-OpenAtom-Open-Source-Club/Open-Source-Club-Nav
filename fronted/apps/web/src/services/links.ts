@@ -1,6 +1,6 @@
 import pool from "@/lib/db";
 import { FALLBACK_LINKS } from "@/data/mock/links";
-import type { FriendLink, LinkCreateInput, LinkUpdateInput, NavModule, ResourceMatrixSubModule } from "@/types/links";
+import type { FriendLink, LinkCreateInput, LinkUpdateInput, NavModule, ResourceMatrixSubModule, GameType } from "@/types/links";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 const DEFAULT_MODULE: NavModule = "friend_links";
@@ -19,6 +19,7 @@ const LINK_SELECT_FIELDS = `
     WHEN category IS NULL OR category = '' THEN '${DEFAULT_MODULE}'
     ELSE category
   END AS module,
+  game_type,
   COALESCE(mc.click_count, 0) AS click_count,
   content,
   created_at,
@@ -37,6 +38,7 @@ type DbLinkRow = FriendLink & {
   module?: NavModule;
   content?: string | null;
   click_count?: number;
+  game_type?: string | null;
 };
 
 function normalizeModule(value: unknown): NavModule {
@@ -96,6 +98,9 @@ function toFriendLinks(rows: unknown): FriendLink[] {
   return (rows as DbLinkRow[]).map((item) => {
     const normalizedModule = normalizeModule(item.module);
     const resourceSubModule = getResourceSubModule(item, normalizedModule);
+    const gameType = (item.game_type === "internal" || item.game_type === "external")
+      ? item.game_type
+      : undefined;
     return {
       id: item.id,
       title: item.title,
@@ -105,6 +110,7 @@ function toFriendLinks(rows: unknown): FriendLink[] {
       active: item.active,
       module: normalizedModule,
       resource_sub_module: resourceSubModule,
+      game_type: gameType ?? null,
       click_count: Number(item.click_count || 0),
       created_at: item.created_at,
       updated_at: item.updated_at,
@@ -206,10 +212,11 @@ export async function getLinkById(id: number): Promise<FriendLink | null> {
 
 export async function createLink(input: LinkCreateInput): Promise<FriendLink> {
   const navModule = normalizeModule(input.module);
+  const gameType = navModule === "mini_games" ? (input.game_type || "internal") : null;
   const [result] = await pool.query(
     `INSERT INTO nav_items
-      (title, content, cover_url, link_url, description, sort, active, category, created_at, updated_at)
-     VALUES (?, ?, '', ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
+      (title, content, cover_url, link_url, description, sort, active, category, game_type, created_at, updated_at)
+     VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
     [
       input.title,
       buildContentPayload(navModule, input.resource_sub_module),
@@ -218,6 +225,7 @@ export async function createLink(input: LinkCreateInput): Promise<FriendLink> {
       input.sort || 0,
       input.active ?? 1,
       navModule,
+      gameType,
     ],
   );
   const insertId = (result as { insertId: number }).insertId;
@@ -266,6 +274,10 @@ export async function updateLink(input: LinkUpdateInput): Promise<FriendLink | n
     fields.push("content = ?");
     values.push(buildContentPayload(moduleForContent, input.resource_sub_module));
   }
+  if (input.game_type !== undefined) {
+    fields.push("game_type = ?");
+    values.push(input.game_type || null);
+  }
   if (fields.length === 0) return null;
 
   values.push(input.id);
@@ -282,5 +294,5 @@ export async function updateLink(input: LinkUpdateInput): Promise<FriendLink | n
 }
 
 export async function deleteLink(id: number): Promise<void> {
-  await pool.query("UPDATE nav_items SET active = 0, updated_at = NOW(3) WHERE id = ?", [id]);
+  await pool.query("DELETE FROM nav_items WHERE id = ?", [id]);
 }

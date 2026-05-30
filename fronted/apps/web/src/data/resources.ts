@@ -1,4 +1,7 @@
-export const RESOURCE_CATEGORIES = [
+import { getContentByType } from "@/services/content";
+
+// 默认资源数据（用于降级）
+const DEFAULT_RESOURCE_CATEGORIES = [
   {
     id: "intelligence",
     label: "智库",
@@ -138,3 +141,62 @@ export const RESOURCE_CATEGORIES = [
     ],
   },
 ];
+
+// 从后端获取资源分类数据
+export async function fetchResourceCategories() {
+  try {
+    // 获取5个子分类的数据
+    const subTypes = ["learning_material", "open_source", "tech_articles", "activity_review", "tools"] as const;
+    const responses = await Promise.all(
+      subTypes.map((subType) =>
+        getContentByType("resource", subType).then((items) => ({
+          subType,
+          items,
+        })),
+      ),
+    );
+
+    // 转换为前端格式
+    const categories = DEFAULT_RESOURCE_CATEGORIES.map((category) => {
+      const mapping: Record<string, string> = {
+        intelligence: "learning_material",
+        surface: "open_source",
+        armory: "tools",
+      };
+
+      const backendSubType = mapping[category.id];
+      if (!backendSubType) return category;
+
+      const response = responses.find((r) => r.subType === backendSubType);
+      const backendItems = response?.items || [];
+
+      // 转换后端数据为前端格式
+      const links = backendItems
+        .filter((item) => item.active === 1)
+        .map((item) => ({
+          title: item.title,
+          desc: item.description || "暂无描述",
+          url: item.link_url,
+          tag: category.links[0]?.tag || "Docs",
+        }));
+
+      // 如果后端有数据，使用后端数据；否则使用默认数据
+      if (links.length > 0) {
+        return {
+          ...category,
+          links: links,
+        };
+      }
+
+      return category;
+    });
+
+    return categories;
+  } catch (error) {
+    console.error("Failed to fetch resource categories:", error);
+    return DEFAULT_RESOURCE_CATEGORIES;
+  }
+}
+
+// 导出默认分类数据（用于静态展示）
+export const RESOURCE_CATEGORIES = DEFAULT_RESOURCE_CATEGORIES;
