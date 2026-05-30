@@ -2,6 +2,8 @@
 package router
 
 import (
+	"time"
+
 	"open-source-club-nav/backend/handler"
 	"open-source-club-nav/backend/middleware"
 
@@ -31,18 +33,33 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 	// -------------------------- 公共接口（不需要鉴权） --------------------------
 	publicGroup := r.Group("/")
 	{
-		// 这里放不需要鉴权的接口，比如注册、登录
-		publicGroup.POST("/register", handler.RegisterHandler)
-		publicGroup.POST("/login", handler.LoginHandler)
+		// 注册、登录（各自独立的 IP 限流桶）
+		publicGroup.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler)
+		publicGroup.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler)
+		// 导航搜索
+		publicGroup.GET("/nav/search", handler.SearchNavItem)
+		// 健康检查（Docker/负载均衡器探活）
+		publicGroup.GET("/healthz", handler.HealthzHandler)
+		// 公开内容接口（用于前端展示）
+		publicGroup.GET("/api/content", handler.GetContentByType)
 	}
 
 	// -------------------------- 私有接口（需要鉴权） --------------------------
 	privateGroup := r.Group("/")
-	privateGroup.Use(middleware.SignAuth()) // 只给私有接口加鉴权
+	privateGroup.Use(middleware.SignAuth()) // JWT 统一鉴权
 	{
-		// 新增管理员列表接口路由
+		// 内容管理接口（editor/super 权限）
+		contentGroup := privateGroup.Group("/api/content")
+		contentGroup.Use(handler.RequireRole("editor", "super"))
+		{
+			contentGroup.POST("", handler.CreateContent)
+			contentGroup.PUT("/:id", handler.UpdateContent)
+			contentGroup.DELETE("/:id", handler.DeleteContent)
+			contentGroup.PUT("/:id/toggle", handler.ToggleContentActive)
+		}
 
-		privateGroup.GET("/backend/admin/list", handler.GetAdminListHandler)
+		// 管理员列表接口（super 权限）
+		privateGroup.GET("/backend/admin/list", handler.RequireRole("super"), handler.GetAdminListHandler)
 	}
 
 	return r

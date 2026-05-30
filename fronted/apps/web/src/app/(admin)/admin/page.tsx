@@ -23,6 +23,7 @@ type LinkItem = {
   active: number;
   module: NavModule;
   resource_sub_module?: ResourceSubModule;
+  game_type?: "internal" | "external" | null;
   click_count?: number;
   created_at?: string | null;
 };
@@ -86,7 +87,8 @@ const MOCK_LINKS: LinkItem[] = [
   { id: 11, title: "校园通知中心", url: "https://example.edu/notice", description: "校园服务入口示例", sort: 2, active: 1, module: "resource_matrix", resource_sub_module: "campus", click_count: 86, created_at: "2026-05-21T08:30:00" },
   { id: 12, title: "开发工具箱", url: "https://toolbox.example.com", description: "工具模块示例", sort: 3, active: 1, module: "resource_matrix", resource_sub_module: "tools", click_count: 74, created_at: "2026-05-21T10:00:00" },
   { id: 2, title: "Cooo Wiki 友情链接", url: "https://wiki.cooo.site/links", description: "友情链接示例", sort: 1, active: 1, module: "friend_links", click_count: 41, created_at: "2026-05-19T15:20:00" },
-  { id: 3, title: "吃豆人小游戏", url: "/games", description: "小游戏模块示例", sort: 1, active: 1, module: "mini_games", click_count: 57, created_at: "2026-05-18T20:11:00" },
+  { id: 3, title: "吃豆人小游戏", url: "/games", description: "小游戏模块示例", sort: 1, active: 1, module: "mini_games", game_type: "internal", click_count: 57, created_at: "2026-05-18T20:11:00" },
+  { id: 4, title: "贪吃蛇大作战", url: "https://playsnake.org/", description: "在线多人贪吃蛇游戏", sort: 2, active: 1, module: "mini_games", game_type: "external", click_count: 32, created_at: "2026-05-22T14:00:00" },
 ];
 const MOCK_USERS: AdminUser[] = [
   { id: 1, username: "demo-admin", role: "super", created_at: "2026-05-01T09:00:00", last_login_at: "2026-05-24T09:42:12" },
@@ -269,6 +271,7 @@ export default function AdminPage() {
     sort: 0,
     module: "resource_matrix" as NavModule,
     resource_sub_module: "think_tank" as ResourceSubModule,
+    game_type: "internal" as "internal" | "external",
   });
   const [userForm, setUserForm] = useState({
     username: "",
@@ -610,8 +613,19 @@ export default function AdminPage() {
     if (!linksRes.ok) throw new Error("加载链接失败");
     const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
     setLinks(linksData?.links || []);
+
+    // 同时加载健康数据以显示链接状态
+    if (!loadedSections.health) {
+      fetch("/api/admin/link-health", { cache: "no-store" })
+        .then((res) => res.json())
+        .then((data: { health?: LinkHealth[] }) => {
+          setHealth(data?.health || []);
+          markSectionLoaded("health");
+        })
+        .catch(() => {});
+    }
     markSectionLoaded("links");
-  }, [activeLinkModule, activeResourceSubModule, applyLinkFilters, markSectionLoaded]);
+  }, [activeLinkModule, activeResourceSubModule, applyLinkFilters, loadedSections.health, markSectionLoaded]);
 
   const loadUsers = useCallback(async () => {
     if (MOCK_MODE) {
@@ -720,6 +734,7 @@ export default function AdminPage() {
       ...prev,
       module: nextModule,
       resource_sub_module: nextSubModule,
+      game_type: nextModule === "mini_games" ? (prev.game_type || "internal") : "internal",
     }));
     if (MOCK_MODE) {
       setLinks(applyLinkFilters(MOCK_LINKS, nextModule, nextSubModule));
@@ -796,6 +811,7 @@ export default function AdminPage() {
         ...linkForm,
         module: activeLinkModule,
         resource_sub_module: activeLinkModule === "resource_matrix" ? activeResourceSubModule : undefined,
+        game_type: activeLinkModule === "mini_games" ? linkForm.game_type : undefined,
         active: 1,
         click_count: 0,
         created_at: new Date().toISOString(),
@@ -808,6 +824,7 @@ export default function AdminPage() {
         sort: 0,
         module: activeLinkModule,
         resource_sub_module: activeResourceSubModule,
+        game_type: "internal",
       });
       setLinkFormOpen(false);
       return;
@@ -821,6 +838,7 @@ export default function AdminPage() {
           ...linkForm,
           module: activeLinkModule,
           resource_sub_module: activeLinkModule === "resource_matrix" ? activeResourceSubModule : undefined,
+          game_type: activeLinkModule === "mini_games" ? linkForm.game_type : undefined,
         }),
       });
       const data = await readJsonSafe<{ error?: string }>(res);
@@ -832,6 +850,7 @@ export default function AdminPage() {
         sort: 0,
         module: activeLinkModule,
         resource_sub_module: activeResourceSubModule,
+        game_type: "internal",
       });
       setLinkFormOpen(false);
       await Promise.all([
@@ -855,25 +874,6 @@ export default function AdminPage() {
       loadLinks(),
       loadLogs().catch(() => {}),
       loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
-    ]);
-  };
-
-  // 启用/禁用链接，后端使用 active 字段
-  const toggleActive = async (item: LinkItem) => {
-    if (MOCK_MODE) {
-      setLinks((prev) => prev.map((x) => (x.id === item.id ? { ...x, active: x.active ? 0 : 1 } : x)));
-      return;
-    }
-    await fetch("/api/admin/links", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: item.id, active: item.active ? 0 : 1 }),
-    });
-    await Promise.all([
-      loadLinks(),
-      loadLogs().catch(() => {}),
-      loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
-      loadedSections.health ? loadHealth().catch(() => {}) : Promise.resolve(),
     ]);
   };
 
@@ -1793,9 +1793,35 @@ export default function AdminPage() {
       <>
       <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
         <div className="admin-console-pagehead-title">内容管理</div>
-        <div className="admin-console-pagehead-desc">按模块管理资源矩阵、友情链接、小游戏；资源矩阵下支持智库、校园、工具三个子模块。</div>
+        <div className="admin-console-pagehead-desc">按模块管理资源矩阵、友情链接、小游戏；资源矩阵下支持智库、校园、工具三个子模块；小游戏支持内置游戏与外部链接两种类型。</div>
       </div>
       <div id="links" className="admin-card" style={{ padding: 16, display: "grid", gap: 12 }}>
+        {/* 模块标题 + 新建按钮 */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: "#0F172A" }}>
+              {NAV_MODULE_META[activeLinkModule].label}
+              {activeLinkModule === "resource_matrix" ? (
+                <span style={{ fontSize: 14, fontWeight: 500, color: "#64748B", marginLeft: 8 }}>
+                  / {RESOURCE_SUB_MODULE_META[activeResourceSubModule].label}
+                </span>
+              ) : null}
+            </div>
+            <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 2 }}>
+              {activeLinkModule === "resource_matrix" && "管理学习资料、开源项目、技术文章、活动回顾、工具推荐等资源"}
+              {activeLinkModule === "friend_links" && "管理与其他站点、社区、组织的友情链接互换"}
+              {activeLinkModule === "mini_games" && "管理内置小游戏和外部游戏链接入口"}
+            </div>
+          </div>
+          <button
+            type="button"
+            className={linkFormOpen ? "admin-btn-ghost" : "admin-btn"}
+            onClick={() => setLinkFormOpen((prev) => !prev)}
+          >
+            {linkFormOpen ? "收起新建" : "+ 新建链接"}
+          </button>
+        </div>
+
         {activeLinkModule === "resource_matrix" ? (
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {(Object.keys(RESOURCE_SUB_MODULE_META) as ResourceSubModule[]).map((subKey) => {
@@ -1816,39 +1842,39 @@ export default function AdminPage() {
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 8 }}>
-          <div style={{ display: "flex", justifyContent: "flex-start" }}>
-            <button
-              type="button"
-              className={linkFormOpen ? "admin-btn-ghost" : "admin-btn"}
-              onClick={() => setLinkFormOpen((prev) => !prev)}
-            >
-              {linkFormOpen ? "收起新建" : "新建链接"}
-            </button>
-          </div>
-          {linkFormOpen ? (
-            <form onSubmit={submitLink} style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1.2fr 1fr 120px 120px 90px" }}>
+        {linkFormOpen ? (
+            <form onSubmit={submitLink} style={{ display: "grid", gap: 8, gridTemplateColumns: activeLinkModule === "mini_games" ? "1fr 1.2fr 1fr 120px 120px 100px 90px" : "1fr 1.2fr 1fr 120px 120px 90px" }}>
               <input className="admin-input" placeholder="标题" value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} />
               <input className="admin-input" placeholder="URL" value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} />
               <input className="admin-input" placeholder="描述" value={linkForm.description} onChange={(e) => setLinkForm({ ...linkForm, description: e.target.value })} />
               <input className="admin-input" type="number" placeholder="排序" value={linkForm.sort} onChange={(e) => setLinkForm({ ...linkForm, sort: Number(e.target.value || 0) })} />
+              {activeLinkModule === "mini_games" && (
+                <select className="admin-input" value={linkForm.game_type || "internal"} onChange={(e) => setLinkForm({ ...linkForm, game_type: e.target.value as "internal" | "external" })}>
+                  <option value="internal">内置游戏</option>
+                  <option value="external">外部链接</option>
+                </select>
+              )}
               <button type="submit" className="admin-btn">新增到当前模块</button>
               <button type="button" className="admin-btn-ghost" onClick={() => setLinkFormOpen(false)}>取消</button>
             </form>
           ) : null}
-        </div>
-
-        <div style={{ fontSize: 12, color: "#64748B" }}>
-          当前模块：{NAV_MODULE_META[activeLinkModule].label}
-          {activeLinkModule === "resource_matrix" ? ` / ${RESOURCE_SUB_MODULE_META[activeResourceSubModule].label}` : ""}
-        </div>
 
         <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "模块", "子模块", "标题", "URL", "点击次数", "创建时间", "状态", "操作"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
+                {[
+                  "ID",
+                  activeLinkModule === "resource_matrix" ? "子模块" : null,
+                  activeLinkModule === "mini_games" ? "游戏类型" : null,
+                  "标题",
+                  "URL",
+                  "点击次数",
+                  "创建时间",
+                  "健康状态",
+                  "操作",
+                ].filter(Boolean).map((h) => (
+                  <th key={String(h)} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -1856,22 +1882,46 @@ export default function AdminPage() {
               {links.map((item) => (
                 <tr key={item.id}>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{NAV_MODULE_META[item.module]?.short || "-"}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    {item.module === "resource_matrix"
-                      ? RESOURCE_SUB_MODULE_META[item.resource_sub_module || "think_tank"]?.short || "-"
-                      : "-"}
-                  </td>
+                  {activeLinkModule === "resource_matrix" && (
+                    <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                      {RESOURCE_SUB_MODULE_META[item.resource_sub_module || "think_tank"]?.short || "-"}
+                    </td>
+                  )}
+                  {activeLinkModule === "mini_games" && (
+                    <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                      <span style={{
+                        display: "inline-block",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 500,
+                        background: item.game_type === "external" ? "#FEF3C7" : "#DBEAFE",
+                        color: item.game_type === "external" ? "#92400E" : "#1E40AF",
+                      }}>
+                        {item.game_type === "external" ? "外部链接" : "内置游戏"}
+                      </span>
+                    </td>
+                  )}
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={item.url}>{item.url}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" }}>
                     {item.created_at ? String(item.created_at).replace("T", " ").slice(0, 19) : "-"}
                   </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: item.active ? "#059669" : "#DC2626", fontWeight: 600 }}>{item.active ? "启用" : "禁用"}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
-                    <button type="button" onClick={() => toggleActive(item)} className="admin-btn-ghost">{item.active ? "禁用" : "启用"}</button>
-                    <button type="button" onClick={() => removeLink(item.id)} className="admin-btn-ghost" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}>删除</button>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    {(() => {
+                      const h = health.find((x) => x.link_id === item.id);
+                      if (!h) return <span style={{ color: "#94A3B8", fontWeight: 500 }}>待检测</span>;
+                      if (h.is_ok) return <span style={{ color: "#059669", fontWeight: 600 }}>正常</span>;
+                      return (
+                        <span style={{ color: "#DC2626", fontWeight: 600 }}>
+                          不可用{h.status_code ? <span style={{ marginLeft: 6, fontSize: 11, background: "#F3F4F6", padding: "1px 6px", borderRadius: 999, color: "#475569", fontWeight: 400 }}>HTTP {h.status_code}</span> : null}
+                        </span>
+                      );
+                    })()}
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    <button type="button" onClick={() => { if (confirm(`确定删除「${item.title}」？`)) removeLink(item.id); }} className="admin-btn-ghost" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}>删除</button>
                   </td>
                 </tr>
               ))}
