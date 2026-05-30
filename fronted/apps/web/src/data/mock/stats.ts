@@ -29,5 +29,16 @@ export function getMockAdminStats() {
     { repo: "facebook/react", clicks: 22 },
     { repo: "nodejs/node", clicks: 18 },
   ];
-  return { today, days, trend7, popularRepos, popularCategories: popularRepos };
+  const hourly24 = Array.from({ length: 24 }).map((_, hour) => {
+    const pvSamples = [18, 14, 11, 9, 8, 12, 22, 38, 56, 71, 68, 75, 83, 88, 86, 79, 72, 69, 64, 58, 49, 41, 34, 26];
+    const uvSamples = [7, 6, 5, 4, 4, 6, 11, 18, 25, 31, 29, 33, 36, 38, 37, 34, 30, 29, 26, 24, 21, 18, 14, 10];
+    const clickSamples = [5, 4, 4, 3, 3, 4, 8, 12, 17, 22, 21, 24, 27, 29, 28, 26, 24, 23, 21, 20, 17, 14, 12, 9];
+    return {
+      hour,
+      page_views: pvSamples[hour],
+      unique_visitors: uvSamples[hour],
+      link_clicks: clickSamples[hour],
+    };
+  });
+  return { today, days, trend7, hourly24, popularRepos, popularCategories: popularRepos };
 }

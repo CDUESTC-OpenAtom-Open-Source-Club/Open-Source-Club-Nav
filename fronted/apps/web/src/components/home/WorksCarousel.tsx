@@ -162,7 +162,7 @@ const createPacmanRound = ({
     frightenedTicks: 0,
     ghostCombo: 0,
     tick: 0,
-    status: `绗?${safeLevel}/${totalLevels} 鍏筹紙鏂版墜鏈€鎱㈡ā寮忥級`,
+    status: `第 ${safeLevel}/${totalLevels} 关（新手最慢模式）`,
   };
 };
 
@@ -1118,7 +1118,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             running: true,
             finished: false,
             tick: (Number(prev.tick) || 0) + 1,
-            status: `鎹熷け 1 鏉″懡锛屽墿浣?${lives} 鏉″懡`,
+            status: `损失 1 条命，剩余 ${lives} 条命`,
           };
         }
 
@@ -1476,10 +1476,10 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
-            鎿嶄綔鏂瑰紡
+            操作方式
           </div>
           <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>
-            鐐瑰嚮妫嬬洏涓婂悆璞嗕汉鍛ㄥ洿鐨勪綅缃彲鏀瑰彉绉诲姩鏂瑰悜锛涢敭鐩樻敮鎸佹柟鍚戦敭锛涜Е灞忚澶囧彲鐩存帴鐐规寜涓嬫柟鏂瑰悜閿€?
+            点击棋盘上吃豆人周围的位置可改变移动方向；键盘支持方向键；触屏设备可直接点击下方方向键。
           </div>
         </div>
       ) : null}
@@ -1546,7 +1546,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
         {game.status}
       </div>
       <div style={{ fontSize: 9, color: "#94A3B8" }}>
-        鏂版墜鏈€鎱㈡ā寮忥細瓒呮參閫熷害銆?0鏉″懡銆佽秴闀挎儕鍚撴椂闂?
+        新手最慢模式：超慢速度、10条命、超长惊吓时间
       </div>
     </div>
   );

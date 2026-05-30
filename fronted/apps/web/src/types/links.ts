@@ -1,3 +1,6 @@
+export type NavModule = "resource_matrix" | "friend_links" | "mini_games";
+export type ResourceMatrixSubModule = "think_tank" | "campus" | "tools";
+
 export interface FriendLink {
   id: number;
   title: string;
@@ -5,6 +8,9 @@ export interface FriendLink {
   description: string;
   sort: number;
   active: number;
+  module?: NavModule;
+  resource_sub_module?: ResourceMatrixSubModule;
+  click_count?: number;
   created_at: string;
   updated_at: string;
 }
@@ -15,6 +21,8 @@ export interface LinkCreateInput {
   description?: string;
   sort?: number;
   active?: number;
+  module?: NavModule;
+  resource_sub_module?: ResourceMatrixSubModule;
 }
 
 export interface LinkUpdateInput {
@@ -24,4 +32,6 @@ export interface LinkUpdateInput {
   description?: string;
   sort?: number;
   active?: number;
+  module?: NavModule;
+  resource_sub_module?: ResourceMatrixSubModule;
 }

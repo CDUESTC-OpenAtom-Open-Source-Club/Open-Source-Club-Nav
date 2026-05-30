@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+﻿import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
 export type AdminRole = "super" | "editor";
@@ -18,7 +18,7 @@ const DEFAULT_DEV_AUTH_SECRET = "kcos-admin-dev-secret-change-me";
 function getAuthSecret(): string {
   const secret = process.env.ADMIN_AUTH_SECRET;
   if (secret && secret.length > 0) return secret;
-  // 生产环境严禁回退到内置默认密钥，否则会话可被伪造，必须显式配置。
+  // 生产环境禁止回退到内置默认密钥，否则会话可被伪造，必须显式配置。
   if (process.env.NODE_ENV === "production") {
     throw new Error("ADMIN_AUTH_SECRET 未配置：生产环境必须显式设置后台会话签名密钥");
   }
@@ -26,9 +26,7 @@ function getAuthSecret(): string {
 }
 
 export function isAdminBypassEnabled(): boolean {
-  // 默认安全：仅当显式设置 ADMIN_BYPASS_LOGIN=true 且非生产环境时才放行绕过。
-  if (process.env.NODE_ENV === "production") return false;
-  return process.env.ADMIN_BYPASS_LOGIN === "true";
+  return process.env.NODE_ENV !== "production" && process.env.ADMIN_BYPASS_LOGIN === "true";
 }
 
 function base64UrlEncode(input: Buffer | string): string {
@@ -122,16 +120,9 @@ export async function clearAdminSessionCookie(): Promise<void> {
 }
 
 export async function getAdminSessionFromCookies(): Promise<AdminSession | null> {
-  // 开发阶段默认允许 bypass，方便在无数据库时进入后台联调。
-  if (isAdminBypassEnabled()) {
-    return {
-      userId: 0,
-      username: "bypass-admin",
-      role: "super",
-      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365,
-    };
-  }
   const cookieStore = await cookies();
   const token = cookieStore.get(ADMIN_SESSION_COOKIE)?.value;
   return verifySessionToken(token);
 }
+
+

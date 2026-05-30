@@ -1,7 +1,9 @@
-"use client";
+﻿"use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Activity, BarChart3, Clock3, Eye, LayoutDashboard, MousePointerClick, ServerCog, Users } from "lucide-react";
+import { MOCK_HEALTH } from "@/data/mock/health";
 const MOCK_MODE = process.env.NEXT_PUBLIC_USE_MOCK_MODE === "true";
 
 type AdminUser = {
@@ -19,6 +21,24 @@ type LinkItem = {
   description: string;
   sort: number;
   active: number;
+  module: NavModule;
+  resource_sub_module?: ResourceSubModule;
+  click_count?: number;
+  created_at?: string | null;
+};
+
+type NavModule = "resource_matrix" | "friend_links" | "mini_games";
+type ResourceSubModule = "think_tank" | "campus" | "tools";
+
+const NAV_MODULE_META: Record<NavModule, { label: string; short: string }> = {
+  resource_matrix: { label: "资源矩阵", short: "资源" },
+  friend_links: { label: "友情链接", short: "友链" },
+  mini_games: { label: "小游戏", short: "游戏" },
+};
+const RESOURCE_SUB_MODULE_META: Record<ResourceSubModule, { label: string; short: string }> = {
+  think_tank: { label: "智库", short: "智库" },
+  campus: { label: "校园", short: "校园" },
+  tools: { label: "工具", short: "工具" },
 };
 
 type StatDay = {
@@ -27,16 +47,30 @@ type StatDay = {
   unique_visitors: number;
   link_clicks: number;
 };
+type HourStat = {
+  hour: number;
+  page_views: number;
+  unique_visitors: number;
+  link_clicks: number;
+};
+type StatMetricKey = "link_clicks" | "page_views" | "unique_visitors";
 type SystemInfo = { uptimeSec: number; cpuCores: number; mem: { usageRate: number } };
 type LinkHealth = { link_id: number; title: string; status_code: number | null; is_ok: number; message: string; checked_at: string };
 type LinkLog = {
   id: number;
   link_id: number | null;
+  link_title?: string | null;
   action: string;
   actor_username: string;
   actor_role: string;
   created_at: string;
   detail?: unknown;
+};
+
+const STAT_METRIC_META: Record<StatMetricKey, { label: string; short: string; color: string; bg: string }> = {
+  link_clicks: { label: "点击量", short: "点击", color: "#2563EB", bg: "rgba(37,99,235,0.12)" },
+  page_views: { label: "访问量", short: "访问", color: "#0EA5E9", bg: "rgba(14,165,233,0.12)" },
+  unique_visitors: { label: "访客数", short: "访客", color: "#059669", bg: "rgba(5,150,105,0.12)" },
 };
 
 const baseSections = [
@@ -47,11 +81,12 @@ const baseSections = [
   { id: "logs", label: "操作日志" },
 ] as const;
 
-const MOCK_USER = { id: 1, username: "demo-admin", role: "super" as const };
 const MOCK_LINKS: LinkItem[] = [
-  { id: 1, title: "React 官方文档", url: "https://react.dev", description: "React 学习入口", sort: 1, active: 1 },
-  { id: 2, title: "Next.js 官方文档", url: "https://nextjs.org/docs", description: "Next.js 文档", sort: 2, active: 1 },
-  { id: 3, title: "OpenAtom 开源社团仓库", url: "https://github.com/openatom", description: "社团相关项目", sort: 3, active: 1 },
+  { id: 1, title: "OpenAtom 导航资源", url: "https://openatom.cn", description: "资源矩阵示例", sort: 1, active: 1, module: "resource_matrix", resource_sub_module: "think_tank", click_count: 129, created_at: "2026-05-20T09:12:00" },
+  { id: 11, title: "校园通知中心", url: "https://example.edu/notice", description: "校园服务入口示例", sort: 2, active: 1, module: "resource_matrix", resource_sub_module: "campus", click_count: 86, created_at: "2026-05-21T08:30:00" },
+  { id: 12, title: "开发工具箱", url: "https://toolbox.example.com", description: "工具模块示例", sort: 3, active: 1, module: "resource_matrix", resource_sub_module: "tools", click_count: 74, created_at: "2026-05-21T10:00:00" },
+  { id: 2, title: "Cooo Wiki 友情链接", url: "https://wiki.cooo.site/links", description: "友情链接示例", sort: 1, active: 1, module: "friend_links", click_count: 41, created_at: "2026-05-19T15:20:00" },
+  { id: 3, title: "吃豆人小游戏", url: "/games", description: "小游戏模块示例", sort: 1, active: 1, module: "mini_games", click_count: 57, created_at: "2026-05-18T20:11:00" },
 ];
 const MOCK_USERS: AdminUser[] = [
   { id: 1, username: "demo-admin", role: "super", created_at: "2026-05-01T09:00:00", last_login_at: "2026-05-24T09:42:12" },
@@ -69,6 +104,17 @@ const MOCK_TREND7 = [
   { stat_date: "2026-05-23", link_clicks: 174 },
   { stat_date: "2026-05-24", link_clicks: 161 },
 ];
+const MOCK_HOURLY24: HourStat[] = Array.from({ length: 24 }).map((_, hour) => {
+  const pvSamples = [24, 18, 15, 11, 10, 15, 29, 44, 62, 76, 71, 79, 90, 96, 91, 85, 78, 74, 67, 61, 54, 47, 38, 30];
+  const uvSamples = [9, 8, 6, 5, 5, 7, 13, 21, 30, 35, 33, 38, 42, 45, 43, 40, 36, 34, 31, 28, 24, 21, 17, 13];
+  const clickSamples = [7, 6, 5, 4, 4, 6, 10, 15, 21, 26, 24, 29, 33, 35, 34, 31, 28, 27, 24, 22, 20, 17, 14, 11];
+  return {
+    hour,
+    page_views: pvSamples[hour],
+    unique_visitors: uvSamples[hour],
+    link_clicks: clickSamples[hour],
+  };
+});
 const MOCK_POPULAR = [
   { repo: "facebook/react", url: "https://github.com/facebook/react", clicks: 174, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 18 }, { stat_date: "2026-05-19", clicks: 22 }, { stat_date: "2026-05-20", clicks: 25 }, { stat_date: "2026-05-21", clicks: 19 }, { stat_date: "2026-05-22", clicks: 27 }, { stat_date: "2026-05-23", clicks: 30 }, { stat_date: "2026-05-24", clicks: 33 }] },
   { repo: "vercel/next.js", url: "https://github.com/vercel/next.js", clicks: 161, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 14 }, { stat_date: "2026-05-19", clicks: 20 }, { stat_date: "2026-05-20", clicks: 18 }, { stat_date: "2026-05-21", clicks: 24 }, { stat_date: "2026-05-22", clicks: 26 }, { stat_date: "2026-05-23", clicks: 28 }, { stat_date: "2026-05-24", clicks: 31 }] },
@@ -125,6 +171,12 @@ function getActionTag(action: string): { text: string; fg: string; bg: string } 
   }
   if (raw.includes("enable") || raw.includes("启用")) {
     return { text: "启用", fg: "#166534", bg: "#DCFCE7" };
+  }
+  if (raw.includes("health") || raw.includes("检测")) {
+    return { text: "健康检测", fg: "#0C4A6E", bg: "#E0F2FE" };
+  }
+  if (raw.includes("user") || raw.includes("用户")) {
+    return { text: "用户操作", fg: "#7C2D12", bg: "#FFEDD5" };
   }
   if (raw.includes("login") || raw.includes("登录")) {
     return { text: "登录", fg: "#334155", bg: "#E2E8F0" };
@@ -189,6 +241,7 @@ export default function AdminPage() {
   const [health, setHealth] = useState<LinkHealth[]>([]);
   const [logs, setLogs] = useState<LinkLog[]>([]);
   const [trend7, setTrend7] = useState<Array<{ stat_date: string; link_clicks: number }>>([]);
+  const [hourly24, setHourly24] = useState<HourStat[]>([]);
   const [popular, setPopular] = useState<Array<{ repo: string; url: string; clicks: number; trend7: Array<{ stat_date: string; clicks: number }>; isValid: boolean | null }>>([]);
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
@@ -200,12 +253,22 @@ export default function AdminPage() {
   const [autoDetectIntervalMinutes, setAutoDetectIntervalMinutes] = useState(15);
   const [autoDetectDraftMinutes, setAutoDetectDraftMinutes] = useState("15");
   const [lastAutoDetectAt, setLastAutoDetectAt] = useState<string | null>(null);
+  const [activeLinkModule, setActiveLinkModule] = useState<NavModule>("resource_matrix");
+  const [activeResourceSubModule, setActiveResourceSubModule] = useState<ResourceSubModule>("think_tank");
+  const [linkFormOpen, setLinkFormOpen] = useState(false);
+  const [linksNavExpanded, setLinksNavExpanded] = useState(false);
+  const [activeStatMetric, setActiveStatMetric] = useState<StatMetricKey>("link_clicks");
+  const [statRange, setStatRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const [hoveredMonthlyIndex, setHoveredMonthlyIndex] = useState<number | null>(null);
+  const [hoveredHourlyIndex, setHoveredHourlyIndex] = useState<number | null>(null);
 
   const [linkForm, setLinkForm] = useState({
     title: "",
     url: "",
     description: "",
     sort: 0,
+    module: "resource_matrix" as NavModule,
+    resource_sub_module: "think_tank" as ResourceSubModule,
   });
   const [userForm, setUserForm] = useState({
     username: "",
@@ -216,10 +279,10 @@ export default function AdminPage() {
   const AUTO_DETECT_INTERVAL_KEY = "kcos_admin_auto_detect_interval_minutes";
   const AUTO_DETECT_LAST_RUN_KEY = "kcos_admin_auto_detect_last_run_at";
 
-  // 顶部 KPI 默认取最新一天，没有数据时回退到空统计。
+  // 今日 KPI（无数据时使用零值占位）
   const today = useMemo(
     () =>
-      stats[0] || {
+      stats[stats.length - 1] || {
         stat_date: new Date().toISOString().slice(0, 10),
         page_views: 0,
         unique_visitors: 0,
@@ -228,12 +291,175 @@ export default function AdminPage() {
     [stats],
   );
 
+  const hourlyStats = useMemo(() => {
+    const rowMap = new Map(hourly24.map((item) => [Number(item.hour), item]));
+    return Array.from({ length: 24 }).map((_, hour) => {
+      const row = rowMap.get(hour);
+      return {
+        hour,
+        page_views: Number(row?.page_views || 0),
+        unique_visitors: Number(row?.unique_visitors || 0),
+        link_clicks: Number(row?.link_clicks || 0),
+      };
+    });
+  }, [hourly24]);
+
+  const hourlyOverview = useMemo(() => {
+    const totals = hourlyStats.reduce(
+      (acc, item) => ({
+        page_views: acc.page_views + item.page_views,
+        unique_visitors: acc.unique_visitors + item.unique_visitors,
+        link_clicks: acc.link_clicks + item.link_clicks,
+      }),
+      { page_views: 0, unique_visitors: 0, link_clicks: 0 },
+    );
+    const hovered = hoveredHourlyIndex === null ? null : hourlyStats[hoveredHourlyIndex] || null;
+    return { totals, hovered };
+  }, [hourlyStats, hoveredHourlyIndex]);
+
+  const hourlyLineChart = useMemo(() => {
+    const metricKeys: StatMetricKey[] = ["page_views", "unique_visitors", "link_clicks"];
+    const width = 980;
+    const height = 286;
+    const padding = { top: 20, right: 20, bottom: 30, left: 38 };
+    const innerWidth = width - padding.left - padding.right;
+    const innerHeight = height - padding.top - padding.bottom;
+    const maxValue = Math.max(
+      5,
+      ...hourlyStats.flatMap((item) => [item.page_views, item.unique_visitors, item.link_clicks]),
+    );
+    const stepX = hourlyStats.length > 1 ? innerWidth / (hourlyStats.length - 1) : innerWidth;
+
+    const pointsByMetric = metricKeys.reduce(
+      (acc, metricKey) => {
+        acc[metricKey] = hourlyStats.map((item, index) => {
+          const value = Number(item[metricKey] || 0);
+          const x = padding.left + (hourlyStats.length === 1 ? innerWidth / 2 : stepX * index);
+          const y = padding.top + innerHeight - (value / maxValue) * innerHeight;
+          return { hour: item.hour, value, x, y };
+        });
+        return acc;
+      },
+      {} as Record<StatMetricKey, Array<{ hour: number; value: number; x: number; y: number }>>,
+    );
+
+    const buildSmoothPath = (list: Array<{ x: number; y: number }>) => {
+      if (!list.length) return "";
+      if (list.length === 1) return `M ${list[0].x} ${list[0].y}`;
+      let path = `M ${list[0].x} ${list[0].y}`;
+      for (let i = 0; i < list.length - 1; i += 1) {
+        const current = list[i];
+        const next = list[i + 1];
+        const midX = (current.x + next.x) / 2;
+        path += ` C ${midX} ${current.y}, ${midX} ${next.y}, ${next.x} ${next.y}`;
+      }
+      return path;
+    };
+
+    const linePathByMetric = metricKeys.reduce(
+      (acc, metricKey) => {
+        acc[metricKey] = buildSmoothPath(pointsByMetric[metricKey]);
+        return acc;
+      },
+      {} as Record<StatMetricKey, string>,
+    );
+
+    const yTicks = Array.from({ length: 5 }).map((_, index) => {
+      const value = Math.round((maxValue / 4) * (4 - index));
+      const y = padding.top + (innerHeight / 4) * index;
+      return { value, y };
+    });
+    const xTicks = [0, 4, 8, 12, 16, 20, 23];
+
+    return {
+      metricKeys,
+      width,
+      height,
+      padding,
+      innerHeight,
+      maxValue,
+      pointsByMetric,
+      linePathByMetric,
+      yTicks,
+      xTicks,
+    };
+  }, [hourlyStats]);
+
   const sections = useMemo(
     () => (user && user.role === "super"
       ? [...baseSections, { id: "users", label: "用户管理" as const }]
       : baseSections),
     [user],
   );
+
+  const applyLinkFilters = useCallback((source: LinkItem[], module: NavModule, subModule: ResourceSubModule) => (
+    source.filter((item) => {
+      if (item.module !== module) return false;
+      if (module !== "resource_matrix") return true;
+      return (item.resource_sub_module || "think_tank") === subModule;
+    })
+  ), []);
+
+  const monthlyStats = useMemo(() => {
+    const sorted = [...stats].sort((a, b) => String(a.stat_date).localeCompare(String(b.stat_date)));
+    const latestDate = sorted.length
+      ? new Date(`${sorted[sorted.length - 1].stat_date}T00:00:00`)
+      : new Date();
+    const monthStart = new Date(latestDate.getFullYear(), latestDate.getMonth(), 1);
+    const monthEnd = new Date(latestDate.getFullYear(), latestDate.getMonth() + 1, 0);
+
+    const statMap = new Map(sorted.map((item) => [String(item.stat_date).slice(0, 10), item]));
+    const days: StatDay[] = [];
+    for (let day = new Date(monthStart); day <= monthEnd; day.setDate(day.getDate() + 1)) {
+      const yyyy = day.getFullYear();
+      const mm = String(day.getMonth() + 1).padStart(2, "0");
+      const dd = String(day.getDate()).padStart(2, "0");
+      const key = `${yyyy}-${mm}-${dd}`;
+      const stat = statMap.get(key);
+      days.push({
+        stat_date: key,
+        page_views: Number(stat?.page_views || 0),
+        unique_visitors: Number(stat?.unique_visitors || 0),
+        link_clicks: Number(stat?.link_clicks || 0),
+      });
+    }
+    return days;
+  }, [stats]);
+
+  const monthRangeMin = monthlyStats[0]?.stat_date || "";
+  const monthRangeMax = monthlyStats[monthlyStats.length - 1]?.stat_date || "";
+  const effectiveRangeFrom = statRange.from || monthRangeMin;
+  const effectiveRangeTo = statRange.to || monthRangeMax;
+  const rangeFrom = effectiveRangeFrom <= effectiveRangeTo ? effectiveRangeFrom : effectiveRangeTo;
+  const rangeTo = effectiveRangeFrom <= effectiveRangeTo ? effectiveRangeTo : effectiveRangeFrom;
+
+  const filteredMonthlyStats = useMemo(
+    () => monthlyStats.filter((item) => item.stat_date >= rangeFrom && item.stat_date <= rangeTo),
+    [monthlyStats, rangeFrom, rangeTo],
+  );
+
+  const maxBarValue = useMemo(
+    () => Math.max(1, ...filteredMonthlyStats.map((item) => Number(item[activeStatMetric] || 0))),
+    [activeStatMetric, filteredMonthlyStats],
+  );
+
+  const monthlyMetricSummary = useMemo(() => {
+    const total = filteredMonthlyStats.reduce((sum, item) => sum + Number(item[activeStatMetric] || 0), 0);
+    const average = filteredMonthlyStats.length ? total / filteredMonthlyStats.length : 0;
+    let peak = filteredMonthlyStats[0] || null;
+    for (const item of filteredMonthlyStats) {
+      if (Number(item[activeStatMetric] || 0) > Number(peak?.[activeStatMetric] || 0)) {
+        peak = item;
+      }
+    }
+    const hovered = hoveredMonthlyIndex === null ? null : filteredMonthlyStats[hoveredMonthlyIndex] || null;
+    return {
+      total,
+      average,
+      peak,
+      hovered,
+    };
+  }, [activeStatMetric, filteredMonthlyStats, hoveredMonthlyIndex]);
 
   const lineChart = useMemo(() => {
     const source = trend7.length
@@ -296,56 +522,96 @@ export default function AdminPage() {
   const markSectionLoaded = useCallback((sectionId: string) => {
     setLoadedSections((prev) => (prev[sectionId] ? prev : { ...prev, [sectionId]: true }));
   }, []);
-
   const loadStats = useCallback(async () => {
     if (MOCK_MODE) {
       setStats(MOCK_STATS);
       setTrend7(MOCK_TREND7);
+      setHourly24(MOCK_HOURLY24);
       setPopular(MOCK_POPULAR);
       markSectionLoaded("popular");
       return;
     }
-    const statsRes = await fetch("/api/admin/stats");
+
+    const statsRes = await fetch("/api/admin/stats", { cache: "no-store" });
     if (!statsRes.ok) throw new Error("加载统计失败");
     const statsData = await readJsonSafe<{
       days?: StatDay[];
+      stats?: StatDay[];
       trend7?: Array<{ stat_date: string; link_clicks: number }>;
-      popularCategories?: Array<{ repo: string; url: string; clicks: number; trend7: Array<{ stat_date: string; clicks: number }>; isValid: boolean | null }>;
+      popularCategories?: Array<{
+        repo: string;
+        url?: string;
+        sourceUrl?: string;
+        clicks: number;
+        trend7?: Array<{ stat_date: string; clicks: number }>;
+        isValid?: boolean | null;
+      }>;
+      popularRepos?: Array<{
+        repo: string;
+        url?: string;
+        sourceUrl?: string;
+        clicks: number;
+        trend7?: Array<{ stat_date: string; clicks: number }>;
+        isValid?: boolean | null;
+      }>;
+      hourly24?: HourStat[];
+      hourly?: HourStat[];
     }>(statsRes);
-    setStats(statsData?.days || []);
+
+    setStats(statsData?.days || statsData?.stats || []);
     setTrend7(statsData?.trend7 || []);
-    setPopular(statsData?.popularCategories || []);
+    setHourly24(statsData?.hourly24 || statsData?.hourly || []);
+
+    const popularSource = statsData?.popularCategories || statsData?.popularRepos || [];
+    setPopular(
+      popularSource.map((item) => ({
+        repo: item.repo,
+        url: item.url || item.sourceUrl || "",
+        clicks: Number(item.clicks || 0),
+        trend7: item.trend7 || [],
+        isValid: item.isValid ?? null,
+      })),
+    );
+
     markSectionLoaded("popular");
   }, [markSectionLoaded]);
 
-  const loadSystem = useCallback(async () => {
+  const loadOverview = useCallback(async () => {
+    await loadStats();
+
     if (MOCK_MODE) {
-      setSystem({ uptimeSec: 73842, cpuCores: 8, mem: { usageRate: 42 } });
+      setSystem({ uptimeSec: 3600, cpuCores: 8, mem: { usageRate: 42 } });
+      markSectionLoaded("overview");
       return;
     }
-    const sysRes = await fetch("/api/admin/system");
-    if (!sysRes.ok) throw new Error("加载系统信息失败");
-    const systemData = await readJsonSafe<SystemInfo>(sysRes);
-    setSystem(systemData);
-  }, []);
 
-  const loadOverview = useCallback(async () => {
-    await Promise.all([loadStats(), loadSystem()]);
+    const sysRes = await fetch("/api/admin/system", { cache: "no-store" });
+    if (!sysRes.ok) throw new Error("加载系统信息失败");
+    const sysData = await readJsonSafe<SystemInfo>(sysRes);
+    if (sysData) {
+      setSystem(sysData);
+    }
     markSectionLoaded("overview");
-  }, [loadStats, loadSystem, markSectionLoaded]);
+  }, [loadStats, markSectionLoaded]);
 
   const loadLinks = useCallback(async () => {
     if (MOCK_MODE) {
-      setLinks(MOCK_LINKS);
+      setLinks(applyLinkFilters(MOCK_LINKS, activeLinkModule, activeResourceSubModule));
       markSectionLoaded("links");
       return;
     }
-    const linksRes = await fetch("/api/admin/links");
+
+    const search = new URLSearchParams({ module: activeLinkModule });
+    if (activeLinkModule === "resource_matrix") {
+      search.set("resource_sub_module", activeResourceSubModule);
+    }
+
+    const linksRes = await fetch(`/api/admin/links?${search.toString()}`, { cache: "no-store" });
     if (!linksRes.ok) throw new Error("加载链接失败");
     const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
     setLinks(linksData?.links || []);
     markSectionLoaded("links");
-  }, [markSectionLoaded]);
+  }, [activeLinkModule, activeResourceSubModule, applyLinkFilters, markSectionLoaded]);
 
   const loadUsers = useCallback(async () => {
     if (MOCK_MODE) {
@@ -353,7 +619,8 @@ export default function AdminPage() {
       markSectionLoaded("users");
       return;
     }
-    const usersRes = await fetch("/api/admin/users");
+
+    const usersRes = await fetch("/api/admin/users", { cache: "no-store" });
     if (!usersRes.ok) throw new Error("加载用户失败");
     const usersData = await readJsonSafe<{ users?: AdminUser[] }>(usersRes);
     setUsers(usersData?.users || []);
@@ -362,15 +629,12 @@ export default function AdminPage() {
 
   const loadHealth = useCallback(async () => {
     if (MOCK_MODE) {
-      setHealth([
-        { link_id: 1, title: "React 官方文档", status_code: 200, is_ok: 1, message: "ok", checked_at: "2026-05-24T10:10:00" },
-        { link_id: 2, title: "Next.js 官方文档", status_code: 200, is_ok: 1, message: "ok", checked_at: "2026-05-24T10:10:10" },
-        { link_id: 3, title: "OpenAtom 开源社团仓库", status_code: 503, is_ok: 0, message: "Service Unavailable", checked_at: "2026-05-24T10:10:20" },
-      ]);
+      setHealth(MOCK_HEALTH);
       markSectionLoaded("health");
       return;
     }
-    const healthRes = await fetch("/api/admin/link-health");
+
+    const healthRes = await fetch("/api/admin/link-health", { cache: "no-store" });
     if (!healthRes.ok) throw new Error("加载健康检测失败");
     const healthData = await readJsonSafe<{ health?: LinkHealth[] }>(healthRes);
     setHealth(healthData?.health || []);
@@ -379,32 +643,25 @@ export default function AdminPage() {
 
   const loadLogs = useCallback(async () => {
     if (MOCK_MODE) {
-      setLogs([
-        { id: 1, link_id: 1, action: "create link", actor_username: "demo-admin", actor_role: "super", created_at: "2026-05-24T09:15:00", detail: { title: "React 官方文档" } },
-        { id: 2, link_id: 3, action: "disable link", actor_username: "editor-a", actor_role: "editor", created_at: "2026-05-24T09:36:00", detail: { reason: "探测失败" } },
-        { id: 3, link_id: 2, action: "update link", actor_username: "demo-admin", actor_role: "super", created_at: "2026-05-24T10:01:00", detail: { field: "description" } },
-      ]);
+      setLogs([]);
       markSectionLoaded("logs");
       return;
     }
-    const logRes = await fetch("/api/admin/logs");
+
+    const logRes = await fetch("/api/admin/logs", { cache: "no-store" });
     if (!logRes.ok) throw new Error("加载日志失败");
-    const logsData = await readJsonSafe<{ logs?: LinkLog[] }>(logRes);
-    setLogs(logsData?.logs || []);
+    const logData = await readJsonSafe<{ logs?: LinkLog[] }>(logRes);
+    setLogs(logData?.logs || []);
     markSectionLoaded("logs");
   }, [markSectionLoaded]);
 
   const loadSectionById = useCallback(async (sectionId: string, role: "super" | "editor") => {
-    if (sectionId === "overview") {
+    if (sectionId === "overview" || sectionId === "popular") {
       await loadOverview();
       return;
     }
     if (sectionId === "links") {
       await loadLinks();
-      return;
-    }
-    if (sectionId === "popular") {
-      await loadStats();
       return;
     }
     if (sectionId === "health") {
@@ -418,28 +675,22 @@ export default function AdminPage() {
     if (sectionId === "users" && role === "super") {
       await loadUsers();
     }
-  }, [loadHealth, loadLinks, loadLogs, loadOverview, loadStats, loadUsers]);
+  }, [loadHealth, loadLinks, loadLogs, loadOverview, loadUsers]);
 
   useEffect(() => {
-    // 鍏堢‘璁ゅ綋鍓嶇櫥褰曟€侊紝鍐嶅喅瀹氭槸鍚﹁繘鍏ュ悗鍙版垨璺宠浆鐧诲綍椤点€?
     const init = async () => {
-      if (MOCK_MODE) {
-        setUser(MOCK_USER);
-        await Promise.all([loadOverview(), loadLinks(), loadUsers(), loadHealth(), loadLogs()]);
-        setLoadedSections({ overview: true, popular: true, links: true, users: true, health: true, logs: true });
-        setChecking(false);
-        return;
-      }
       try {
-        const meRes = await fetch("/api/admin/me");
+        const meRes = await fetch("/api/admin/me", { cache: "no-store" });
         if (!meRes.ok) {
           router.replace("/admin/login");
           return;
         }
+
         const me = await readJsonSafe<{ user?: { id: number; username: string; role: "super" | "editor" } }>(meRes);
         if (!me?.user) {
           throw new Error("登录态异常");
         }
+
         setUser(me.user);
         await Promise.all([loadOverview(), loadLinks()]);
         setLoadedSections({ overview: true, popular: true, links: true });
@@ -449,17 +700,82 @@ export default function AdminPage() {
         setChecking(false);
       }
     };
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
-  // 当前后台为单页模块切换模式，这里只切换可见模块。
+    void init();
+  }, [loadLinks, loadOverview, router]);
+
+  // 懒加载对应分区数据，并滚动到目标分区
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
     if (!user || loadedSections[sectionId]) return;
     loadSectionById(sectionId, user.role).catch(() => {
       setError("加载模块数据失败");
     });
+  };
+
+  const switchLinkModule = async (nextModule: NavModule) => {
+    setActiveLinkModule(nextModule);
+    const nextSubModule = nextModule === "resource_matrix" ? activeResourceSubModule : "think_tank";
+    setLinkForm((prev) => ({
+      ...prev,
+      module: nextModule,
+      resource_sub_module: nextSubModule,
+    }));
+    if (MOCK_MODE) {
+      setLinks(applyLinkFilters(MOCK_LINKS, nextModule, nextSubModule));
+      return;
+    }
+    try {
+      const search = new URLSearchParams({ module: nextModule });
+      if (nextModule === "resource_matrix") {
+        search.set("resource_sub_module", nextSubModule);
+      }
+      const linksRes = await fetch(`/api/admin/links?${search.toString()}`);
+      if (!linksRes.ok) throw new Error("加载导航模块数据失败");
+      const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
+      setLinks(linksData?.links || []);
+      markSectionLoaded("links");
+    } catch {
+      setError("加载导航模块数据失败");
+    }
+  };
+
+  const switchResourceSubModule = async (nextSubModule: ResourceSubModule) => {
+    setActiveResourceSubModule(nextSubModule);
+    setLinkForm((prev) => ({ ...prev, resource_sub_module: nextSubModule }));
+    if (activeLinkModule !== "resource_matrix") return;
+    if (MOCK_MODE) {
+      setLinks(applyLinkFilters(MOCK_LINKS, "resource_matrix", nextSubModule));
+      return;
+    }
+    try {
+      const search = new URLSearchParams({
+        module: "resource_matrix",
+        resource_sub_module: nextSubModule,
+      });
+      const linksRes = await fetch(`/api/admin/links?${search.toString()}`);
+      if (!linksRes.ok) throw new Error("加载资源矩阵子模块数据失败");
+      const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
+      setLinks(linksData?.links || []);
+      markSectionLoaded("links");
+    } catch {
+      setError("加载资源矩阵子模块数据失败");
+    }
+  };
+
+  const handleSidebarSectionClick = (sectionId: string) => {
+    if (sectionId === "links") {
+      setLinksNavExpanded((prev) => !prev);
+      scrollToSection(sectionId);
+      return;
+    }
+    scrollToSection(sectionId);
+  };
+
+  const handleSidebarModuleClick = (module: NavModule) => {
+    setLinksNavExpanded(true);
+    setActiveSection("links");
+    void switchLinkModule(module);
   };
 
   const logout = async () => {
@@ -474,9 +790,26 @@ export default function AdminPage() {
   const submitLink = async (e: FormEvent) => {
     e.preventDefault();
     if (MOCK_MODE) {
-      const nextId = links.length ? Math.max(...links.map((x) => x.id)) + 1 : 1;
-      setLinks((prev) => [...prev, { id: nextId, ...linkForm, active: 1 }]);
-      setLinkForm({ title: "", url: "", description: "", sort: 0 });
+      const nextId = Date.now();
+      const nextItem: LinkItem = {
+        id: nextId,
+        ...linkForm,
+        module: activeLinkModule,
+        resource_sub_module: activeLinkModule === "resource_matrix" ? activeResourceSubModule : undefined,
+        active: 1,
+        click_count: 0,
+        created_at: new Date().toISOString(),
+      };
+      setLinks((prev) => [...prev, nextItem]);
+      setLinkForm({
+        title: "",
+        url: "",
+        description: "",
+        sort: 0,
+        module: activeLinkModule,
+        resource_sub_module: activeResourceSubModule,
+      });
+      setLinkFormOpen(false);
       return;
     }
     setError("");
@@ -484,11 +817,23 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(linkForm),
+        body: JSON.stringify({
+          ...linkForm,
+          module: activeLinkModule,
+          resource_sub_module: activeLinkModule === "resource_matrix" ? activeResourceSubModule : undefined,
+        }),
       });
       const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "新增链接失败");
-      setLinkForm({ title: "", url: "", description: "", sort: 0 });
+      setLinkForm({
+        title: "",
+        url: "",
+        description: "",
+        sort: 0,
+        module: activeLinkModule,
+        resource_sub_module: activeResourceSubModule,
+      });
+      setLinkFormOpen(false);
       await Promise.all([
         loadLinks(),
         loadLogs().catch(() => {}),
@@ -499,7 +844,7 @@ export default function AdminPage() {
     }
   };
 
-  // 删除后重新拉取列表，确保表格和统计区域同步刷新。
+  // 删除链接后刷新相关分区数据
   const removeLink = async (id: number) => {
     if (MOCK_MODE) {
       setLinks((prev) => prev.filter((x) => x.id !== id));
@@ -513,7 +858,7 @@ export default function AdminPage() {
     ]);
   };
 
-  // 启用/禁用共用同一个更新入口，仅切换 active 字段。
+  // 启用/禁用链接，后端使用 active 字段
   const toggleActive = async (item: LinkItem) => {
     if (MOCK_MODE) {
       setLinks((prev) => prev.map((x) => (x.id === item.id ? { ...x, active: x.active ? 0 : 1 } : x)));
@@ -548,11 +893,11 @@ export default function AdminPage() {
         body: JSON.stringify(userForm),
       });
       const data = await readJsonSafe<{ error?: string }>(res);
-      if (!res.ok) throw new Error(data?.error || "创建用户失败");
+      if (!res.ok) throw new Error(data?.error || "创建用户澶辫触");
       setUserForm({ username: "", password: "", role: "editor" });
-      await loadUsers();
+      await Promise.all([loadUsers(), loadLogs().catch(() => {})]);
     } catch (err) {
-      setError(String((err as Error).message || "创建用户失败"));
+      setError(String((err as Error).message || "创建用户澶辫触"));
     }
   };
   const runHealthCheck = async () => {
@@ -593,19 +938,22 @@ export default function AdminPage() {
     const storedEnabled = window.localStorage.getItem(AUTO_DETECT_ENABLED_KEY);
     const storedMinutes = window.localStorage.getItem(AUTO_DETECT_INTERVAL_KEY);
     const storedLastRun = window.localStorage.getItem(AUTO_DETECT_LAST_RUN_KEY);
-    if (storedEnabled === "true") {
-      setAutoDetectEnabled(true);
-    }
-    if (storedMinutes) {
-      const parsed = Number(storedMinutes);
-      if (Number.isFinite(parsed) && parsed >= 1) {
-        setAutoDetectIntervalMinutes(parsed);
-        setAutoDetectDraftMinutes(String(parsed));
+    const timer = window.setTimeout(() => {
+      if (storedEnabled === "true") {
+        setAutoDetectEnabled(true);
       }
-    }
-    if (storedLastRun) {
-      setLastAutoDetectAt(storedLastRun);
-    }
+      if (storedMinutes) {
+        const parsed = Number(storedMinutes);
+        if (Number.isFinite(parsed) && parsed >= 1) {
+          setAutoDetectIntervalMinutes(parsed);
+          setAutoDetectDraftMinutes(String(parsed));
+        }
+      }
+      if (storedLastRun) {
+        setLastAutoDetectAt(storedLastRun);
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -616,6 +964,14 @@ export default function AdminPage() {
     return () => window.clearInterval(intervalId);
   }, [autoDetectEnabled, autoDetectIntervalMinutes, healthChecking]);
 
+  useEffect(() => {
+    if (activeSection !== "health") return;
+    const intervalId = window.setInterval(() => {
+      loadHealth().catch(() => {});
+    }, 15000);
+    return () => window.clearInterval(intervalId);
+  }, [activeSection, loadHealth]);
+
   const openAutoDetectDialog = () => {
     setAutoDetectDraftMinutes(String(autoDetectIntervalMinutes));
     setAutoDetectDialogOpen(true);
@@ -624,7 +980,7 @@ export default function AdminPage() {
   const saveAutoDetectSettings = () => {
     const nextMinutes = Number(autoDetectDraftMinutes);
     if (!Number.isFinite(nextMinutes) || nextMinutes < 1) {
-      setError("自动探测时间必须是大于等于 1 的分钟数");
+      setError("自动检测时间必须大于等于 1 分钟");
       return;
     }
     setError("");
@@ -655,25 +1011,47 @@ export default function AdminPage() {
       <div className="admin-console-layout">
         <aside className="admin-console-sidebar">
           <div className="admin-console-side-title">控制台</div>
-          {/* 左侧菜单只负责切换模块，不承载路由状态。 */}
+          {/* 侧边导航：支持模块快速切换 */}
           {sections.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              className={`admin-console-side-item ${activeSection === section.id ? "active" : ""}`}
-              onClick={() => scrollToSection(section.id)}
-            >
-              {section.label}
-            </button>
+            <div key={section.id} style={{ display: "grid", gap: 6 }}>
+              <button
+                type="button"
+                className={`admin-console-side-item ${activeSection === section.id ? "active" : ""}`}
+                onClick={() => handleSidebarSectionClick(section.id)}
+                style={section.id === "links" ? { justifyContent: "space-between" } : undefined}
+              >
+                <span>{section.label}</span>
+                {section.id === "links" ? (
+                  <span style={{ fontSize: 12, color: "#94A3B8", marginLeft: 8 }}>{linksNavExpanded ? "▾" : "▸"}</span>
+                ) : null}
+              </button>
+              {section.id === "links" && linksNavExpanded ? (
+                <div style={{ display: "grid", gap: 6 }}>
+                  {(Object.keys(NAV_MODULE_META) as NavModule[]).map((moduleKey) => (
+                    <button
+                      key={moduleKey}
+                      type="button"
+                      className={`admin-console-side-item ${activeSection === "links" && activeLinkModule === moduleKey ? "active" : ""}`}
+                      onClick={() => handleSidebarModuleClick(moduleKey)}
+                      style={{ minHeight: 34, padding: "0 10px 0 30px", fontSize: 13, fontWeight: 500 }}
+                    >
+                      {NAV_MODULE_META[moduleKey].label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           ))}
         </aside>
 
         <div className="admin-console-content">
-      {/* 这一块保留为后台统一头部，所有模块切换时都显示。 */}
+      {/* 顶部信息卡：当前登录用户与快捷操作 */}
       <div id="overview" className="admin-card admin-console-anchor-card" style={{ padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "rgba(226,238,252,0.94)", borderColor: "#93C5FD", boxShadow: "0 14px 34px rgba(37,99,235,0.18)" }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#0F172A" }}>管理后台</div>
-          <div style={{ fontSize: 12, color: "#64748B" }}>当前用户：{user.username}（{user.role}）</div>
+          <div style={{ fontSize: 12, color: "#64748B" }}>
+            当前用户：{user.username}（{user.role === "super" ? "超级管理员" : "编辑"}）
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" onClick={() => router.push("/")} className="admin-btn-ghost">
@@ -688,15 +1066,25 @@ export default function AdminPage() {
       {error ? (
         <div style={{ color: "#DC2626", fontSize: 12 }}>{error}</div>
       ) : null}
-      {/* 每次只渲染一个模块，减少信息堆叠，保持后台单页切换体验。 */}
+      {/* 按当前激活分区显示对应内容 */}
       {activeSection === "overview" ? (
         <>
-          <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
-            <div className="admin-console-pagehead-title">首页总览</div>
+          <div className="admin-card admin-console-pagehead admin-overview-panel" style={{ padding: 16 }}>
+            <div className="admin-console-title-row">
+              <span className="admin-console-icon-badge admin-console-icon-badge-soft">
+                <LayoutDashboard size={16} />
+              </span>
+              <div className="admin-console-pagehead-title">首页总览</div>
+            </div>
             <div className="admin-console-pagehead-desc">查看系统运行状态、今日访问数据和后台全局摘要。</div>
           </div>
-          <div className="admin-card" style={{ padding: 16, background: "linear-gradient(135deg,#FFFFFF 0%,#F3F8FF 55%,#EEF6FF 100%)", border: "1px solid #DCE8F8", boxShadow: "0 14px 28px rgba(37,99,235,0.08)" }}>
-            <div style={{ fontWeight: 700, color: "#0F172A", marginBottom: 10 }}>服务器运行情况</div>
+          <div className="admin-card admin-overview-panel" style={{ padding: 16, background: "linear-gradient(135deg,#FFFFFF 0%,#F3F8FF 55%,#EEF6FF 100%)", border: "1px solid #DCE8F8", boxShadow: "0 14px 28px rgba(37,99,235,0.08)" }}>
+            <div className="admin-console-title-row" style={{ marginBottom: 10 }}>
+              <span className="admin-console-icon-badge" style={{ background: "linear-gradient(135deg, rgba(37,99,235,0.18), rgba(14,165,233,0.22))", color: "#1D4ED8" }}>
+                <ServerCog size={16} />
+              </span>
+              <div style={{ fontWeight: 700, color: "#0F172A" }}>服务器运行情况</div>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 14, alignItems: "center" }}>
               <div style={{ display: "grid", placeItems: "center" }}>
                 <div
@@ -736,7 +1124,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div style={{ marginTop: 2, fontSize: 12, color: "#64748B", display: "flex", justifyContent: "space-between" }}>
-                  <span>实例状态：运行中</span>
+                  <span>服务状态实时更新</span>
                   <span>Uptime: {system?.uptimeSec ?? 0}s</span>
                 </div>
               </div>
@@ -751,18 +1139,412 @@ export default function AdminPage() {
               gap: 10,
             }}
           >
-            {[
-              { label: "今日访问量 (PV)", value: today.page_views },
-              { label: "今日访客数 (UV)", value: today.unique_visitors },
-              { label: "今日点击量", value: today.link_clicks },
+            {[ 
+              { label: "今日访问量 (PV)", value: today.page_views, icon: Eye, tint: "linear-gradient(135deg, rgba(14,165,233,0.16), rgba(14,165,233,0.26))", color: "#0EA5E9" },
+              { label: "今日访客数 (UV)", value: today.unique_visitors, icon: Users, tint: "linear-gradient(135deg, rgba(5,150,105,0.16), rgba(16,185,129,0.24))", color: "#059669" },
+              { label: "今日点击量", value: today.link_clicks, icon: MousePointerClick, tint: "linear-gradient(135deg, rgba(37,99,235,0.16), rgba(59,130,246,0.26))", color: "#1D4ED8" },
             ].map((item) => (
-              <div key={item.label} className="admin-card admin-console-kpi-card" style={{ padding: 12, background: "rgba(214,231,250,0.95)", borderColor: "#93C5FD", boxShadow: "0 10px 26px rgba(37,99,235,0.16)" }}>
-                <div style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>{item.label}</div>
+              <div key={item.label} className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 12, background: "rgba(214,231,250,0.95)", borderColor: "#93C5FD", boxShadow: "0 10px 26px rgba(37,99,235,0.16)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>{item.label}</div>
+                  <span className="admin-console-icon-badge" style={{ background: item.tint, color: item.color }}>
+                    <item.icon size={14} />
+                  </span>
+                </div>
                 <div style={{ fontSize: 26, color: "#1D4ED8", fontWeight: 800 }}>
                   {item.value}
                 </div>
               </div>
             ))}
+          </div>
+          <div className="admin-card admin-console-chart-card admin-console-anchor-card admin-overview-panel" style={{ padding: 12 }}>
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <div>
+                  <div className="admin-console-title-row" style={{ marginBottom: 4 }}>
+                    <span className="admin-console-icon-badge" style={{ background: "linear-gradient(135deg, rgba(14,165,233,0.14), rgba(59,130,246,0.24))", color: "#2563EB" }}>
+                      <Activity size={15} />
+                    </span>
+                    <div style={{ fontWeight: 800, color: "#0F172A" }}>今日概况（24 小时）</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+                    按小时展示访问量、访客数与点击量的变化趋势。
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {hourlyLineChart.metricKeys.map((metricKey) => (
+                    <span
+                      key={`legend-${metricKey}`}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "5px 10px",
+                        borderRadius: 999,
+                        border: `1px solid ${STAT_METRIC_META[metricKey].color}33`,
+                        background: "#FFFFFF",
+                        fontSize: 12,
+                        color: "#334155",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <span style={{ width: 8, height: 8, borderRadius: 999, background: STAT_METRIC_META[metricKey].color }} />
+                      {STAT_METRIC_META[metricKey].label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  border: "1px solid #BFDBFE",
+                  borderRadius: 12,
+                  background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(239,246,255,0.72))",
+                  padding: "8px 12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <div style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>
+                  {hourlyOverview.hovered ? `${String(hourlyOverview.hovered.hour).padStart(2, "0")}:00 - ${String(hourlyOverview.hovered.hour).padStart(2, "0")}:59` : "今日累计"}
+                </div>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  {(Object.keys(STAT_METRIC_META) as StatMetricKey[]).map((metricKey) => (
+                    <span key={`hourly-overview-${metricKey}`} style={{ fontSize: 12, color: STAT_METRIC_META[metricKey].color, fontWeight: 700 }}>
+                      {STAT_METRIC_META[metricKey].label}：{hourlyOverview.hovered ? Number(hourlyOverview.hovered[metricKey] || 0) : Number(hourlyOverview.totals[metricKey] || 0)}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div
+                className="admin-console-chart-surface"
+                style={{
+                  minHeight: 300,
+                  border: "1px dashed #93C5FD",
+                  borderRadius: 14,
+                  padding: 12,
+                  background: "linear-gradient(180deg, rgba(255,255,255,0.84), rgba(239,246,255,0.82))",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
+                <svg
+                  viewBox={`0 0 ${hourlyLineChart.width} ${hourlyLineChart.height}`}
+                  style={{ width: "100%", height: "100%", display: "block" }}
+                  aria-label="今日24小时访问与点击趋势"
+                >
+                  {hourlyLineChart.yTicks.map((tick) => (
+                    <g key={`hourly-y-${tick.y}`}>
+                      <line x1={hourlyLineChart.padding.left} y1={tick.y} x2={hourlyLineChart.width - hourlyLineChart.padding.right} y2={tick.y} stroke="rgba(148,163,184,0.24)" strokeDasharray="4 4" />
+                      <text x={8} y={tick.y + 4} fontSize="11" fill="#64748B">
+                        {tick.value}
+                      </text>
+                    </g>
+                  ))}
+
+                  {hourlyLineChart.xTicks.map((hour) => {
+                    const x = hourlyLineChart.pointsByMetric.page_views[hour]?.x || hourlyLineChart.padding.left;
+                    return (
+                      <g key={`hourly-x-${hour}`}>
+                        <line x1={x} y1={hourlyLineChart.padding.top} x2={x} y2={hourlyLineChart.height - hourlyLineChart.padding.bottom} stroke="rgba(148,163,184,0.1)" />
+                        <text x={x} y={hourlyLineChart.height - 6} textAnchor="middle" fontSize="10" fill="#64748B">
+                          {String(hour).padStart(2, "0")}
+                        </text>
+                      </g>
+                    );
+                  })}
+
+                  {hourlyLineChart.metricKeys.map((metricKey) => (
+                    <g key={`hourly-path-${metricKey}`}>
+                      <path
+                        d={hourlyLineChart.linePathByMetric[metricKey]}
+                        fill="none"
+                        stroke={STAT_METRIC_META[metricKey].color}
+                        strokeWidth={metricKey === "page_views" ? 2.6 : 2.3}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      {hourlyLineChart.pointsByMetric[metricKey].map((point, index) => {
+                        const isActive = index === hoveredHourlyIndex;
+                        return (
+                          <circle
+                            key={`hourly-point-${metricKey}-${point.hour}`}
+                            cx={point.x}
+                            cy={point.y}
+                            r={isActive ? 4.1 : 2.5}
+                            fill="#FFFFFF"
+                            stroke={STAT_METRIC_META[metricKey].color}
+                            strokeWidth={isActive ? 2.2 : 1.6}
+                            style={{ transition: "r 0.16s ease, stroke-width 0.16s ease" }}
+                          />
+                        );
+                      })}
+                    </g>
+                  ))}
+                </svg>
+
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: `${hourlyLineChart.padding.top}px ${hourlyLineChart.padding.right}px ${hourlyLineChart.padding.bottom}px ${hourlyLineChart.padding.left}px`,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(24, minmax(0, 1fr))",
+                  }}
+                >
+                  {hourlyStats.map((item, index) => (
+                    <button
+                      key={`hourly-hit-${item.hour}`}
+                      type="button"
+                      onMouseEnter={() => setHoveredHourlyIndex(index)}
+                      onMouseLeave={() => setHoveredHourlyIndex(null)}
+                      onFocus={() => setHoveredHourlyIndex(index)}
+                      onBlur={() => setHoveredHourlyIndex(null)}
+                      style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer" }}
+                      aria-label={String(item.hour).padStart(2, "0") + "点数据"}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="admin-card admin-console-chart-card admin-console-anchor-card admin-overview-panel" style={{ padding: 12 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(280px, 0.9fr) minmax(0, 1.6fr)",
+                gap: 12,
+                alignItems: "stretch",
+              }}
+            >
+              <div
+                style={{
+                  border: "1px solid #DCE8F8",
+                  borderRadius: 14,
+                  background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(244,248,255,0.92))",
+                  padding: 14,
+                  display: "grid",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <div className="admin-console-title-row" style={{ marginBottom: 4 }}>
+                    <span className="admin-console-icon-badge" style={{ background: "linear-gradient(135deg, rgba(37,99,235,0.15), rgba(99,102,241,0.24))", color: "#1D4ED8" }}>
+                      <BarChart3 size={15} />
+                    </span>
+                    <div style={{ fontWeight: 800, color: "#0F172A" }}>月度数据柱形图</div>
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748B" }}>切换指标与日期区间，图表会即时响应。</div>
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {(Object.keys(STAT_METRIC_META) as StatMetricKey[]).map((metricKey) => {
+                    const isActive = metricKey === activeStatMetric;
+                    return (
+                      <button
+                        key={metricKey}
+                        type="button"
+                        onClick={() => setActiveStatMetric(metricKey)}
+                        className={isActive ? "admin-btn" : "admin-btn-ghost"}
+                        style={isActive
+                          ? {
+                              background: STAT_METRIC_META[metricKey].color,
+                              borderColor: STAT_METRIC_META[metricKey].color,
+                              color: "#fff",
+                            }
+                          : undefined}
+                      >
+                        {STAT_METRIC_META[metricKey].label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>日期区间</span>
+                    <span style={{ fontSize: 11, color: "#94A3B8" }}>{monthRangeMin ? monthRangeMin.slice(0, 7) : ""}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="date"
+                      className="admin-input"
+                      value={effectiveRangeFrom}
+                      min={monthRangeMin}
+                      max={monthRangeMax}
+                      onChange={(e) => setStatRange((prev) => ({ ...prev, from: e.target.value }))}
+                    />
+                    <span style={{ fontSize: 12, color: "#94A3B8" }}>至</span>
+                    <input
+                      type="date"
+                      className="admin-input"
+                      value={effectiveRangeTo}
+                      min={monthRangeMin}
+                      max={monthRangeMax}
+                      onChange={(e) => setStatRange((prev) => ({ ...prev, to: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+                  <div className="admin-overview-submetric" style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: 10, background: "#FFFFFF" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748B" }}>
+                      <BarChart3 size={12} />
+                      总计
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>{Math.round(monthlyMetricSummary.total)}</div>
+                  </div>
+                  <div className="admin-overview-submetric" style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: 10, background: "#FFFFFF" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748B" }}>
+                      <Clock3 size={12} />
+                      日均
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>{Math.round(monthlyMetricSummary.average)}</div>
+                  </div>
+                  <div className="admin-overview-submetric" style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: 10, background: "#FFFFFF" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748B" }}>
+                      <Activity size={12} />
+                      峰值
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A" }}>
+                      {Number(monthlyMetricSummary.peak?.[activeStatMetric] || 0)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div
+                className="admin-console-chart-surface"
+                style={{
+                  minHeight: 320,
+                  border: "1px dashed #93C5FD",
+                  borderRadius: 14,
+                  padding: 14,
+                  background: "linear-gradient(180deg, rgba(255,255,255,0.74), rgba(239,246,255,0.82))",
+                  position: "relative",
+                  overflow: "visible",
+                }}
+              >
+                {filteredMonthlyStats.length ? (
+                  <div style={{ display: "grid", gap: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                      <div style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>
+                        当前指标：{STAT_METRIC_META[activeStatMetric].label}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>
+                        {rangeFrom || "-"} 至 {rangeTo || "-"}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        minHeight: 42,
+                        border: "1px solid #BFDBFE",
+                        borderRadius: 12,
+                        background: "rgba(255,255,255,0.92)",
+                        padding: "8px 10px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: 10,
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      {monthlyMetricSummary.hovered ? (
+                        <>
+                          <span style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>
+                            {monthlyMetricSummary.hovered.stat_date}
+                          </span>
+                          <span style={{ fontSize: 12, color: STAT_METRIC_META[activeStatMetric].color, fontWeight: 800 }}>
+                            {STAT_METRIC_META[activeStatMetric].label}：{Number(monthlyMetricSummary.hovered[activeStatMetric] || 0)}
+                          </span>
+                        </>
+                      ) : (
+                        <span style={{ fontSize: 12, color: "#64748B" }}>
+                          悬停柱状条可查看每日 {STAT_METRIC_META[activeStatMetric].label}。
+                        </span>
+                      )}
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-end",
+                        gap: 7,
+                        minHeight: 220,
+                        overflowX: "auto",
+                        paddingBottom: 22,
+                        paddingTop: 6,
+                        paddingLeft: 4,
+                        paddingRight: 4,
+                      }}
+                    >
+                      {filteredMonthlyStats.map((item, index) => {
+                        const value = Number(item[activeStatMetric] || 0);
+                        const barHeight = Math.max(12, Math.round((value / maxBarValue) * 180));
+                        const isActive = hoveredMonthlyIndex === index;
+                        return (
+                          <button
+                            key={item.stat_date}
+                            type="button"
+                            onMouseEnter={() => setHoveredMonthlyIndex(index)}
+                            onMouseLeave={() => setHoveredMonthlyIndex(null)}
+                            onFocus={() => setHoveredMonthlyIndex(index)}
+                            onBlur={() => setHoveredMonthlyIndex(null)}
+                            style={{
+                              minWidth: 24,
+                              border: "none",
+                              background: "transparent",
+                              padding: 0,
+                              display: "grid",
+                              gap: 6,
+                              justifyItems: "center",
+                              cursor: "pointer",
+                            }}
+                          >
+                            <div style={{ fontSize: 10, color: "#64748B", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", opacity: isActive ? 1 : 0.85 }}>
+                              {value}
+                            </div>
+                            <div
+                              title={item.stat_date + " " + STAT_METRIC_META[activeStatMetric].label + "：" + value}
+                              style={{
+                                width: 18,
+                                height: barHeight,
+                                borderRadius: "8px 8px 3px 3px",
+                                border: "1px solid " + STAT_METRIC_META[activeStatMetric].color + "55",
+                                background: "linear-gradient(180deg, " + STAT_METRIC_META[activeStatMetric].bg + ", " + STAT_METRIC_META[activeStatMetric].color + ")",
+                                transform: isActive ? "translateY(-3px) scale(1.02)" : "translateY(0) scale(1)",
+                                boxShadow: isActive ? "0 10px 22px rgba(37,99,235,0.18)" : "none",
+                                transition: "transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease",
+                                filter: isActive ? "saturate(1.1)" : "saturate(0.98)",
+                              }}
+                            />
+                            <div
+                              style={{
+                                fontSize: 10,
+                                color: isActive ? "#0F172A" : "#64748B",
+                                transform: "rotate(-25deg)",
+                                transformOrigin: "center top",
+                                whiteSpace: "nowrap",
+                                fontWeight: isActive ? 700 : 500,
+                              }}
+                            >
+                              {String(item.stat_date).slice(5)}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 8 }}>所选区间暂无数据，请调整日期范围。</div>
+                )}
+              </div>
+            </div>
           </div>
         </>
       ) : null}
@@ -773,7 +1555,7 @@ export default function AdminPage() {
         <div className="admin-console-pagehead-desc">聚合查看近 7 天点击走势与仓库热度表现。</div>
       </div>
       <div id="popular" className="admin-card admin-console-chart-card admin-console-anchor-card" style={{ padding: 12 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>近7天点击走势</div>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>近 7 天点击走势</div>
         <div
           className="admin-console-chart-surface"
           style={{
@@ -795,7 +1577,7 @@ export default function AdminPage() {
             <div
               style={{
                 position: "absolute",
-                left: `${(lineChart.points[hoveredTrendIndex].x / lineChart.width) * 100}%`,
+                left: ((lineChart.points[hoveredTrendIndex].x / lineChart.width) * 100) + "%",
                 top: 18,
                 transform: "translateX(-50%)",
                 padding: "6px 9px",
@@ -813,12 +1595,12 @@ export default function AdminPage() {
                 {String(lineChart.points[hoveredTrendIndex].stat_date).slice(5)}
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>
-                点击量 {lineChart.points[hoveredTrendIndex].link_clicks}
+                点击量：{lineChart.points[hoveredTrendIndex].link_clicks}
               </div>
             </div>
           ) : null}
           <svg
-            viewBox={`0 0 ${lineChart.width} ${lineChart.height}`}
+            viewBox={"0 0 " + lineChart.width + " " + lineChart.height}
             style={{ width: "100%", height: 220, display: "block", overflow: "visible" }}
             aria-label="近7天点击走势折线图"
             onMouseLeave={() => setHoveredTrendIndex(null)}
@@ -942,7 +1724,7 @@ export default function AdminPage() {
                 <tr style={{ background: "#F8FAFD" }}>
                   <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>仓库名</th>
                   <th style={{ textAlign: "right", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天总点击量</th>
-                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天点击量统计图</th>
+                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天点击趋势图</th>
                   <th style={{ textAlign: "center", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>当前状态</th>
                 </tr>
               </thead>
@@ -986,7 +1768,7 @@ export default function AdminPage() {
                           border: `1px solid ${p.isValid === true ? "#86EFAC" : p.isValid === false ? "#FCA5A5" : "#CBD5E1"}`,
                         }}
                       >
-                        {p.isValid === true ? "有效仓库" : p.isValid === false ? "链接异常" : "待检测"}
+                        {p.isValid === true ? "有效" : p.isValid === false ? "异常" : "待检测"}
                       </span>
                     </td>
                   </tr>
@@ -1007,25 +1789,65 @@ export default function AdminPage() {
       ) : null}
 
 
-      {activeSection === "links" ? (
+            {activeSection === "links" ? (
       <>
       <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
         <div className="admin-console-pagehead-title">内容管理</div>
-        <div className="admin-console-pagehead-desc">维护导航链接，支持新增、启用、禁用和删除。</div>
+        <div className="admin-console-pagehead-desc">按模块管理资源矩阵、友情链接、小游戏；资源矩阵下支持智库、校园、工具三个子模块。</div>
       </div>
       <div id="links" className="admin-card" style={{ padding: 16, display: "grid", gap: 12 }}>
-        <form onSubmit={submitLink} style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1.2fr 1fr 120px 120px" }}>
-          <input className="admin-input" placeholder="标题" value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} />
-          <input className="admin-input" placeholder="URL" value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} />
-          <input className="admin-input" placeholder="描述" value={linkForm.description} onChange={(e) => setLinkForm({ ...linkForm, description: e.target.value })} />
-          <input className="admin-input" type="number" placeholder="排序" value={linkForm.sort} onChange={(e) => setLinkForm({ ...linkForm, sort: Number(e.target.value || 0) })} />
-          <button type="submit" className="admin-btn">添加链接</button>
-        </form>
+        {activeLinkModule === "resource_matrix" ? (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {(Object.keys(RESOURCE_SUB_MODULE_META) as ResourceSubModule[]).map((subKey) => {
+              const isActive = subKey === activeResourceSubModule;
+              return (
+                <button
+                  key={subKey}
+                  type="button"
+                  className={isActive ? "admin-btn" : "admin-btn-ghost"}
+                  onClick={() => {
+                    void switchResourceSubModule(subKey);
+                  }}
+                >
+                  {RESOURCE_SUB_MODULE_META[subKey].label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+
+        <div style={{ display: "grid", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <button
+              type="button"
+              className={linkFormOpen ? "admin-btn-ghost" : "admin-btn"}
+              onClick={() => setLinkFormOpen((prev) => !prev)}
+            >
+              {linkFormOpen ? "收起新建" : "新建链接"}
+            </button>
+          </div>
+          {linkFormOpen ? (
+            <form onSubmit={submitLink} style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1.2fr 1fr 120px 120px 90px" }}>
+              <input className="admin-input" placeholder="标题" value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} />
+              <input className="admin-input" placeholder="URL" value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} />
+              <input className="admin-input" placeholder="描述" value={linkForm.description} onChange={(e) => setLinkForm({ ...linkForm, description: e.target.value })} />
+              <input className="admin-input" type="number" placeholder="排序" value={linkForm.sort} onChange={(e) => setLinkForm({ ...linkForm, sort: Number(e.target.value || 0) })} />
+              <button type="submit" className="admin-btn">新增到当前模块</button>
+              <button type="button" className="admin-btn-ghost" onClick={() => setLinkFormOpen(false)}>取消</button>
+            </form>
+          ) : null}
+        </div>
+
+        <div style={{ fontSize: 12, color: "#64748B" }}>
+          当前模块：{NAV_MODULE_META[activeLinkModule].label}
+          {activeLinkModule === "resource_matrix" ? ` / ${RESOURCE_SUB_MODULE_META[activeResourceSubModule].label}` : ""}
+        </div>
+
         <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "标题", "URL", "状态", "操作"].map((h) => (
+                {["ID", "模块", "子模块", "标题", "URL", "点击次数", "创建时间", "状态", "操作"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -1034,8 +1856,18 @@ export default function AdminPage() {
               {links.map((item) => (
                 <tr key={item.id}>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{NAV_MODULE_META[item.module]?.short || "-"}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    {item.module === "resource_matrix"
+                      ? RESOURCE_SUB_MODULE_META[item.resource_sub_module || "think_tank"]?.short || "-"
+                      : "-"}
+                  </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" }}>
+                    {item.created_at ? String(item.created_at).replace("T", " ").slice(0, 19) : "-"}
+                  </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: item.active ? "#059669" : "#DC2626", fontWeight: 600 }}>{item.active ? "启用" : "禁用"}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
                     <button type="button" onClick={() => toggleActive(item)} className="admin-btn-ghost">{item.active ? "禁用" : "启用"}</button>
@@ -1044,7 +1876,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {!links.length ? (
-                <tr><td colSpan={5} style={{ padding: "14px", color: "#64748B" }}>暂无链接数据</td></tr>
+                <tr><td colSpan={9} style={{ padding: "14px", color: "#64748B" }}>当前筛选下暂无内容</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -1062,7 +1894,7 @@ export default function AdminPage() {
       <div id="health" className="admin-card" style={{ padding: 20, background: "#F3F6FA", border: "1px solid #E6ECF5", borderRadius: 12, display: "grid", gap: 16, boxShadow: "0 8px 24px rgba(15,23,42,0.04)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", gap: 12 }}>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, boxShadow: "inset 0 0 0 1px rgba(24,144,255,0.06)" }}>
-            <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评分</div>
+            <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评估</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: "#1890FF" }}>
               {health.length ? `${Math.round((health.filter((h) => h.is_ok).length / health.length) * 100)}%` : "100%"}
             </div>
@@ -1085,8 +1917,8 @@ export default function AdminPage() {
             <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
             <div style={{ fontSize: 12, color: "#64748B" }}>
               {autoDetectEnabled
-                ? `自动探测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
-                : "自动探测未开启"}
+                ? `自动检测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
+                : "自动检测未开启"}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1096,7 +1928,7 @@ export default function AdminPage() {
               className="admin-btn-ghost"
               style={{ height: 34, padding: "0 14px", borderRadius: 8, borderColor: autoDetectEnabled ? "#86EFAC" : "#CBD5E1", color: autoDetectEnabled ? "#166534" : "#334155" }}
             >
-              自动探测
+              自动检测
             </button>
             <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 34, padding: "0 14px", borderRadius: 8 }} disabled={healthChecking}>
               {healthChecking ? "探测中..." : "全量探测"}
@@ -1118,7 +1950,7 @@ export default function AdminPage() {
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>{h.title || `#${h.link_id}`}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
                     <span style={{ color: h.is_ok ? "#059669" : "#DC2626", fontWeight: 700 }}>
-                      {h.is_ok ? "● 运行正常" : "● 服务不可用"}
+                      {h.is_ok ? "运行正常" : "服务不可用"}
                     </span>
                     {!h.is_ok && h.status_code ? <span style={{ marginLeft: 8, fontSize: 12, background: "#F3F4F6", padding: "2px 8px", borderRadius: 999, color: "#475569" }}>HTTP {h.status_code}</span> : null}
                   </td>
@@ -1185,7 +2017,7 @@ export default function AdminPage() {
                     </span>
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }}>
-                    {l.link_id ? `link#${l.link_id}` : "-"}
+                    {l.link_id ? `${l.link_title ? `${l.link_title} ` : ""}(#${l.link_id})` : "-"}
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#64748B", maxWidth: 360, wordBreak: "break-all", lineHeight: 1.5 }}>
                     {"detail" in l ? formatLogDetail((l as LinkLog).detail) : "-"}
@@ -1219,7 +2051,7 @@ export default function AdminPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "用户名", "角色", "创建时间", "最近登录"].map((h) => (
+                {["ID", "Username", "Role", "Created At", "Last Login"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -1276,7 +2108,7 @@ export default function AdminPage() {
             }}
           >
             <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>自动探测设置</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>自动检测设置</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>
                 设定定期触发的分钟间隔。开启后将在当前控制台会话中自动执行全量探测，并持久化到浏览器本地。
               </div>
@@ -1317,3 +2149,7 @@ export default function AdminPage() {
     </div>
   );
 }
+
+
+
+

@@ -33,6 +33,33 @@ export async function getAdminStats() {
   const today = list[0] || { stat_date: new Date().toISOString().slice(0, 10), page_views: 0, unique_visitors: 0, link_clicks: 0 };
   const days = [...list].reverse();
   const trend7 = days.slice(-7);
+  const [hourlyRows] = await pool.query(
+    `SELECT
+       HOUR(created_at) AS hour,
+       SUM(CASE WHEN event_type = 'visit' THEN 1 ELSE 0 END) AS page_views,
+       COUNT(DISTINCT CASE WHEN event_type = 'visit' THEN visitor_id ELSE NULL END) AS unique_visitors,
+       SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END) AS link_clicks
+     FROM metrics
+     WHERE created_at >= CURDATE()
+       AND created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+     GROUP BY HOUR(created_at)
+     ORDER BY hour ASC`,
+  );
+  const hourlyMap = new Map(
+    (hourlyRows as Array<{ hour: number; page_views: number; unique_visitors: number; link_clicks: number }>).map((item) => [
+      Number(item.hour || 0),
+      {
+        hour: Number(item.hour || 0),
+        page_views: Number(item.page_views || 0),
+        unique_visitors: Number(item.unique_visitors || 0),
+        link_clicks: Number(item.link_clicks || 0),
+      },
+    ]),
+  );
+  const hourly24 = Array.from({ length: 24 }).map((_, hour) => {
+    const row = hourlyMap.get(hour);
+    return row || { hour, page_views: 0, unique_visitors: 0, link_clicks: 0 };
+  });
 
   const [popularRows] = await pool.query(
     `SELECT
@@ -133,7 +160,7 @@ export async function getAdminStats() {
     }),
   );
 
-  return { today, days, trend7, popularRepos, popularCategories: popularRepos };
+  return { today, days, trend7, hourly24, popularRepos, popularCategories: popularRepos };
 }
 
 export async function recordVisit(visitorId: string): Promise<{ newVisitor: boolean }> {
