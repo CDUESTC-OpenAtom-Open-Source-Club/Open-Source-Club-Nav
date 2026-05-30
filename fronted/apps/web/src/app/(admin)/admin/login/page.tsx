@@ -155,6 +155,7 @@ export default function AdminLoginPage() {
       router.replace("/admin");
     } catch (err) {
       setError(String((err as Error)?.message || "登录失败，请稍后重试"));
+      setPassword("");
     } finally {
       setLoading(false);
     }

@@ -2,11 +2,20 @@
 // PATCH /api/works/:id - 更新单个作品
 
 import pool from "@/lib/db";
+import { getAdminSessionFromCookies } from "@/lib/admin-auth";
+import { ensureAdminTables } from "@/lib/admin-db";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  await ensureAdminTables();
+  const session = await getAdminSessionFromCookies();
+  if (!session) return Response.json({ error: "未登录" }, { status: 401 });
+  if (session.role !== "editor" && session.role !== "super") {
+    return Response.json({ error: "无权限" }, { status: 403 });
+  }
+
   try {
     const { id } = await params;
     const body = await request.json();

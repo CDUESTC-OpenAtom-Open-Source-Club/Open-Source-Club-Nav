@@ -3,6 +3,18 @@
 // POST：支持手动新增作品，也支持根据 GitHub 仓库地址补全信息。
 
 import { getWorks, createWork } from "@/services/works";
+import { getAdminSessionFromCookies } from "@/lib/admin-auth";
+import { ensureAdminTables } from "@/lib/admin-db";
+
+async function requireEditorOrSuper(): Promise<Response | null> {
+  await ensureAdminTables();
+  const session = await getAdminSessionFromCookies();
+  if (!session) return Response.json({ error: "未登录" }, { status: 401 });
+  if (session.role !== "editor" && session.role !== "super") {
+    return Response.json({ error: "无权限" }, { status: 403 });
+  }
+  return null;
+}
 
 export async function GET() {
   const result = await getWorks();
@@ -10,6 +22,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const denied = await requireEditorOrSuper();
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     if (!body.title || !body.author_name) {

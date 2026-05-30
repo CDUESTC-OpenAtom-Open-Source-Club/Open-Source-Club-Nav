@@ -13,13 +13,22 @@ export interface AdminSession {
 export const ADMIN_SESSION_COOKIE = "kcos_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 60 * 60 * 24 * 7;
 
+const DEFAULT_DEV_AUTH_SECRET = "kcos-admin-dev-secret-change-me";
+
 function getAuthSecret(): string {
-  // 本地开发允许使用默认密钥，生产环境应通过环境变量覆盖。
-  return process.env.ADMIN_AUTH_SECRET || "kcos-admin-dev-secret-change-me";
+  const secret = process.env.ADMIN_AUTH_SECRET;
+  if (secret && secret.length > 0) return secret;
+  // 生产环境严禁回退到内置默认密钥，否则会话可被伪造，必须显式配置。
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("ADMIN_AUTH_SECRET 未配置：生产环境必须显式设置后台会话签名密钥");
+  }
+  return DEFAULT_DEV_AUTH_SECRET;
 }
 
 export function isAdminBypassEnabled(): boolean {
-  return process.env.ADMIN_BYPASS_LOGIN !== "false";
+  // 默认安全：仅当显式设置 ADMIN_BYPASS_LOGIN=true 且非生产环境时才放行绕过。
+  if (process.env.NODE_ENV === "production") return false;
+  return process.env.ADMIN_BYPASS_LOGIN === "true";
 }
 
 function base64UrlEncode(input: Buffer | string): string {
