@@ -1085,7 +1085,7 @@ export default function HomePage() {
                           <img
                             className="about-member-avatar-img"
                             src={avatarUrl}
-                            alt={`${member.name} GitHub 澶村儚`}
+                            alt={`${member.name} GitHub 头像`}
                             loading="lazy"
                           />
                           <div className="about-member-name">{member.name}</div>

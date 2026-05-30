@@ -1,5 +1,6 @@
-import pool from "@/lib/db";
+﻿import pool from "@/lib/db";
 import {
+  ADMIN_SESSION_COOKIE,
   createSessionToken,
   isAdminBypassEnabled,
   setAdminSessionCookie,
@@ -31,19 +32,44 @@ export async function POST(request: Request) {
     const username = String(body?.username || "").trim();
     const password = String(body?.password || "");
     attemptedUsername = username;
-
-    if (isAdminBypassEnabled()) {
-      return Response.json(
-        { error: "当前为开发绕过模式，无法执行真实登录，请先设置 ADMIN_BYPASS_LOGIN=false" },
-        { status: 409 },
-      );
-    }
-
     if (!username || !password) {
       return Response.json({ error: "请输入用户名和密码" }, { status: 400 });
     }
     if (username.length > 64 || password.length > 256) {
       return Response.json({ error: "登录信息格式不合法" }, { status: 400 });
+    }
+
+    if (isAdminBypassEnabled()) {
+      const bootstrapUsername = (process.env.ADMIN_BOOTSTRAP_USERNAME || "admin").trim();
+      const bootstrapPassword = process.env.ADMIN_BOOTSTRAP_PASSWORD || "admin123456";
+      if (username !== bootstrapUsername || password !== bootstrapPassword) {
+        return Response.json({ error: "用户名或密码错误" }, { status: 401 });
+      }
+
+      const token = createSessionToken({
+        userId: 1,
+        username: bootstrapUsername,
+        role: "super",
+      });
+      const maxAge = 60 * 60 * 24 * 7;
+      const cookie = [
+        `${ADMIN_SESSION_COOKIE}=${token}`,
+        "Path=/",
+        "HttpOnly",
+        "SameSite=Strict",
+        `Max-Age=${maxAge}`,
+        process.env.NODE_ENV === "production" ? "Secure" : "",
+      ]
+        .filter(Boolean)
+        .join("; ");
+      return Response.json({
+        ok: true,
+        user: { id: 1, username: bootstrapUsername, role: "super" },
+      }, {
+        headers: {
+          "Set-Cookie": cookie,
+        },
+      });
     }
 
     const recentFailures = await getRecentAdminLoginFailures({
@@ -123,3 +149,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "登录服务异常，请稍后重试" }, { status: 500 });
   }
 }
+
+
+

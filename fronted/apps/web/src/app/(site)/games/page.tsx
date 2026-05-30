@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { PacmanMiniGame } from "@/components/home/WorksCarousel";
 import { pacmanMockLeaderboard } from "@/data/pacmanLeaderboard";
 
@@ -15,7 +16,63 @@ const boardCardStyle = {
   boxShadow: "0 16px 36px rgba(15,23,42,0.06)",
 } as const;
 
+type LinkItem = {
+  title: string;
+  url: string;
+  description?: string;
+};
+
+const BASE_MINI_GAME_LINKS: LinkItem[] = [
+  { title: "吃豆人小游戏", url: "/games", description: "站内经典小游戏入口" },
+];
+
 export default function GamesPage() {
+  const [remoteMiniGameLinks, setRemoteMiniGameLinks] = useState<LinkItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncMiniGameLinks = async () => {
+      try {
+        const res = await fetch("/api/links?module=mini_games", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const list = Array.isArray(data?.links) ? data.links : [];
+        if (cancelled) return;
+        const normalized = list
+          .map((item: { title?: unknown; url?: unknown; description?: unknown }) => ({
+            title: String(item?.title || "").trim(),
+            url: String(item?.url || "").trim(),
+            description: String(item?.description || "").trim(),
+          }))
+          .filter((item: LinkItem) => item.title && item.url);
+        setRemoteMiniGameLinks(normalized);
+      } catch {
+        // ignore network errors, keep base links
+      }
+    };
+
+    void syncMiniGameLinks();
+    const timer = window.setInterval(() => {
+      void syncMiniGameLinks();
+    }, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const miniGameLinks = useMemo(() => {
+    const seen = new Set<string>();
+    const merged = [...BASE_MINI_GAME_LINKS, ...remoteMiniGameLinks];
+    return merged.filter((item) => {
+      const key = `${item.title}::${item.url}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [remoteMiniGameLinks]);
+
   return (
     <main
       className="games-page"
@@ -88,6 +145,34 @@ export default function GamesPage() {
                   <div className="games-card-title">快速提示</div>
                   <div className="games-card-copy">
                     建议先点击游戏面板聚焦，再使用方向键操作。鼠标点击吃豆人周边区域时，会自动选择更接近的移动方向。
+                  </div>
+                </div>
+                <div style={boardCardStyle}>
+                  <div className="games-card-title">小游戏链接</div>
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {miniGameLinks.map((item, index) => {
+                      const isExternal = item.url.startsWith("http");
+                      return (
+                        <a
+                          key={`${item.title}-${index}`}
+                          href={item.url}
+                          target={isExternal ? "_blank" : undefined}
+                          rel={isExternal ? "noopener noreferrer" : undefined}
+                          style={{
+                            border: "1px solid rgba(191,219,254,0.9)",
+                            borderRadius: 10,
+                            padding: "8px 10px",
+                            textDecoration: "none",
+                            background: "rgba(255,255,255,0.85)",
+                            display: "grid",
+                            gap: 2,
+                          }}
+                        >
+                          <span style={{ fontSize: 13, color: "#0F172A", fontWeight: 700 }}>{item.title}</span>
+                          <span style={{ fontSize: 11, color: "#64748B" }}>{item.description || item.url}</span>
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               </div>

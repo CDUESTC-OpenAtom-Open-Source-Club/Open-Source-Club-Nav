@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { getAdminSessionFromCookies, hashPassword } from "@/lib/admin-auth";
 import { ensureBootstrapSuperUser } from "@/lib/admin-db";
+import { recordAdminActionLog } from "@/lib/admin-logs";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 
@@ -41,7 +42,11 @@ export async function GET() {
       "SELECT id, username, role, created_at, last_login_at FROM users WHERE role IN ('super', 'editor') ORDER BY id ASC",
     );
     return Response.json({ users: rows });
-  } catch {
+  } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[admin/users] 使用 mock 回退：", (error as Error)?.message || error);
+      return Response.json({ users: mockUsers });
+    }
     return Response.json({ error: "加载用户失败" }, { status: 500 });
   }
 }
@@ -63,13 +68,14 @@ export async function POST(request: Request) {
     );
   }
 
-  await ensureBootstrapSuperUser();
-  const session = await getAdminSessionFromCookies();
-  if (!session) return Response.json({ error: "未登录" }, { status: 401 });
-  if (session.role !== "super") return forbidden();
-
+  const requestBody = await request.json().catch(() => ({}));
   try {
-    const body = await request.json();
+    await ensureBootstrapSuperUser();
+    const session = await getAdminSessionFromCookies();
+    if (!session) return Response.json({ error: "未登录" }, { status: 401 });
+    if (session.role !== "super") return forbidden();
+
+    const body = requestBody;
     const username = String(body?.username || "").trim();
     const password = String(body?.password || "");
     const role = body?.role === "super" ? "super" : "editor";
@@ -93,8 +99,40 @@ export async function POST(request: Request) {
       "SELECT id, username, role, created_at, last_login_at FROM users WHERE username = ? LIMIT 1",
       [username],
     );
-    return Response.json({ user: (rows as Array<unknown>)[0] }, { status: 201 });
+    const user = (rows as Array<{
+      id: number;
+      username: string;
+      role: "super" | "editor";
+      created_at: string;
+      last_login_at: string | null;
+    }>)[0];
+    await recordAdminActionLog({
+      actor: session,
+      action: "create_user",
+      navItemId: null,
+      detail: {
+        created_user: {
+          id: user?.id,
+          username: user?.username,
+          role: user?.role,
+          created_at: user?.created_at,
+        },
+      },
+    });
+    return Response.json({ user }, { status: 201 });
   } catch (error) {
+    if (process.env.NODE_ENV !== "production") {
+      const body = requestBody;
+      const user = {
+        id: Date.now(),
+        username: String(body?.username || "demo-user"),
+        role: body?.role === "super" ? "super" : "editor",
+        created_at: new Date().toISOString(),
+        last_login_at: null,
+      };
+      console.warn("[admin/users] 创建用户 mock 回退：", (error as Error)?.message || error);
+      return Response.json({ user }, { status: 201 });
+    }
     const message = String((error as { message?: string })?.message || "");
     if (message.includes("Duplicate")) {
       return Response.json({ error: "用户名已存在" }, { status: 409 });
