@@ -34,6 +34,7 @@ export const MOCK_ADMIN_LINKS = [
     sort: 1,
     active: 1,
     module: "resource_matrix",
+    resource_sub_module: "think_tank",
   },
   {
     id: 2,
@@ -52,6 +53,7 @@ export const MOCK_ADMIN_LINKS = [
     sort: 3,
     active: 0,
     module: "resource_matrix",
+    resource_sub_module: "tools",
   },
   {
     id: 4,

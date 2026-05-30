@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useMemo, useState } from "react";
 import {
   Brain,
   MapPin,
@@ -12,7 +13,7 @@ import { RESOURCE_CATEGORIES } from "@/data/resources";
 
 const ICON_MAP: Record<string, LucideIcon> = { Brain, MapPin, Wrench };
 
-const FRIEND_LINKS = [
+const BASE_FRIEND_LINKS = [
   { title: "电子科技大学成都学院", url: "https://www.cduestc.fun/" },
   { title: "科成星球", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club" },
 ];
@@ -53,11 +54,61 @@ type LeftPanelProps = {
   isDarkMode?: boolean;
 };
 
+type LinkItem = {
+  title: string;
+  url: string;
+};
+
 export default function LeftPanel({
   activeCategory,
   onCategorySelect,
   isDarkMode = false,
 }: LeftPanelProps) {
+  const [remoteFriendLinks, setRemoteFriendLinks] = useState<LinkItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncFriendLinks = async () => {
+      try {
+        const res = await fetch("/api/links?module=friend_links", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const list = Array.isArray(data?.links) ? data.links : [];
+        if (cancelled) return;
+        const normalized = list
+          .map((item: { title?: unknown; url?: unknown }) => ({
+            title: String(item?.title || "").trim(),
+            url: String(item?.url || "").trim(),
+          }))
+          .filter((item: LinkItem) => item.title && item.url);
+        setRemoteFriendLinks(normalized);
+      } catch {
+        // ignore network errors, keep base links
+      }
+    };
+
+    void syncFriendLinks();
+    const timer = window.setInterval(() => {
+      void syncFriendLinks();
+    }, 60000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  const friendLinks = useMemo(() => {
+    const seen = new Set<string>();
+    const merged = [...BASE_FRIEND_LINKS, ...remoteFriendLinks];
+    return merged.filter((item) => {
+      const key = `${item.title}::${item.url}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [remoteFriendLinks]);
+
   return (
     <aside
       style={{
@@ -241,7 +292,7 @@ export default function LeftPanel({
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          {FRIEND_LINKS.map((item, idx) => (
+          {friendLinks.map((item, idx) => (
             <a
               key={`${item.title}-${idx}`}
               href={item.url}

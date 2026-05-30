@@ -6,6 +6,18 @@ import GlobeCanvas from "./GlobeCanvas";
 import WorksCarousel from "./WorksCarousel";
 import { RESOURCE_CATEGORIES } from "@/data/resources";
 
+const RESOURCE_SUB_TO_CATEGORY_ID = {
+  think_tank: "intelligence",
+  campus: "surface",
+  tools: "armory",
+};
+
+const RESOURCE_SUB_DEFAULT_TAG = {
+  think_tank: "Learning",
+  campus: "Campus",
+  tools: "Dev",
+};
+
 const TAG_COLORS = {
   Learning: { bg: "#EFF6FF", text: "#2563EB", border: "#BFDBFE" },
   Practice: { bg: "#F0FDF4", text: "#059669", border: "#BBF7D0" },
@@ -250,12 +262,12 @@ function getLinkMeta(url) {
   }
 }
 
-function HologramPanel({ category, onClose, isDarkMode }) {
+function HologramPanel({ category, categories, onClose, isDarkMode }) {
   // 资源分类点开后，中心区域会切到这个覆盖层展示详细链接。
   const [hoveredLink, setHoveredLink] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
   const lastTapRef = useRef({ index: null, ts: 0 });
-  const cat = RESOURCE_CATEGORIES.find((c) => c.id === category);
+  const cat = categories.find((c) => c.id === category);
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
@@ -1140,6 +1152,68 @@ export default function CentralHub({
   const [viewportMode, setViewportMode] = useState("desktop");
   const [isShortViewport, setIsShortViewport] = useState(false);
   const [homeStats, setHomeStats] = useState(DEFAULT_HOME_STATS);
+  const [resourceCategories, setResourceCategories] = useState(RESOURCE_CATEGORIES);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncResourceCategories = async () => {
+      try {
+        const subModules = ["think_tank", "campus", "tools"];
+        const responses = await Promise.all(
+          subModules.map((subModule) =>
+            fetch(`/api/links?module=resource_matrix&resource_sub_module=${subModule}`, { cache: "no-store" })
+              .then((res) => (res.ok ? res.json() : null))
+              .catch(() => null),
+          ),
+        );
+
+        if (cancelled) return;
+
+        const remoteBySub = {
+          think_tank: Array.isArray(responses[0]?.links) ? responses[0].links : [],
+          campus: Array.isArray(responses[1]?.links) ? responses[1].links : [],
+          tools: Array.isArray(responses[2]?.links) ? responses[2].links : [],
+        };
+
+        const merged = RESOURCE_CATEGORIES.map((category) => {
+          const subModule = Object.keys(RESOURCE_SUB_TO_CATEGORY_ID).find(
+            (key) => RESOURCE_SUB_TO_CATEGORY_ID[key] === category.id,
+          );
+          if (!subModule) return category;
+
+          const remoteLinks = (remoteBySub[subModule] || [])
+            .map((item) => ({
+              title: String(item?.title || "").trim(),
+              desc: String(item?.description || "").trim() || "后台新增资源",
+              url: String(item?.url || "").trim(),
+              tag: RESOURCE_SUB_DEFAULT_TAG[subModule],
+            }))
+            .filter((item) => item.title && item.url);
+
+          const existingKeys = new Set(category.links.map((link) => `${link.title}::${link.url}`));
+          const appended = remoteLinks.filter((item) => !existingKeys.has(`${item.title}::${item.url}`));
+          return {
+            ...category,
+            links: [...category.links, ...appended],
+          };
+        });
+
+        setResourceCategories(merged);
+      } catch {
+        // ignore sync failures, keep base categories
+      }
+    };
+
+    void syncResourceCategories();
+    const timer = setInterval(() => {
+      void syncResourceCategories();
+    }, 60000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -1256,6 +1330,7 @@ export default function CentralHub({
         // 选中分类后用覆盖层替换主页内容，视觉上更像“进入一个子空间”。
         <HologramPanel
           category={activeCategory}
+          categories={resourceCategories}
           onClose={onClosePanel}
           isDarkMode={isDarkMode}
         />

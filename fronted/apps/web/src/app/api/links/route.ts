@@ -5,6 +5,21 @@
 import { getLinks, createLink, updateLink, deleteLink } from "@/services/links";
 import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import { ensureAdminTables } from "@/lib/admin-db";
+import type { NavModule, ResourceMatrixSubModule } from "@/types/links";
+
+const MODULES: NavModule[] = ["resource_matrix", "friend_links", "mini_games"];
+const RESOURCE_SUB_MODULES: ResourceMatrixSubModule[] = ["think_tank", "campus", "tools"];
+const DEFAULT_MODULE: NavModule = "friend_links";
+
+function parseModule(value: unknown): NavModule {
+  return MODULES.includes(value as NavModule) ? (value as NavModule) : DEFAULT_MODULE;
+}
+
+function parseResourceSubModule(value: unknown): ResourceMatrixSubModule | undefined {
+  return RESOURCE_SUB_MODULES.includes(value as ResourceMatrixSubModule)
+    ? (value as ResourceMatrixSubModule)
+    : undefined;
+}
 
 async function requireEditorOrSuper() {
   await ensureAdminTables();
@@ -16,9 +31,19 @@ async function requireEditorOrSuper() {
   return null;
 }
 
-export async function GET() {
-  const result = await getLinks("friend_links");
-  return Response.json(result);
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const navModule = parseModule(searchParams.get("module"));
+  const resourceSubModule = navModule === "resource_matrix"
+    ? parseResourceSubModule(searchParams.get("resource_sub_module"))
+    : undefined;
+
+  const result = await getLinks(navModule, resourceSubModule);
+  return Response.json({
+    ...result,
+    module: navModule,
+    resource_sub_module: resourceSubModule || null,
+  });
 }
 
 export async function POST(request: Request) {
