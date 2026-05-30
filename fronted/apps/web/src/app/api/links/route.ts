@@ -1,5 +1,5 @@
 // 友情链接接口。
-// GET：返回启用中的友链列表。
+// GET：返回启用中的友情链接。
 // POST/PUT/DELETE：需 editor+ 权限。
 
 import { getLinks, createLink, updateLink, deleteLink } from "@/services/links";
@@ -17,7 +17,7 @@ async function requireEditorOrSuper() {
 }
 
 export async function GET() {
-  const result = await getLinks();
+  const result = await getLinks("friend_links");
   return Response.json(result);
 }
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     if (!body.title || !body.url) {
       return Response.json({ error: "title 和 url 为必填项" }, { status: 400 });
     }
-    const link = await createLink(body);
+    const link = await createLink({ ...body, module: "friend_links" });
     return Response.json({ link }, { status: 201 });
   } catch {
     return Response.json({ error: "数据库未配置，无法新增友链" }, { status: 503 });
@@ -44,7 +44,7 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     if (!body.id) return Response.json({ error: "id 为必填项" }, { status: 400 });
-    const link = await updateLink(body);
+    const link = await updateLink({ ...body, module: "friend_links" });
     if (!link) return Response.json({ error: "友链不存在" }, { status: 404 });
     return Response.json({ link });
   } catch {

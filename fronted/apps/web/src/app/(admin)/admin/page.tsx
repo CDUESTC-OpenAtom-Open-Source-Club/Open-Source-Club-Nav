@@ -19,6 +19,15 @@ type LinkItem = {
   description: string;
   sort: number;
   active: number;
+  module: NavModule;
+};
+
+type NavModule = "resource_matrix" | "friend_links" | "mini_games";
+
+const NAV_MODULE_META: Record<NavModule, { label: string; short: string }> = {
+  resource_matrix: { label: "资源矩阵", short: "资源" },
+  friend_links: { label: "友情链接", short: "友链" },
+  mini_games: { label: "小游戏", short: "游戏" },
 };
 
 type StatDay = {
@@ -49,9 +58,9 @@ const baseSections = [
 
 const MOCK_USER = { id: 1, username: "demo-admin", role: "super" as const };
 const MOCK_LINKS: LinkItem[] = [
-  { id: 1, title: "React 官方文档", url: "https://react.dev", description: "React 学习入口", sort: 1, active: 1 },
-  { id: 2, title: "Next.js 官方文档", url: "https://nextjs.org/docs", description: "Next.js 文档", sort: 2, active: 1 },
-  { id: 3, title: "OpenAtom 开源社团仓库", url: "https://github.com/openatom", description: "社团相关项目", sort: 3, active: 1 },
+  { id: 1, title: "OpenAtom 导航资源", url: "https://openatom.cn", description: "资源矩阵示例", sort: 1, active: 1, module: "resource_matrix" },
+  { id: 2, title: "Cooo Wiki 友链页", url: "https://wiki.cooo.site/links", description: "友情链接示例", sort: 1, active: 1, module: "friend_links" },
+  { id: 3, title: "吃豆人小游戏", url: "/games", description: "小游戏模块示例", sort: 1, active: 1, module: "mini_games" },
 ];
 const MOCK_USERS: AdminUser[] = [
   { id: 1, username: "demo-admin", role: "super", created_at: "2026-05-01T09:00:00", last_login_at: "2026-05-24T09:42:12" },
@@ -200,12 +209,14 @@ export default function AdminPage() {
   const [autoDetectIntervalMinutes, setAutoDetectIntervalMinutes] = useState(15);
   const [autoDetectDraftMinutes, setAutoDetectDraftMinutes] = useState("15");
   const [lastAutoDetectAt, setLastAutoDetectAt] = useState<string | null>(null);
+  const [activeLinkModule, setActiveLinkModule] = useState<NavModule>("resource_matrix");
 
   const [linkForm, setLinkForm] = useState({
     title: "",
     url: "",
     description: "",
     sort: 0,
+    module: "resource_matrix" as NavModule,
   });
   const [userForm, setUserForm] = useState({
     username: "",
@@ -216,7 +227,7 @@ export default function AdminPage() {
   const AUTO_DETECT_INTERVAL_KEY = "kcos_admin_auto_detect_interval_minutes";
   const AUTO_DETECT_LAST_RUN_KEY = "kcos_admin_auto_detect_last_run_at";
 
-  // 顶部 KPI 默认取最新一天，没有数据时回退到空统计。
+  // 今日 KPI（无数据时使用零值占位）
   const today = useMemo(
     () =>
       stats[0] || {
@@ -336,16 +347,16 @@ export default function AdminPage() {
 
   const loadLinks = useCallback(async () => {
     if (MOCK_MODE) {
-      setLinks(MOCK_LINKS);
+      setLinks(MOCK_LINKS.filter((item) => item.module === activeLinkModule));
       markSectionLoaded("links");
       return;
     }
-    const linksRes = await fetch("/api/admin/links");
+    const linksRes = await fetch(`/api/admin/links?module=${activeLinkModule}`);
     if (!linksRes.ok) throw new Error("加载链接失败");
     const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
     setLinks(linksData?.links || []);
     markSectionLoaded("links");
-  }, [markSectionLoaded]);
+  }, [activeLinkModule, markSectionLoaded]);
 
   const loadUsers = useCallback(async () => {
     if (MOCK_MODE) {
@@ -363,9 +374,9 @@ export default function AdminPage() {
   const loadHealth = useCallback(async () => {
     if (MOCK_MODE) {
       setHealth([
-        { link_id: 1, title: "React 官方文档", status_code: 200, is_ok: 1, message: "ok", checked_at: "2026-05-24T10:10:00" },
-        { link_id: 2, title: "Next.js 官方文档", status_code: 200, is_ok: 1, message: "ok", checked_at: "2026-05-24T10:10:10" },
-        { link_id: 3, title: "OpenAtom 开源社团仓库", status_code: 503, is_ok: 0, message: "Service Unavailable", checked_at: "2026-05-24T10:10:20" },
+        { link_id: 1, title: "OpenAtom 官网", status_code: 200, is_ok: 1, message: "正常", checked_at: "2026-05-24T10:10:00" },
+        { link_id: 2, title: "GitHub", status_code: 200, is_ok: 1, message: "ok", checked_at: "2026-05-24T10:10:10" },
+        { link_id: 3, title: "吃豆人小游戏", status_code: 503, is_ok: 0, message: "服务不可用", checked_at: "2026-05-24T10:10:20" },
       ]);
       markSectionLoaded("health");
       return;
@@ -421,7 +432,7 @@ export default function AdminPage() {
   }, [loadHealth, loadLinks, loadLogs, loadOverview, loadStats, loadUsers]);
 
   useEffect(() => {
-    // 鍏堢‘璁ゅ綋鍓嶇櫥褰曟€侊紝鍐嶅喅瀹氭槸鍚﹁繘鍏ュ悗鍙版垨璺宠浆鐧诲綍椤点€?
+    // 页面首次加载时完成鉴权与基础数据初始化
     const init = async () => {
       if (MOCK_MODE) {
         setUser(MOCK_USER);
@@ -453,13 +464,30 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 当前后台为单页模块切换模式，这里只切换可见模块。
+  // 懒加载对应分区数据，并滚动到目标分区
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
     if (!user || loadedSections[sectionId]) return;
     loadSectionById(sectionId, user.role).catch(() => {
       setError("加载模块数据失败");
     });
+  };
+
+  const switchLinkModule = async (nextModule: NavModule) => {
+    setActiveLinkModule(nextModule);
+    if (MOCK_MODE) {
+      setLinks(MOCK_LINKS.filter((item) => item.module === nextModule));
+      return;
+    }
+    try {
+      const linksRes = await fetch(`/api/admin/links?module=${nextModule}`);
+      if (!linksRes.ok) throw new Error("加载导航模块数据失败");
+      const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
+      setLinks(linksData?.links || []);
+      markSectionLoaded("links");
+    } catch {
+      setError("加载导航模块数据失败");
+    }
   };
 
   const logout = async () => {
@@ -474,9 +502,9 @@ export default function AdminPage() {
   const submitLink = async (e: FormEvent) => {
     e.preventDefault();
     if (MOCK_MODE) {
-      const nextId = links.length ? Math.max(...links.map((x) => x.id)) + 1 : 1;
-      setLinks((prev) => [...prev, { id: nextId, ...linkForm, active: 1 }]);
-      setLinkForm({ title: "", url: "", description: "", sort: 0 });
+      const nextId = Date.now();
+      setLinks((prev) => [...prev, { id: nextId, ...linkForm, module: activeLinkModule, active: 1 }]);
+      setLinkForm({ title: "", url: "", description: "", sort: 0, module: activeLinkModule });
       return;
     }
     setError("");
@@ -484,11 +512,11 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/links", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(linkForm),
+        body: JSON.stringify({ ...linkForm, module: activeLinkModule }),
       });
       const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "新增链接失败");
-      setLinkForm({ title: "", url: "", description: "", sort: 0 });
+      setLinkForm({ title: "", url: "", description: "", sort: 0, module: activeLinkModule });
       await Promise.all([
         loadLinks(),
         loadLogs().catch(() => {}),
@@ -499,7 +527,7 @@ export default function AdminPage() {
     }
   };
 
-  // 删除后重新拉取列表，确保表格和统计区域同步刷新。
+  // 删除链接后刷新相关分区数据
   const removeLink = async (id: number) => {
     if (MOCK_MODE) {
       setLinks((prev) => prev.filter((x) => x.id !== id));
@@ -513,7 +541,7 @@ export default function AdminPage() {
     ]);
   };
 
-  // 启用/禁用共用同一个更新入口，仅切换 active 字段。
+  // 启用/禁用链接，后端使用 active 字段
   const toggleActive = async (item: LinkItem) => {
     if (MOCK_MODE) {
       setLinks((prev) => prev.map((x) => (x.id === item.id ? { ...x, active: x.active ? 0 : 1 } : x)));
@@ -624,7 +652,7 @@ export default function AdminPage() {
   const saveAutoDetectSettings = () => {
     const nextMinutes = Number(autoDetectDraftMinutes);
     if (!Number.isFinite(nextMinutes) || nextMinutes < 1) {
-      setError("自动探测时间必须是大于等于 1 的分钟数");
+      setError("自动检测时间必须大于等于 1 分钟");
       return;
     }
     setError("");
@@ -655,7 +683,7 @@ export default function AdminPage() {
       <div className="admin-console-layout">
         <aside className="admin-console-sidebar">
           <div className="admin-console-side-title">控制台</div>
-          {/* 左侧菜单只负责切换模块，不承载路由状态。 */}
+          {/* 侧边导航：支持模块快速切换 */}
           {sections.map((section) => (
             <button
               key={section.id}
@@ -669,11 +697,13 @@ export default function AdminPage() {
         </aside>
 
         <div className="admin-console-content">
-      {/* 这一块保留为后台统一头部，所有模块切换时都显示。 */}
+      {/* 顶部信息卡：当前登录用户与快捷操作 */}
       <div id="overview" className="admin-card admin-console-anchor-card" style={{ padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "rgba(226,238,252,0.94)", borderColor: "#93C5FD", boxShadow: "0 14px 34px rgba(37,99,235,0.18)" }}>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700, color: "#0F172A" }}>管理后台</div>
-          <div style={{ fontSize: 12, color: "#64748B" }}>当前用户：{user.username}（{user.role}）</div>
+          <div style={{ fontSize: 12, color: "#64748B" }}>
+            当前用户：{user.username}（{user.role === "super" ? "超级管理员" : "编辑"}）
+          </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button type="button" onClick={() => router.push("/")} className="admin-btn-ghost">
@@ -688,7 +718,7 @@ export default function AdminPage() {
       {error ? (
         <div style={{ color: "#DC2626", fontSize: 12 }}>{error}</div>
       ) : null}
-      {/* 每次只渲染一个模块，减少信息堆叠，保持后台单页切换体验。 */}
+      {/* 按当前激活分区显示对应内容 */}
       {activeSection === "overview" ? (
         <>
           <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
@@ -736,7 +766,7 @@ export default function AdminPage() {
                   </div>
                 </div>
                 <div style={{ marginTop: 2, fontSize: 12, color: "#64748B", display: "flex", justifyContent: "space-between" }}>
-                  <span>实例状态：运行中</span>
+                  <span>服务状态实时更新</span>
                   <span>Uptime: {system?.uptimeSec ?? 0}s</span>
                 </div>
               </div>
@@ -752,8 +782,8 @@ export default function AdminPage() {
             }}
           >
             {[
-              { label: "今日访问量 (PV)", value: today.page_views },
-              { label: "今日访客数 (UV)", value: today.unique_visitors },
+              { label: "今日访问量(PV)", value: today.page_views },
+              { label: "今日访客数(UV)", value: today.unique_visitors },
               { label: "今日点击量", value: today.link_clicks },
             ].map((item) => (
               <div key={item.label} className="admin-card admin-console-kpi-card" style={{ padding: 12, background: "rgba(214,231,250,0.95)", borderColor: "#93C5FD", boxShadow: "0 10px 26px rgba(37,99,235,0.16)" }}>
@@ -773,7 +803,7 @@ export default function AdminPage() {
         <div className="admin-console-pagehead-desc">聚合查看近 7 天点击走势与仓库热度表现。</div>
       </div>
       <div id="popular" className="admin-card admin-console-chart-card admin-console-anchor-card" style={{ padding: 12 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>近7天点击走势</div>
+        <div style={{ fontWeight: 700, marginBottom: 8 }}>近 7 天点击走势</div>
         <div
           className="admin-console-chart-surface"
           style={{
@@ -813,7 +843,7 @@ export default function AdminPage() {
                 {String(lineChart.points[hoveredTrendIndex].stat_date).slice(5)}
               </div>
               <div style={{ fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>
-                点击量 {lineChart.points[hoveredTrendIndex].link_clicks}
+                点击量：{lineChart.points[hoveredTrendIndex].link_clicks}
               </div>
             </div>
           ) : null}
@@ -942,7 +972,7 @@ export default function AdminPage() {
                 <tr style={{ background: "#F8FAFD" }}>
                   <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>仓库名</th>
                   <th style={{ textAlign: "right", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天总点击量</th>
-                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天点击量统计图</th>
+                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天点击趋势图</th>
                   <th style={{ textAlign: "center", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>当前状态</th>
                 </tr>
               </thead>
@@ -986,7 +1016,7 @@ export default function AdminPage() {
                           border: `1px solid ${p.isValid === true ? "#86EFAC" : p.isValid === false ? "#FCA5A5" : "#CBD5E1"}`,
                         }}
                       >
-                        {p.isValid === true ? "有效仓库" : p.isValid === false ? "链接异常" : "待检测"}
+                        {p.isValid === true ? "有效" : p.isValid === false ? "异常" : "待检测"}
                       </span>
                     </td>
                   </tr>
@@ -1007,25 +1037,48 @@ export default function AdminPage() {
       ) : null}
 
 
-      {activeSection === "links" ? (
+            {activeSection === "links" ? (
       <>
       <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
         <div className="admin-console-pagehead-title">内容管理</div>
-        <div className="admin-console-pagehead-desc">维护导航链接，支持新增、启用、禁用和删除。</div>
+        <div className="admin-console-pagehead-desc">按模块管理资源矩阵、友情链接、小游戏的导航内容。</div>
       </div>
       <div id="links" className="admin-card" style={{ padding: 16, display: "grid", gap: 12 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {(Object.keys(NAV_MODULE_META) as NavModule[]).map((moduleKey) => {
+            const isActive = moduleKey === activeLinkModule;
+            return (
+              <button
+                key={moduleKey}
+                type="button"
+                className={isActive ? "admin-btn" : "admin-btn-ghost"}
+                onClick={() => {
+                  void switchLinkModule(moduleKey);
+                }}
+              >
+                {NAV_MODULE_META[moduleKey].label}
+              </button>
+            );
+          })}
+        </div>
+
         <form onSubmit={submitLink} style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1.2fr 1fr 120px 120px" }}>
           <input className="admin-input" placeholder="标题" value={linkForm.title} onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })} />
           <input className="admin-input" placeholder="URL" value={linkForm.url} onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })} />
           <input className="admin-input" placeholder="描述" value={linkForm.description} onChange={(e) => setLinkForm({ ...linkForm, description: e.target.value })} />
           <input className="admin-input" type="number" placeholder="排序" value={linkForm.sort} onChange={(e) => setLinkForm({ ...linkForm, sort: Number(e.target.value || 0) })} />
-          <button type="submit" className="admin-btn">添加链接</button>
+          <button type="submit" className="admin-btn">新增到当前模块</button>
         </form>
+
+        <div style={{ fontSize: 12, color: "#64748B" }}>
+          当前模块：{NAV_MODULE_META[activeLinkModule].label}
+        </div>
+
         <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "标题", "URL", "状态", "操作"].map((h) => (
+                {["ID", "模块", "标题", "URL", "状态", "操作"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -1034,6 +1087,7 @@ export default function AdminPage() {
               {links.map((item) => (
                 <tr key={item.id}>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{NAV_MODULE_META[item.module]?.short || "-"}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: item.active ? "#059669" : "#DC2626", fontWeight: 600 }}>{item.active ? "启用" : "禁用"}</td>
@@ -1044,7 +1098,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {!links.length ? (
-                <tr><td colSpan={5} style={{ padding: "14px", color: "#64748B" }}>暂无链接数据</td></tr>
+                <tr><td colSpan={6} style={{ padding: "14px", color: "#64748B" }}>当前模块暂无内容</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -1062,7 +1116,7 @@ export default function AdminPage() {
       <div id="health" className="admin-card" style={{ padding: 20, background: "#F3F6FA", border: "1px solid #E6ECF5", borderRadius: 12, display: "grid", gap: 16, boxShadow: "0 8px 24px rgba(15,23,42,0.04)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", gap: 12 }}>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, boxShadow: "inset 0 0 0 1px rgba(24,144,255,0.06)" }}>
-            <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评分</div>
+            <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评估</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: "#1890FF" }}>
               {health.length ? `${Math.round((health.filter((h) => h.is_ok).length / health.length) * 100)}%` : "100%"}
             </div>
@@ -1085,8 +1139,8 @@ export default function AdminPage() {
             <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
             <div style={{ fontSize: 12, color: "#64748B" }}>
               {autoDetectEnabled
-                ? `自动探测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
-                : "自动探测未开启"}
+                ? `自动检测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
+                : "自动检测未开启"}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1096,7 +1150,7 @@ export default function AdminPage() {
               className="admin-btn-ghost"
               style={{ height: 34, padding: "0 14px", borderRadius: 8, borderColor: autoDetectEnabled ? "#86EFAC" : "#CBD5E1", color: autoDetectEnabled ? "#166534" : "#334155" }}
             >
-              自动探测
+              自动检测
             </button>
             <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 34, padding: "0 14px", borderRadius: 8 }} disabled={healthChecking}>
               {healthChecking ? "探测中..." : "全量探测"}
@@ -1118,7 +1172,7 @@ export default function AdminPage() {
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>{h.title || `#${h.link_id}`}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
                     <span style={{ color: h.is_ok ? "#059669" : "#DC2626", fontWeight: 700 }}>
-                      {h.is_ok ? "● 运行正常" : "● 服务不可用"}
+                      {h.is_ok ? "运行正常" : "服务不可用"}
                     </span>
                     {!h.is_ok && h.status_code ? <span style={{ marginLeft: 8, fontSize: 12, background: "#F3F4F6", padding: "2px 8px", borderRadius: 999, color: "#475569" }}>HTTP {h.status_code}</span> : null}
                   </td>
@@ -1219,7 +1273,7 @@ export default function AdminPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "用户名", "角色", "创建时间", "最近登录"].map((h) => (
+                {["ID", "Username", "Role", "Created At", "Last Login"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -1276,7 +1330,7 @@ export default function AdminPage() {
             }}
           >
             <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>自动探测设置</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A" }}>自动检测设置</div>
               <div style={{ fontSize: 13, color: "#64748B" }}>
                 设定定期触发的分钟间隔。开启后将在当前控制台会话中自动执行全量探测，并持久化到浏览器本地。
               </div>

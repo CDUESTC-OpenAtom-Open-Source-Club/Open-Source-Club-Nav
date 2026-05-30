@@ -1118,7 +1118,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
             running: true,
             finished: false,
             tick: (Number(prev.tick) || 0) + 1,
-            status: `鎹熷け 1 鏉″懡锛屽墿浣?${lives} 鏉″懡`,
+            status: `损失 1 鏉″懡锛屽墿浣?${lives} 条命`,
           };
         }
 
@@ -1476,7 +1476,7 @@ export function PacmanMiniGame({ compact = false, standalone = false }) {
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
-            鎿嶄綔鏂瑰紡
+            操作方式
           </div>
           <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.6 }}>
             鐐瑰嚮妫嬬洏涓婂悆璞嗕汉鍛ㄥ洿鐨勪綅缃彲鏀瑰彉绉诲姩鏂瑰悜锛涢敭鐩樻敮鎸佹柟鍚戦敭锛涜Е灞忚澶囧彲鐩存帴鐐规寜涓嬫柟鏂瑰悜閿€?

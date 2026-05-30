@@ -1,3 +1,5 @@
+export type NavModule = "resource_matrix" | "friend_links" | "mini_games";
+
 export interface FriendLink {
   id: number;
   title: string;
@@ -5,6 +7,7 @@ export interface FriendLink {
   description: string;
   sort: number;
   active: number;
+  module?: NavModule;
   created_at: string;
   updated_at: string;
 }
@@ -15,6 +18,7 @@ export interface LinkCreateInput {
   description?: string;
   sort?: number;
   active?: number;
+  module?: NavModule;
 }
 
 export interface LinkUpdateInput {
@@ -24,4 +28,5 @@ export interface LinkUpdateInput {
   description?: string;
   sort?: number;
   active?: number;
+  module?: NavModule;
 }

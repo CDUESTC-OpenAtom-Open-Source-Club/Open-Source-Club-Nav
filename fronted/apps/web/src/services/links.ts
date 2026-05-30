@@ -1,13 +1,39 @@
 import pool from "@/lib/db";
 import { FALLBACK_LINKS } from "@/data/mock/links";
-import type { FriendLink, LinkCreateInput, LinkUpdateInput } from "@/types/links";
+import type { FriendLink, LinkCreateInput, LinkUpdateInput, NavModule } from "@/types/links";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
+const DEFAULT_MODULE: NavModule = "friend_links";
+const MODULES: NavModule[] = ["resource_matrix", "friend_links", "mini_games"];
 
-export async function getLinks(): Promise<{ links: FriendLink[]; source: string }> {
-  if (USE_MOCK) return { links: FALLBACK_LINKS, source: "mock" };
+function normalizeModule(value: unknown): NavModule {
+  return MODULES.includes(value as NavModule) ? (value as NavModule) : DEFAULT_MODULE;
+}
+
+function buildModuleWhereClause(navModule?: NavModule): { sql: string; values: unknown[] } {
+  if (!navModule) return { sql: "", values: [] };
+  if (navModule === "friend_links") {
+    // Backward compatibility: legacy rows may have null/empty category.
+    return { sql: "AND (category = ? OR category IS NULL OR category = '')", values: [navModule] };
+  }
+  return { sql: "AND category = ?", values: [navModule] };
+}
+
+function toFriendLinks(rows: unknown): FriendLink[] {
+  return (rows as FriendLink[]).map((item) => ({
+    ...item,
+    module: normalizeModule((item as FriendLink).module),
+  }));
+}
+
+export async function getLinks(navModule: NavModule = DEFAULT_MODULE): Promise<{ links: FriendLink[]; source: string }> {
+  if (USE_MOCK) {
+    const links = FALLBACK_LINKS.filter((item) => normalizeModule(item.module) === navModule);
+    return { links, source: "mock" };
+  }
 
   try {
+    const where = buildModuleWhereClause(navModule);
     const [rows] = await pool.query(
       `SELECT
          id,
@@ -16,23 +42,33 @@ export async function getLinks(): Promise<{ links: FriendLink[]; source: string 
          description,
          sort,
          active,
+         CASE
+           WHEN category IS NULL OR category = '' THEN '${DEFAULT_MODULE}'
+           ELSE category
+         END AS module,
          created_at,
          updated_at
        FROM nav_items
        WHERE active = 1
-       ORDER BY sort ASC, id ASC`
+         ${where.sql}
+       ORDER BY sort ASC, id ASC`,
+      where.values,
     );
-    return { links: rows as FriendLink[], source: "mysql" };
+    return { links: toFriendLinks(rows), source: "mysql" };
   } catch {
-    return { links: FALLBACK_LINKS, source: "fallback" };
+    const links = FALLBACK_LINKS.filter((item) => normalizeModule(item.module) === navModule);
+    return { links, source: "fallback" };
   }
 }
 
-export async function getAllLinks(): Promise<FriendLink[]> {
+export async function getAllLinks(navModule?: NavModule): Promise<FriendLink[]> {
   if (USE_MOCK) {
     const { MOCK_ADMIN_LINKS } = await import("@/data/mock/links");
-    return MOCK_ADMIN_LINKS as FriendLink[];
+    const full = MOCK_ADMIN_LINKS as FriendLink[];
+    return navModule ? full.filter((item) => normalizeModule(item.module) === navModule) : full;
   }
+
+  const where = buildModuleWhereClause(navModule);
   const [rows] = await pool.query(
     `SELECT
        id,
@@ -41,19 +77,27 @@ export async function getAllLinks(): Promise<FriendLink[]> {
        description,
        sort,
        active,
+       CASE
+         WHEN category IS NULL OR category = '' THEN '${DEFAULT_MODULE}'
+         ELSE category
+       END AS module,
        created_at,
        updated_at
      FROM nav_items
+     WHERE 1 = 1
+       ${where.sql}
      ORDER BY sort ASC, id ASC`,
+    where.values,
   );
-  return rows as FriendLink[];
+  return toFriendLinks(rows);
 }
 
 export async function createLink(input: LinkCreateInput): Promise<FriendLink> {
+  const navModule = normalizeModule(input.module);
   const [result] = await pool.query(
     `INSERT INTO nav_items
-      (title, content, cover_url, link_url, description, sort, active, created_at, updated_at)
-     VALUES (?, ?, '', ?, ?, ?, ?, NOW(3), NOW(3))`,
+      (title, content, cover_url, link_url, description, sort, active, category, created_at, updated_at)
+     VALUES (?, ?, '', ?, ?, ?, ?, ?, NOW(3), NOW(3))`,
     [
       input.title,
       input.description || "",
@@ -61,6 +105,7 @@ export async function createLink(input: LinkCreateInput): Promise<FriendLink> {
       input.description || "",
       input.sort || 0,
       input.active ?? 1,
+      navModule,
     ],
   );
   const insertId = (result as { insertId: number }).insertId;
@@ -72,17 +117,21 @@ export async function createLink(input: LinkCreateInput): Promise<FriendLink> {
        description,
        sort,
        active,
+       CASE
+         WHEN category IS NULL OR category = '' THEN '${DEFAULT_MODULE}'
+         ELSE category
+       END AS module,
        created_at,
        updated_at
      FROM nav_items
      WHERE id = ?`,
     [insertId],
   );
-  return (rows as FriendLink[])[0];
+  return toFriendLinks(rows)[0];
 }
 
 export async function updateLink(input: LinkUpdateInput): Promise<FriendLink | null> {
-  const allowed = ["title", "url", "description", "sort", "active"] as const;
+  const allowed = ["title", "url", "description", "sort", "active", "module"] as const;
   const fields: string[] = [];
   const values: (string | number)[] = [];
 
@@ -91,6 +140,9 @@ export async function updateLink(input: LinkUpdateInput): Promise<FriendLink | n
       if (key === "url") {
         fields.push("link_url = ?");
         values.push(input[key] as string | number);
+      } else if (key === "module") {
+        fields.push("category = ?");
+        values.push(normalizeModule(input[key]));
       } else {
         fields.push(`${key} = ?`);
         values.push(input[key] as string | number);
@@ -109,13 +161,17 @@ export async function updateLink(input: LinkUpdateInput): Promise<FriendLink | n
        description,
        sort,
        active,
+       CASE
+         WHEN category IS NULL OR category = '' THEN '${DEFAULT_MODULE}'
+         ELSE category
+       END AS module,
        created_at,
        updated_at
      FROM nav_items
      WHERE id = ?`,
     [input.id],
   );
-  return (rows as FriendLink[])[0] || null;
+  return toFriendLinks(rows)[0] || null;
 }
 
 export async function deleteLink(id: number): Promise<void> {

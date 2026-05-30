@@ -3,8 +3,11 @@ import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/admin-db";
 import { MOCK_ADMIN_LINKS } from "@/data/mock/links";
 import { getAllLinks, createLink, updateLink, deleteLink } from "@/services/links";
+import type { NavModule } from "@/types/links";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
+const MODULES: NavModule[] = ["resource_matrix", "friend_links", "mini_games"];
+const DEFAULT_MODULE: NavModule = "friend_links";
 
 function unauthorized() {
   return Response.json({ error: "未登录" }, { status: 401 });
@@ -12,6 +15,10 @@ function unauthorized() {
 
 function forbidden() {
   return Response.json({ error: "无权限" }, { status: 403 });
+}
+
+function parseModule(value: unknown): NavModule {
+  return MODULES.includes(value as NavModule) ? (value as NavModule) : DEFAULT_MODULE;
 }
 
 async function requireEditorOrSuper() {
@@ -47,21 +54,26 @@ async function writeLinkLog(
   );
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const navModule = parseModule(searchParams.get("module"));
+
   if (USE_MOCK) {
-    return Response.json({ links: MOCK_ADMIN_LINKS });
+    const links = MOCK_ADMIN_LINKS.filter((item) => parseModule((item as { module?: string }).module) === navModule);
+    return Response.json({ links, module: navModule });
   }
 
   const auth = await requireEditorOrSuper();
   if (auth.error) return auth.error;
 
-  const links = await getAllLinks();
-  return Response.json({ links });
+  const links = await getAllLinks(navModule);
+  return Response.json({ links, module: navModule });
 }
 
 export async function POST(request: Request) {
   if (USE_MOCK) {
     const body = await request.json().catch(() => ({}));
+    const navModule = parseModule(body?.module);
     return Response.json({
       ok: true,
       link: {
@@ -71,6 +83,7 @@ export async function POST(request: Request) {
         description: String(body?.description || ""),
         sort: Number(body?.sort || 0),
         active: 1,
+        module: navModule,
       },
     }, { status: 201 });
   }
@@ -84,13 +97,14 @@ export async function POST(request: Request) {
     const url = String(body?.url || "").trim();
     const description = String(body?.description || "").trim();
     const sort = Number(body?.sort || 0);
+    const navModule = parseModule(body?.module);
 
     if (!title || !url) {
       return Response.json({ error: "标题和链接不能为空" }, { status: 400 });
     }
 
-    const link = await createLink({ title, url, description, sort });
-    await writeLinkLog(auth.session, "create", link.id, { title, url, description, sort });
+    const link = await createLink({ title, url, description, sort, module: navModule });
+    await writeLinkLog(auth.session, "create", link.id, { title, url, description, sort, module: navModule });
     return Response.json({ ok: true, link }, { status: 201 });
   } catch {
     return Response.json({ error: "新增链接失败" }, { status: 500 });
@@ -111,7 +125,16 @@ export async function PUT(request: Request) {
     const id = Number(body?.id);
     if (!id) return Response.json({ error: "缺少 id" }, { status: 400 });
 
-    const link = await updateLink(body);
+    const navModule = body?.module === undefined ? undefined : parseModule(body?.module);
+    const link = await updateLink({
+      id,
+      title: body?.title,
+      url: body?.url,
+      description: body?.description,
+      sort: body?.sort,
+      active: body?.active,
+      module: navModule,
+    });
     if (!link) return Response.json({ error: "没有可更新字段" }, { status: 400 });
 
     await writeLinkLog(auth.session, "update", id, {
@@ -120,6 +143,7 @@ export async function PUT(request: Request) {
       description: body?.description,
       sort: body?.sort,
       active: body?.active,
+      module: navModule,
     });
     return Response.json({ ok: true, link });
   } catch {
