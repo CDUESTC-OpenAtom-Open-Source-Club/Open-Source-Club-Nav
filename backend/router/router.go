@@ -96,6 +96,18 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 			adminGameGroup.PUT("/:id", handler.UpdateMiniGame) // 编辑小游戏
 		}
 
+		contentGroup := privateGroup.Group("/api/content")
+		contentGroup.Use(handler.RequireRole("editor", "super"))
+		{
+			contentGroup.POST("", handler.CreateContent)
+			contentGroup.PUT("/:id", handler.UpdateContent)
+			contentGroup.DELETE("/:id", handler.DeleteContent)
+			contentGroup.PUT("/:id/toggle", handler.ToggleContentActive)
+		}
+
+		// 管理员列表接口（super 权限）
+		privateGroup.GET("/backend/admin/list", handler.RequireRole("super"), handler.GetAdminListHandler)
+
 	}
 
 	return r
