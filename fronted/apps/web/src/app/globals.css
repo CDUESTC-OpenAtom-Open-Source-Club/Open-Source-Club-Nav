@@ -1342,6 +1342,11 @@
   top: 16px;
 }
 
+.admin-console-nav-group {
+  display: grid;
+  gap: 6px;
+}
+
 .admin-console-side-title {
   padding: 4px 8px 12px;
   font-size: 12px;
@@ -1364,6 +1369,9 @@
   background: transparent;
   cursor: pointer;
   text-align: left;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   transition:
     background-color 0.18s ease,
     border-color 0.18s ease,
@@ -1372,10 +1380,35 @@
     box-shadow 0.18s ease;
 }
 
+.admin-console-side-item::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 5px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #2563eb);
+  opacity: 0;
+  transform: scaleX(0.35);
+  transform-origin: center;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
 .admin-console-side-item:hover {
   background: #f8fbff;
   border-color: #e0ecff;
   color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.admin-console-side-item:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.admin-console-side-item:focus-visible {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.28);
 }
 
 .admin-console-side-item.active {
@@ -1386,11 +1419,102 @@
   transform: translateX(2px);
 }
 
+.admin-console-side-item.active::after,
+.admin-console-side-item:hover::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.admin-console-side-item--primary {
+  justify-content: space-between;
+}
+
+.admin-console-side-chevron {
+  margin-left: 8px;
+  color: #94a3b8;
+  font-size: 12px;
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.admin-console-side-item[aria-expanded="true"] .admin-console-side-chevron {
+  color: #2563eb;
+  transform: rotate(180deg);
+}
+
+.admin-console-subnav {
+  display: grid;
+  gap: 6px;
+  padding-left: 16px;
+  transform-origin: top;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    max-height 0.24s ease,
+    margin 0.22s ease,
+    padding 0.22s ease;
+  max-height: 260px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.admin-console-subnav.is-expanded {
+  max-height: 260px;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.admin-console-subnav.is-collapsed {
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  margin-top: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
+}
+
+.admin-console-subnav-item {
+  min-height: 34px;
+  padding: 0 10px 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+@keyframes adminSubnavIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .admin-console-content {
   display: grid;
   gap: 12px;
   align-content: start;
   min-height: 640px;
+}
+
+.admin-section-transition {
+  display: grid;
+  gap: 12px;
+  animation: adminSectionIn 0.24s ease both;
+}
+
+@keyframes adminSectionIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .admin-console-anchor-card {
@@ -2536,6 +2660,14 @@
   line-height: 1.7;
 }
 
+.admin-link-create-form {
+  align-items: center;
+}
+
+.admin-link-create-form__submit {
+  width: 100%;
+}
+
 @media (max-width: 1080px) {
   .games-main-grid {
     grid-template-columns: 1fr;
@@ -2571,25 +2703,94 @@
   }
 
   .admin-console-sidebar {
-    position: static;
-    top: auto;
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
+    position: sticky;
+    top: 8px;
+    z-index: 60;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    overflow-x: auto;
-    padding: 10px;
-    gap: 8px;
+    overflow: visible;
+    padding: 8px;
+    gap: 6px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    scrollbar-width: none;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+  }
+
+  .admin-console-sidebar::-webkit-scrollbar {
+    display: none;
   }
 
   .admin-console-side-title {
     display: none;
   }
 
+  .admin-console-nav-group {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    position: relative;
+  }
+
+  .admin-console-nav-group.is-expanded {
+    flex: 0 0 auto;
+  }
+
   .admin-console-side-item {
     min-height: 34px;
-    padding: 0 10px;
+    width: auto;
+    padding: 0 12px;
     font-size: 13px;
     white-space: nowrap;
+    border-radius: 999px;
+  }
+
+  .admin-console-side-item.active {
+    transform: none;
+  }
+
+  .admin-console-side-item::after {
+    left: 14px;
+    right: 14px;
+    bottom: 4px;
+  }
+
+  .admin-console-side-chevron {
+    margin-left: 6px;
+  }
+
+  .admin-console-subnav {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 8px);
+    z-index: 80;
+    min-width: max(180px, 100%);
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 8px;
+    border: 1px solid #dbeafe;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    scrollbar-width: none;
+  }
+
+  .admin-console-subnav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .admin-console-subnav-item {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 0 12px;
+    font-size: 12px;
   }
 
   .admin-console-content {
@@ -2598,5 +2799,54 @@
 
   .admin-console-kpi-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  .admin-link-create-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .admin-link-create-form .admin-input[type="number"] {
+    grid-column: span 1;
+  }
+
+  .admin-link-create-form__submit {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-shell {
+    padding: 10px;
+  }
+
+  .admin-console-sidebar {
+    top: 6px;
+    margin-inline: -2px;
+    padding: 7px;
+  }
+
+  .admin-console-nav-group.is-expanded {
+    position: static;
+  }
+
+  .admin-console-nav-group.is-expanded > .admin-console-side-item--primary {
+    width: auto;
+    justify-content: center;
+  }
+
+  .admin-console-subnav {
+    left: 10px;
+    right: 10px;
+    top: calc(100% + 6px);
+    width: auto;
+    padding-bottom: 1px;
+  }
+
+  .admin-link-create-form {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-link-create-form__submit {
+    grid-column: span 1;
   }
 }

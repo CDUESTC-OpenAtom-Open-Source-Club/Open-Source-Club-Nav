@@ -4,7 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, X } from "lucide-react";
 import GlobeCanvas from "./GlobeCanvas";
 import WorksCarousel from "./WorksCarousel";
-import { RESOURCE_CATEGORIES, fetchResourceCategories } from "@/data/resources";
+import { RESOURCE_CATEGORIES } from "@/data/resources";
+
+const RESOURCE_SUB_TO_CATEGORY_ID = {
+  think_tank: "intelligence",
+  campus: "surface",
+  tools: "armory",
+};
+
+const RESOURCE_SUB_DEFAULT_TAG = {
+  think_tank: "Learning",
+  campus: "Campus",
+  tools: "Dev",
+};
 
 const TAG_COLORS = {
   Learning: { bg: "#EFF6FF", text: "#2563EB", border: "#BFDBFE" },
@@ -1146,16 +1158,64 @@ export default function CentralHub({
     let cancelled = false;
 
     const syncResourceCategories = async () => {
-      if (cancelled) return;
+      try {
+        const subModules = ["think_tank", "campus", "tools"];
+        const responses = await Promise.all(
+          subModules.map((subModule) =>
+            fetch(`/api/links?module=resource_matrix&resource_sub_module=${subModule}`, { cache: "no-store" })
+              .then((res) => (res.ok ? res.json() : null))
+              .catch(() => null),
+          ),
+        );
 
-      const categories = await fetchResourceCategories();
-      setResourceCategories(categories);
+        if (cancelled) return;
+
+        const remoteBySub = {
+          think_tank: Array.isArray(responses[0]?.links) ? responses[0].links : [],
+          campus: Array.isArray(responses[1]?.links) ? responses[1].links : [],
+          tools: Array.isArray(responses[2]?.links) ? responses[2].links : [],
+        };
+
+        const merged = RESOURCE_CATEGORIES.map((category) => {
+          const subModule = Object.keys(RESOURCE_SUB_TO_CATEGORY_ID).find(
+            (key) => RESOURCE_SUB_TO_CATEGORY_ID[key] === category.id,
+          );
+          if (!subModule) return category;
+
+          const remoteLinks = (remoteBySub[subModule] || [])
+            .map((item) => ({
+              title: String(item?.title || "").trim(),
+              desc: String(item?.description || "").trim() || "后台新增资源",
+              url: String(item?.url || "").trim(),
+              tag: RESOURCE_SUB_DEFAULT_TAG[subModule],
+            }))
+            .filter((item) => item.title && item.url);
+
+          const existingLinks = Array.isArray(category.links) ? category.links : [];
+          const seen = new Set(existingLinks.map((item) => `${item.title}::${item.url}`));
+          const appendedLinks = remoteLinks.filter((item) => {
+            const key = `${item.title}::${item.url}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+
+          return {
+            ...category,
+            links: [...existingLinks, ...appendedLinks],
+          };
+        });
+
+        setResourceCategories(merged);
+      } catch {
+        // ignore sync failures, keep base categories
+      }
     };
 
     void syncResourceCategories();
     const timer = setInterval(() => {
       void syncResourceCategories();
-    }, 60000);
+    }, 5000);
     return () => {
       cancelled = true;
       clearInterval(timer);
