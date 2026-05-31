@@ -1191,11 +1191,18 @@ export default function CentralHub({
             }))
             .filter((item) => item.title && item.url);
 
-          const existingKeys = new Set(category.links.map((link) => `${link.title}::${link.url}`));
-          const appended = remoteLinks.filter((item) => !existingKeys.has(`${item.title}::${item.url}`));
+          const existingLinks = Array.isArray(category.links) ? category.links : [];
+          const seen = new Set(existingLinks.map((item) => `${item.title}::${item.url}`));
+          const appendedLinks = remoteLinks.filter((item) => {
+            const key = `${item.title}::${item.url}`;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+
           return {
             ...category,
-            links: [...category.links, ...appended],
+            links: [...existingLinks, ...appendedLinks],
           };
         });
 
@@ -1208,7 +1215,7 @@ export default function CentralHub({
     void syncResourceCategories();
     const timer = setInterval(() => {
       void syncResourceCategories();
-    }, 60000);
+    }, 5000);
     return () => {
       cancelled = true;
       clearInterval(timer);
