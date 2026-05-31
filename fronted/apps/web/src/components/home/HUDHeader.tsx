@@ -135,12 +135,15 @@ export default function HUDHeader({
         zIndex: 100,
       }}
     >
-      <div
+      <a
+        href="/"
         style={{
           display: "flex",
           alignItems: "center",
           gap: compact ? 8 : 10,
           minWidth: compact ? "auto" : LEFT_BLOCK_MIN_WIDTH,
+          textDecoration: "none",
+          cursor: "pointer",
         }}
       >
         <div
@@ -194,7 +197,7 @@ export default function HUDHeader({
             kcos.club
           </div>
         </div>
-      </div>
+      </a>
 
       {!compact ? (
         <>

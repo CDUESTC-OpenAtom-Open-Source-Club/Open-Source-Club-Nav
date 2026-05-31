@@ -1852,7 +1852,7 @@ export default function AdminPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "模块", "子模块", "标题", "URL", "点击次数", "创建时间", "健康状态", "操作"].map((h) => (
+                {["ID", "标题", "URL", "点击次数", "创建时间", "健康状态", "操作"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
@@ -1861,14 +1861,6 @@ export default function AdminPage() {
               {links.map((item) => (
                 <tr key={item.id}>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{NAV_MODULE_META[item.module]?.short || "-"}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    {item.module === "resource_matrix"
-                      ? RESOURCE_SUB_MODULE_META[item.resource_sub_module || "think_tank"]?.short || "-"
-                      : item.module === "mini_games"
-                        ? "内部"
-                        : "-"}
-                  </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
@@ -1889,7 +1881,7 @@ export default function AdminPage() {
                 </tr>
               ))}
               {!links.length ? (
-                <tr><td colSpan={9} style={{ padding: "14px", color: "#64748B" }}>当前筛选下暂无内容</td></tr>
+                <tr><td colSpan={7} style={{ padding: "14px", color: "#64748B" }}>当前筛选下暂无内容</td></tr>
               ) : null}
             </tbody>
           </table>
