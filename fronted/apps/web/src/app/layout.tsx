@@ -1,4 +1,14 @@
 import "./globals.css";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: {
+    default: "KCOS 开放原子开源社团",
+    template: "%s | KCOS 开放原子开源社团",
+  },
+  description: "科成开放原子开源社团导航平台",
+  applicationName: "OpenAtom Club Nav",
+};
 
 export default function RootLayout({
   children,

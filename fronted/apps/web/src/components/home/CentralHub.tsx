@@ -24,13 +24,13 @@ const TAG_COLORS = {
   Research: { bg: "#FFF7ED", text: "#EA580C", border: "#FED7AA" },
   Papers: { bg: "#FAF5FF", text: "#7C3AED", border: "#DDD6FE" },
   Course: { bg: "#F0FDF4", text: "#059669", border: "#BBF7D0" },
-  Campus: { bg: "#EFF6FF", text: "#0A84FF", border: "#BFDBFE" },
+  Campus: { bg: "#EFF6FF", text: "#005FCC", border: "#BFDBFE" },
   Life: { bg: "#FFFBEB", text: "#F59E0B", border: "#FDE68A" },
   Dev: { bg: "#F1F5F9", text: "#374151", border: "#E2E8F0" },
-  Mirror: { bg: "#EFF6FF", text: "#0A84FF", border: "#BFDBFE" },
+  Mirror: { bg: "#EFF6FF", text: "#005FCC", border: "#BFDBFE" },
   IDE: { bg: "#FAF5FF", text: "#7C3AED", border: "#DDD6FE" },
   DevOps: { bg: "#F0FDF4", text: "#059669", border: "#BBF7D0" },
-  Docs: { bg: "#F8FAFC", text: "#64748B", border: "#E2E8F0" },
+  Docs: { bg: "#F8FAFC", text: "#595959", border: "#E2E8F0" },
 };
 
 const CLUB_OVERVIEW_ITEMS = [

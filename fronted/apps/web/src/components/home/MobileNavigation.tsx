@@ -78,6 +78,8 @@ function MobileActionButton({
     <button
       type="button"
       aria-label={label}
+      aria-expanded={active}
+      aria-controls={active ? "mobile-nav-panel" : undefined}
       data-ui-touch="true"
       onClick={onClick}
       style={{
@@ -379,6 +381,7 @@ export function MobileNavigationPanel({
       className="mobile-nav-overlay"
       data-mobile-nav-overlay="true"
       data-mobile-nav-phase={phase}
+      role="presentation"
       style={{
         position: "fixed",
         top: 48,
@@ -396,9 +399,12 @@ export function MobileNavigationPanel({
       }}
     >
       <div
+        id="mobile-nav-panel"
         className="mobile-nav-panel"
         data-mobile-nav-panel="true"
         data-mobile-nav-phase={phase}
+        role="navigation"
+        aria-label="移动端主导航"
         onTransitionEnd={(event) => {
           if (event.currentTarget !== event.target) return;
           if (event.propertyName !== "transform") return;
