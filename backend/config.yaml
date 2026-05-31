@@ -1,5 +1,5 @@
 mysql:
-  dsn: "root:change-me@tcp(127.0.0.1:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
+  dsn: "root:336699@tcp(127.0.0.1:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
 jwt:
   secret: "change-me"
   expire: 3600

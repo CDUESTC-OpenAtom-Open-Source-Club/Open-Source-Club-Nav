@@ -1,0 +1,266 @@
+# .github/workflows/deploy.yml
+# main 分支 push 时：检测变更 → 测试 → 构建镜像 → 部署到生产服务器
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ── 变更检测 ──────────────────────────────────────────────────────────────────
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_changed: ${{ steps.diff.outputs.frontend_changed }}
+      backend_changed: ${{ steps.diff.outputs.backend_changed }}
+      db_changed: ${{ steps.diff.outputs.db_changed }}
+      should_deploy: ${{ steps.diff.outputs.should_deploy }}
+      web_image_base: ${{ steps.images.outputs.web_image_base }}
+      backend_image_base: ${{ steps.images.outputs.backend_image_base }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute image names
+        id: images
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "web_image_base=ghcr.io/${REPO_LOWER}-web" >> "$GITHUB_OUTPUT"
+          echo "backend_image_base=ghcr.io/${REPO_LOWER}-backend" >> "$GITHUB_OUTPUT"
+
+      - name: Detect changes
+        id: diff
+        run: |
+          BEFORE="${{ github.event.before }}"
+          SHA="${{ github.sha }}"
+
+          # 首次 push 或 force push 时 before 可能全零，此时视为全部变更
+          if [[ "${BEFORE}" == "0000000000000000000000000000000000000000" ]]; then
+            echo "frontend_changed=true" >> "$GITHUB_OUTPUT"
+            echo "backend_changed=true" >> "$GITHUB_OUTPUT"
+            echo "db_changed=true" >> "$GITHUB_OUTPUT"
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
+            echo "Initial or force push detected, building everything."
+            exit 0
+          fi
+
+          CHANGED=$(git diff --name-only "${BEFORE}" "${SHA}" || true)
+          echo "Changed files:"
+          echo "${CHANGED}"
+
+          FRONTEND="false"
+          BACKEND="false"
+          DB="false"
+
+          # 纯文档文件列表（忽略这些以外的所有变更才跳过部署）
+          DOCS_ONLY="true"
+
+          while IFS= read -r file; do
+            [[ -z "${file}" ]] && continue
+
+            # 判断是否为纯文档文件
+            case "${file}" in
+              docs/*|*.md|LICENSE|.gitignore|.gitmodules)
+                ;; # 仍可能是 docs-only，继续检查其他文件
+              *)
+                DOCS_ONLY="false"
+                ;;
+            esac
+
+            # 前端变更
+            case "${file}" in
+              fronted/apps/web/*|fronted/shared/*|deploy/docker-compose.prod.yml|fronted/apps/web/Dockerfile)
+                FRONTEND="true"
+                ;;
+            esac
+
+            # 后端变更
+            case "${file}" in
+              backend/*|deploy/docker-compose.prod.yml)
+                BACKEND="true"
+                ;;
+            esac
+
+            # 数据库迁移变更
+            case "${file}" in
+              backend/db/migrate/*)
+                DB="true"
+                ;;
+            esac
+          done <<< "${CHANGED}"
+
+          # 纯文档变更不部署
+          if [[ "${DOCS_ONLY}" == "true" ]]; then
+            echo "Docs-only change, skipping deploy."
+            echo "frontend_changed=false" >> "$GITHUB_OUTPUT"
+            echo "backend_changed=false" >> "$GITHUB_OUTPUT"
+            echo "db_changed=false" >> "$GITHUB_OUTPUT"
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          SHOULD_DEPLOY="false"
+          if [[ "${FRONTEND}" == "true" || "${BACKEND}" == "true" ]]; then
+            SHOULD_DEPLOY="true"
+          fi
+
+          echo "frontend_changed=${FRONTEND}" >> "$GITHUB_OUTPUT"
+          echo "backend_changed=${BACKEND}" >> "$GITHUB_OUTPUT"
+          echo "db_changed=${DB}" >> "$GITHUB_OUTPUT"
+          echo "should_deploy=${SHOULD_DEPLOY}" >> "$GITHUB_OUTPUT"
+
+  # ── 前端测试 ─────────────────────────────────────────────────────────────────
+  test_frontend:
+    needs: detect
+    if: needs.detect.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: fronted/apps/web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: fronted/apps/web
+        run: npm ci
+
+      - name: Lint
+        working-directory: fronted/apps/web
+        run: npm run lint
+
+      - name: Build
+        working-directory: fronted/apps/web
+        run: npm run build
+
+  # ── 后端测试 ─────────────────────────────────────────────────────────────────
+  test_backend:
+    needs: detect
+    if: needs.detect.outputs.backend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Run tests
+        working-directory: backend
+        run: go test ./...
+
+  # ── 构建并推送 Web 镜像 ─────────────────────────────────────────────────────
+  build_web:
+    needs: [detect, test_frontend]
+    if: needs.detect.outputs.frontend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v6
+        with:
+          context: fronted/apps/web
+          push: true
+          tags: |
+            ${{ needs.detect.outputs.web_image_base }}:${{ github.sha }}
+            ${{ needs.detect.outputs.web_image_base }}:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 构建并推送 Backend 镜像 ─────────────────────────────────────────────────
+  build_backend:
+    needs: [detect, test_backend]
+    if: needs.detect.outputs.backend_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: true
+          tags: |
+            ${{ needs.detect.outputs.backend_image_base }}:${{ github.sha }}
+            ${{ needs.detect.outputs.backend_image_base }}:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ── 部署到生产服务器 ────────────────────────────────────────────────────────
+  deploy:
+    needs: [detect, build_web, build_backend]
+    if: |
+      always() &&
+      needs.detect.result == 'success' &&
+      needs.detect.outputs.should_deploy == 'true' &&
+      (needs.build_web.result == 'success' || needs.build_web.result == 'skipped') &&
+      (needs.build_backend.result == 'success' || needs.build_backend.result == 'skipped')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: production-main
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+          eval "$(ssh-agent -s)"
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" | ssh-add -
+          echo "SSH_AUTH_SOCK=${SSH_AUTH_SOCK}" >> "$GITHUB_ENV"
+
+      - name: Deploy via SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          SHA: ${{ github.sha }}
+          FRONTEND_CHANGED: ${{ needs.detect.outputs.frontend_changed }}
+          BACKEND_CHANGED: ${{ needs.detect.outputs.backend_changed }}
+          DB_CHANGED: ${{ needs.detect.outputs.db_changed }}
+          WEB_IMAGE: ${{ needs.detect.outputs.web_image_base }}:${{ github.sha }}
+          BACKEND_IMAGE: ${{ needs.detect.outputs.backend_image_base }}:${{ github.sha }}
+        run: |
+          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "${DEPLOY_PATH}/deploy.sh" \
+              --sha "${SHA}" \
+              --frontend-changed "${FRONTEND_CHANGED}" \
+              --backend-changed "${BACKEND_CHANGED}" \
+              --db-changed "${DB_CHANGED}" \
+              --web-image "${WEB_IMAGE}" \
+              --backend-image "${BACKEND_IMAGE}"

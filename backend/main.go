@@ -33,6 +33,7 @@ func main() {
 
 	// 初始化路由
 	r := router.InitRouter(db)
+	r.Run()
 
 	// 启动服务（如果yaml里没有server，这里可以直接写端口，比如":8080"）
 	// 启动服务
