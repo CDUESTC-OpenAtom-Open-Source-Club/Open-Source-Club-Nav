@@ -39,7 +39,7 @@ func GetNavWithBusiness(c *gin.Context) {
 	switch nav.BusinessTable {
 	case "friend_links":
 		var links []model.FriendLink
-		db.Find(&links)
+		db.Order("sort ASC").Find(&links)
 		businessData = links
 	case "resource_matrix":
 		var resources []model.ResourceMatrix
