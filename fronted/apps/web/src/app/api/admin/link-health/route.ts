@@ -3,11 +3,13 @@ import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/admin-db";
 import { recordAdminActionLog } from "@/lib/admin-logs";
 import { MOCK_HEALTH } from "@/data/mock/health";
+import { getAllLinks } from "@/services/links";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 const LINK_CHECK_TIMEOUT_MS = 10000;
 const LINK_CHECK_CONCURRENCY = 6;
-const REALTIME_MIN_INTERVAL_MS = 20000;
+const REALTIME_MIN_INTERVAL_MS = 5000;
+const MOCK_REALTIME_INTERVAL_MS = 5000;
 
 type LinkHealthRow = {
   link_id: number;
@@ -20,6 +22,7 @@ type LinkHealthRow = {
 };
 
 let mockHealth: LinkHealthRow[] = MOCK_HEALTH.map((item) => ({ ...item }));
+let mockLastCheckedAt = 0;
 let realtimeCheckInFlight: Promise<{ checked: number; failed: number; at: string }> | null = null;
 let lastRealtimeCheckAt = 0;
 
@@ -32,24 +35,91 @@ function refreshMockHealth() {
   return mockHealth;
 }
 
+async function probeUrl(url: string): Promise<{
+  statusCode: number | null;
+  isOk: boolean;
+  message: string;
+}> {
+  const normalizedUrl = String(url || "").trim();
+  if (!normalizedUrl) {
+    return { statusCode: null, isOk: false, message: "empty url" };
+  }
+  if (normalizedUrl.startsWith("/")) {
+    return { statusCode: 200, isOk: true, message: "internal route" };
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LINK_CHECK_TIMEOUT_MS);
+  try {
+    const res = await fetch(normalizedUrl, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: controller.signal,
+      cache: "no-store",
+    });
+    const healthy = res.status >= 200 && res.status < 400;
+    return {
+      statusCode: res.status,
+      isOk: healthy,
+      message: healthy ? "" : `HTTP ${res.status}`,
+    };
+  } catch (e) {
+    const err = e as Error;
+    if (err?.name === "AbortError") {
+      return { statusCode: null, isOk: false, message: `timeout ${LINK_CHECK_TIMEOUT_MS}ms` };
+    }
+    return { statusCode: null, isOk: false, message: String(err?.message || "request failed").slice(0, 200) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function runMockHealthCheck() {
+  const links = await getAllLinks();
+  const activeLinks = links.filter((item) => Number(item.active ?? 1) === 1);
+  const list = await Promise.all(activeLinks.map(async (link) => {
+    const result = await probeUrl(String(link.url || ""));
+    return {
+      link_id: Number(link.id),
+      title: String(link.title || `#${link.id}`),
+      url: String(link.url || ""),
+      status_code: result.statusCode,
+      is_ok: result.isOk ? 1 : 0,
+      checked_at: new Date().toISOString(),
+      message: result.message,
+    } satisfies LinkHealthRow;
+  }));
+  mockHealth = list;
+  mockLastCheckedAt = Date.now();
+  return {
+    checked: list.length,
+    failed: list.filter((item) => !item.is_ok).length,
+    at: new Date().toISOString(),
+    health: list,
+  };
+}
+
 export async function GET() {
   if (USE_MOCK) {
-    return Response.json({ health: MOCK_HEALTH });
+    if (!mockHealth.length || Date.now() - mockLastCheckedAt >= MOCK_REALTIME_INTERVAL_MS) {
+      await runMockHealthCheck();
+    }
+    return Response.json({ health: mockHealth, refreshed_at: new Date().toISOString(), source: "mock_probe" });
   }
 
   try {
     await ensureAdminTables();
     const session = await getAdminSessionFromCookies();
     if (!session) return Response.json({ error: "未登录" }, { status: 401 });
-    const shouldRealtime = true;
-    if (shouldRealtime) {
-      await runHealthCheck({
-        session,
-        force: false,
-        writeLog: false,
-        reason: "realtime_poll",
-      });
+    if (session.role !== "editor" && session.role !== "super") {
+      return Response.json({ error: "无权限" }, { status: 403 });
     }
+    await runHealthCheck({
+      session,
+      force: false,
+      writeLog: false,
+      reason: "realtime_poll",
+    });
 
     const [rows] = await pool.query(
       `SELECT h.nav_item_id AS link_id, h.url, h.status_code, h.is_ok, h.checked_at, h.message, h.response_time_ms, n.title
@@ -61,7 +131,7 @@ export async function GET() {
     return Response.json({ health: rows, refreshed_at: new Date(lastRealtimeCheckAt || Date.now()).toISOString() });
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
-      console.warn("[admin/link-health] GET 使用 mock 回退：", (error as Error)?.message || error);
+      console.warn("[admin/link-health] GET fallback mock:", (error as Error)?.message || error);
       return Response.json({ health: refreshMockHealth(), refreshed_at: new Date().toISOString() });
     }
     throw error;
@@ -70,14 +140,24 @@ export async function GET() {
 
 export async function POST() {
   if (USE_MOCK) {
-    const health = refreshMockHealth();
-    return Response.json({ ok: true, checked: health.length, health });
+    const summary = await runMockHealthCheck();
+    return Response.json({
+      ok: true,
+      checked: summary.checked,
+      failed: summary.failed,
+      refreshed_at: summary.at,
+      health: summary.health,
+      source: "mock_probe",
+    });
   }
 
   try {
     await ensureAdminTables();
     const session = await getAdminSessionFromCookies();
     if (!session) return Response.json({ error: "未登录" }, { status: 401 });
+    if (session.role !== "editor" && session.role !== "super") {
+      return Response.json({ error: "无权限" }, { status: 403 });
+    }
     const summary = await runHealthCheck({
       session,
       force: true,
@@ -87,7 +167,7 @@ export async function POST() {
     return Response.json({ ok: true, checked: summary.checked, failed: summary.failed, refreshed_at: summary.at });
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
-      console.warn("[admin/link-health] POST 使用 mock 回退：", (error as Error)?.message || error);
+      console.warn("[admin/link-health] POST fallback mock:", (error as Error)?.message || error);
       const health = refreshMockHealth();
       return Response.json({ ok: true, checked: health.length, health });
     }
@@ -120,7 +200,6 @@ async function checkOneLink(link: { id: number; url: string }) {
     return { isOk: false };
   }
 
-  // 站内相对路径直接判定为可用，避免 Node fetch 解析相对路径失败。
   if (normalizedUrl.startsWith("/")) {
     await pool.query(
       `INSERT INTO nav_item_health (nav_item_id, url, status_code, is_ok, checked_at, message, response_time_ms)
@@ -137,38 +216,12 @@ async function checkOneLink(link: { id: number; url: string }) {
     return { isOk: true };
   }
 
-  let statusCode: number | null = null;
-  let isOk = 0;
-  let message = "";
-  let responseTimeMs: number | null = null;
-  const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, LINK_CHECK_TIMEOUT_MS);
   const startedAt = Date.now();
-
-  try {
-    const res = await fetch(normalizedUrl, {
-      method: "HEAD",
-      redirect: "follow",
-      signal: controller.signal,
-      cache: "no-store",
-    });
-    responseTimeMs = Math.max(0, Date.now() - startedAt);
-    statusCode = res.status;
-    isOk = res.ok ? 1 : 0;
-    if (!res.ok) message = `HTTP ${res.status}`;
-  } catch (e) {
-    const err = e as Error;
-    responseTimeMs = Math.max(0, Date.now() - startedAt);
-    if (err?.name === "AbortError") {
-      message = `timeout ${LINK_CHECK_TIMEOUT_MS}ms`;
-    } else {
-      message = String(err?.message || "request failed").slice(0, 200);
-    }
-  } finally {
-    clearTimeout(timer);
-  }
+  const result = await probeUrl(normalizedUrl);
+  const responseTimeMs = Math.max(0, Date.now() - startedAt);
+  const statusCode = result.statusCode;
+  const isOk = result.isOk ? 1 : 0;
+  const message = result.message;
 
   await pool.query(
     `INSERT INTO nav_item_health (nav_item_id, url, status_code, is_ok, checked_at, message, response_time_ms)

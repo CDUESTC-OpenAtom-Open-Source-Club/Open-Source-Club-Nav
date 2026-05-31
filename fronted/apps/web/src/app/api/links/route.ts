@@ -5,10 +5,11 @@
 import { getLinks, createLink, updateLink, deleteLink } from "@/services/links";
 import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import { ensureAdminTables } from "@/lib/admin-db";
-import type { NavModule, ResourceMatrixSubModule } from "@/types/links";
+import type { MiniGameType, NavModule, ResourceMatrixSubModule } from "@/types/links";
 
 const MODULES: NavModule[] = ["resource_matrix", "friend_links", "mini_games"];
 const RESOURCE_SUB_MODULES: ResourceMatrixSubModule[] = ["think_tank", "campus", "tools"];
+const MINI_GAME_TYPES: MiniGameType[] = ["internal", "external"];
 const DEFAULT_MODULE: NavModule = "friend_links";
 
 function parseModule(value: unknown): NavModule {
@@ -19,6 +20,12 @@ function parseResourceSubModule(value: unknown): ResourceMatrixSubModule | undef
   return RESOURCE_SUB_MODULES.includes(value as ResourceMatrixSubModule)
     ? (value as ResourceMatrixSubModule)
     : undefined;
+}
+
+function parseMiniGameType(value: unknown, url?: string): MiniGameType | undefined {
+  if (MINI_GAME_TYPES.includes(value as MiniGameType)) return value as MiniGameType;
+  if (!url) return undefined;
+  return /^https?:\/\//i.test(url) ? "external" : "internal";
 }
 
 async function requireEditorOrSuper() {
@@ -55,7 +62,12 @@ export async function POST(request: Request) {
     if (!body.title || !body.url) {
       return Response.json({ error: "title 和 url 为必填项" }, { status: 400 });
     }
-    const link = await createLink({ ...body, module: "friend_links" });
+    const navModule = parseModule(body.module);
+    const resourceSubModule = navModule === "resource_matrix"
+      ? parseResourceSubModule(body.resource_sub_module) || "think_tank"
+      : undefined;
+    const gameType = navModule === "mini_games" ? parseMiniGameType(body.game_type, body.url) : undefined;
+    const link = await createLink({ ...body, module: navModule, resource_sub_module: resourceSubModule, game_type: gameType });
     return Response.json({ link }, { status: 201 });
   } catch {
     return Response.json({ error: "数据库未配置，无法新增友链" }, { status: 503 });
@@ -69,7 +81,12 @@ export async function PUT(request: Request) {
   try {
     const body = await request.json();
     if (!body.id) return Response.json({ error: "id 为必填项" }, { status: 400 });
-    const link = await updateLink({ ...body, module: "friend_links" });
+    const navModule = body.module === undefined ? undefined : parseModule(body.module);
+    const resourceSubModule = navModule === "resource_matrix"
+      ? parseResourceSubModule(body.resource_sub_module) || "think_tank"
+      : undefined;
+    const gameType = navModule === "mini_games" ? parseMiniGameType(body.game_type, body.url) : undefined;
+    const link = await updateLink({ ...body, module: navModule, resource_sub_module: resourceSubModule, game_type: gameType });
     if (!link) return Response.json({ error: "友链不存在" }, { status: 404 });
     return Response.json({ link });
   } catch {
