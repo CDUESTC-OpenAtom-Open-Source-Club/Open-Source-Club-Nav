@@ -91,7 +91,7 @@ export default function LeftPanel({
     void syncFriendLinks();
     const timer = window.setInterval(() => {
       void syncFriendLinks();
-    }, 60000);
+    }, 5000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

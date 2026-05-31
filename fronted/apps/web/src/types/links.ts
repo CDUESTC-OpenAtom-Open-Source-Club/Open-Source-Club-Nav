@@ -1,6 +1,6 @@
 export type NavModule = "resource_matrix" | "friend_links" | "mini_games";
 export type ResourceMatrixSubModule = "think_tank" | "campus" | "tools";
-export type GameType = "internal" | "external";
+export type MiniGameType = "internal" | "external";
 
 export interface FriendLink {
   id: number;
@@ -11,7 +11,7 @@ export interface FriendLink {
   active: number;
   module?: NavModule;
   resource_sub_module?: ResourceMatrixSubModule;
-  game_type?: GameType | null;
+  game_type?: MiniGameType;
   click_count?: number;
   created_at: string;
   updated_at: string;
@@ -25,7 +25,7 @@ export interface LinkCreateInput {
   active?: number;
   module?: NavModule;
   resource_sub_module?: ResourceMatrixSubModule;
-  game_type?: GameType | null;
+  game_type?: MiniGameType;
 }
 
 export interface LinkUpdateInput {
@@ -37,5 +37,5 @@ export interface LinkUpdateInput {
   active?: number;
   module?: NavModule;
   resource_sub_module?: ResourceMatrixSubModule;
-  game_type?: GameType | null;
+  game_type?: MiniGameType;
 }

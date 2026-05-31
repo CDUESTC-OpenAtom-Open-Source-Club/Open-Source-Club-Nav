@@ -4,6 +4,7 @@ package handler
 import (
 	"net/http"
 	"open-source-club-nav/backend/model"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -22,7 +23,29 @@ import (
 // @Router /nav/search [get]
 func SearchNavItem(c *gin.Context) {
 	// 1. 获取请求参数
-	keyword := c.Query("keyword")
+	keyword := strings.TrimSpace(c.Query("keyword"))
+	if keyword == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "keyword is required"})
+		return
+	}
+
+	limit := 20
+	if rawLimit := strings.TrimSpace(c.DefaultQuery("limit", "")); rawLimit != "" {
+		if parsed, err := strconv.Atoi(rawLimit); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	offset := 0
+	if rawOffset := strings.TrimSpace(c.DefaultQuery("offset", "")); rawOffset != "" {
+		if parsed, err := strconv.Atoi(rawOffset); err == nil && parsed > 0 {
+			offset = parsed
+		}
+	}
+
 	var navItems []model.NavItem
 
 	// 2. 从Context中获取DB连接
@@ -38,10 +61,15 @@ func SearchNavItem(c *gin.Context) {
 	}
 
 	// 3. 模糊查询（标题或内容包含关键词）
-	likeKeyword := "%" + strings.TrimSpace(keyword) + "%"
-	if err := gormDB.Where("title LIKE ? OR content LIKE ?", likeKeyword, likeKeyword).Find(&navItems).Error; err != nil {
+	likeKeyword := "%" + keyword + "%"
+	if err := gormDB.
+		Where("title LIKE ? OR content LIKE ?", likeKeyword, likeKeyword).
+		Order("id ASC").
+		Limit(limit).
+		Offset(offset).
+		Find(&navItems).Error; err != nil {
 		zap.L().Error("搜索失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "搜索失败: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "search failed"})
 		return
 	}
 

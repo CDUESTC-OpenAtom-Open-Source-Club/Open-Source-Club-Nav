@@ -1,6 +1,7 @@
 import { getAdminSessionFromCookies } from "@/lib/admin-auth";
 import { ensureAdminTables } from "@/lib/admin-db";
 import pool from "@/lib/db";
+import { listMockAdminActionLogs } from "@/lib/admin-logs";
 
 const USE_MOCK = process.env.USE_MOCK_DATA === "true";
 
@@ -23,35 +24,11 @@ function parseJsonDetail(detail: unknown): unknown {
 }
 
 export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const limit = parseLimit(searchParams.get("limit"));
+
   if (USE_MOCK) {
-    return Response.json({
-      logs: [
-        {
-          id: 1,
-          link_id: 12,
-          action: "update_link",
-          actor_username: "demo-admin",
-          actor_role: "super",
-          created_at: "2026-05-30T09:21:00",
-          detail: {
-            changed_fields: ["title", "description"],
-            before: { title: "旧标题", description: "旧描述" },
-            after: { title: "新标题", description: "新描述" },
-          },
-        },
-        {
-          id: 2,
-          link_id: null,
-          action: "create_user",
-          actor_username: "demo-admin",
-          actor_role: "super",
-          created_at: "2026-05-30T08:55:00",
-          detail: {
-            created_user: { id: 7, username: "editor-b", role: "editor" },
-          },
-        },
-      ],
-    });
+    return Response.json({ logs: listMockAdminActionLogs(limit) });
   }
 
   try {
@@ -61,9 +38,6 @@ export async function GET(request: Request) {
     if (session.role !== "super" && session.role !== "editor") {
       return Response.json({ error: "无权限" }, { status: 403 });
     }
-
-    const { searchParams } = new URL(request.url);
-    const limit = parseLimit(searchParams.get("limit"));
 
     const [rows] = await pool.query(
       `SELECT
@@ -96,28 +70,15 @@ export async function GET(request: Request) {
       detail: parseJsonDetail(row.detail),
     }));
 
+    if (!logs.length && process.env.NODE_ENV !== "production") {
+      return Response.json({ logs: listMockAdminActionLogs(Math.min(limit, 2)) });
+    }
+
     return Response.json({ logs });
   } catch (error) {
     if (process.env.NODE_ENV !== "production") {
-      console.warn("[admin/logs] 使用 mock 回退：", (error as Error)?.message || error);
-      return Response.json({
-        logs: [
-          {
-            id: 1,
-            link_id: 12,
-            action: "update_link",
-            actor_username: "demo-admin",
-            actor_role: "super",
-            created_at: "2026-05-30T09:21:00",
-            detail: {
-              changed_fields: ["title", "description"],
-              before: { title: "旧标题", description: "旧描述" },
-              after: { title: "新标题", description: "新描述" },
-            },
-            link_title: "OpenAtom Docs",
-          },
-        ],
-      });
+      console.warn("[admin/logs] fallback mock:", (error as Error)?.message || error);
+      return Response.json({ logs: listMockAdminActionLogs(limit) });
     }
     throw error;
   }
