@@ -13,6 +13,7 @@ type User struct {
 	DeletedAt    *time.Time `gorm:"column:deleted_at" json:"-"`
 	Username     string     `gorm:"column:username" json:"username"`
 	Password     string     `gorm:"-" json:"password,omitempty"`
+	Session      string     `gorm:"column:session" json:"-"`
 }
 
 func (User) TableName() string {
