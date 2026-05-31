@@ -554,7 +554,7 @@ function CardBody({
               >
                 <img
                   src={c.avatar}
-                  alt={c.login}
+                  alt={`${c.login} GitHub avatar`}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
               </a>
@@ -646,7 +646,7 @@ function WorkCard({
         textAlign: "left",
         ...style,
       }}
-      aria-label={`Focus ${work.title}`}
+      aria-label={isCenter ? `打开作品 ${work.title}` : `聚焦作品 ${work.title}`}
       title={isCenter ? work.desc : "查看详情"}
     >
       <CardBody
@@ -1687,6 +1687,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const controlDividerColor = isDarkMode ? "#334155" : "#E2EAF2";
   const stageMinHeight = isDenseDesktop ? 180 : isTablet ? 230 : 280;
   const stageBottomGap = isDenseDesktop ? 8 : 10;
+  const carouselStatus = `${currentIndex + 1} / ${total}: ${focused?.title || "N/A"}`;
 
   const go = (dir: number) => {
     setCurrentIndex((i) => (i + dir + total) % total);
@@ -1783,6 +1784,9 @@ export default function WorksCarousel({ isDarkMode = false }) {
 
   return (
     <div
+      role="region"
+      aria-label="作品展示轮播"
+      aria-roledescription="carousel"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -1792,6 +1796,23 @@ export default function WorksCarousel({ isDarkMode = false }) {
         background: sectionBg,
       }}
     >
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        {carouselStatus}
+      </span>
       <div
         style={{
           display: "flex",
@@ -1882,7 +1903,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   opacity: viewMode === "carousel" ? 1 : 0.45,
                   transition: "all 0.18s ease",
                 }}
-                aria-label={autoPlay ? "Pause autoplay" : "Resume autoplay"}
+                aria-label={autoPlay ? "暂停自动播放" : "继续自动播放"}
+                aria-pressed={autoPlay}
                 title={autoPlay ? "Pause autoplay" : "Resume autoplay"}
                 onMouseEnter={(e) => {
                   if (viewMode === "carousel") {
@@ -1921,7 +1943,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   opacity: viewMode === "carousel" ? 1 : 0.45,
                   transition: "all 0.18s ease",
                 }}
-                aria-label="Next work"
+                aria-label="下一项作品"
                 title="Next"
                 onMouseEnter={(e) => {
                   if (viewMode === "carousel") {
@@ -1973,7 +1995,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 cursor: "pointer",
                 transition: "all 0.18s ease",
               }}
-              aria-label={`Switch to ${mode} view`}
+              aria-label={mode === "carousel" ? "切换到轮播视图" : "切换到列表视图"}
               title={mode === "carousel" ? "Carousel" : "List"}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-1px)";
@@ -2120,7 +2142,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
             border: `1px solid ${isDarkMode ? "rgba(51,65,85,0.72)" : "rgba(226,234,242,0.92)"}`,
             boxShadow: isFocused ? "inset 0 0 0 1px #BBDCF2" : "none",
           }}
-          aria-label="Member works carousel"
+          aria-label="成员作品轮播"
+          aria-roledescription="carousel"
         >
           <TechBackground />
 
@@ -2461,7 +2484,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 cursor: "pointer",
                 transition: "all 0.18s ease",
               }}
-              aria-label="Next work"
+              aria-label="下一项作品"
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-1px)";
                 e.currentTarget.style.boxShadow =

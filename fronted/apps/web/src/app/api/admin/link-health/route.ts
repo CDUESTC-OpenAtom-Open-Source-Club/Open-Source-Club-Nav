@@ -19,6 +19,8 @@ type LinkHealthRow = {
   checked_at: string;
   message: string;
   title: string;
+  module?: "resource_matrix" | "friend_links" | "mini_games";
+  resource_sub_module?: "think_tank" | "campus" | "tools" | null;
 };
 
 let mockHealth: LinkHealthRow[] = MOCK_HEALTH.map((item) => ({ ...item }));
@@ -87,6 +89,8 @@ async function runMockHealthCheck() {
       is_ok: result.isOk ? 1 : 0,
       checked_at: new Date().toISOString(),
       message: result.message,
+      module: link.module,
+      resource_sub_module: link.resource_sub_module || null,
     } satisfies LinkHealthRow;
   }));
   mockHealth = list;
@@ -122,7 +126,23 @@ export async function GET() {
     });
 
     const [rows] = await pool.query(
-      `SELECT h.nav_item_id AS link_id, h.url, h.status_code, h.is_ok, h.checked_at, h.message, h.response_time_ms, n.title
+      `SELECT
+         h.nav_item_id AS link_id,
+         h.url,
+         h.status_code,
+         h.is_ok,
+         h.checked_at,
+         h.message,
+         h.response_time_ms,
+         n.title,
+         CASE
+           WHEN n.category IS NULL OR n.category = '' THEN 'friend_links'
+           ELSE n.category
+         END AS module,
+         CASE
+           WHEN JSON_VALID(n.content) THEN JSON_UNQUOTE(JSON_EXTRACT(n.content, '$.resourceSubModule'))
+           ELSE NULL
+         END AS resource_sub_module
        FROM nav_item_health h
        LEFT JOIN nav_items n ON n.id = h.nav_item_id
        ORDER BY h.checked_at DESC
