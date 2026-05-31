@@ -76,7 +76,6 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 	privateGroup := r.Group("")
 	privateGroup.Use(middleware.SignAuth())
 	{
-		privateGroup.GET("/backend/admin/list", handler.GetAdminListHandler)
 		// 友情链接后台接口组
 		adminLinkGroup := privateGroup.Group("/api/admin/links")
 		{

@@ -3,15 +3,13 @@ package handler
 
 import (
 	"net/http"
-
-	"open-source-club-nav/backend/model" // 替换为你的项目实际包名
-=======
-	"open-source-club-nav/backend/model"
 	"strconv"
 	"strings"
 
+	"open-source-club-nav/backend/model"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -76,11 +74,6 @@ func GetNavWithBusiness(c *gin.Context) {
 // @Success 200 {array} model.FriendLink "搜索结果列表"
 // @Router /api/links [get]
 func SearchNavItem(c *gin.Context) {
-	// 1. 获取请求参数
-
-	keyword := c.Query("keyword")
-	var links []model.FriendLink
-=======
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	if keyword == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "keyword is required"})
@@ -104,9 +97,6 @@ func SearchNavItem(c *gin.Context) {
 		}
 	}
 
-	var navItems []model.NavItem
-
-
 	// 2. 从Context中获取DB连接
 	db, ok := c.Get("db")
 	if !ok {
@@ -119,14 +109,8 @@ func SearchNavItem(c *gin.Context) {
 		return
 	}
 
-
-	// 3. 执行查询（这里是示例，根据实际业务调整）
-	if keyword != "" {
-		gormDB.Where("title LIKE ?", "%"+keyword+"%").Find(&links)
-	} else {
-		gormDB.Find(&links)
-=======
 	// 3. 模糊查询（标题或内容包含关键词）
+	var navItems []model.NavItem
 	likeKeyword := "%" + keyword + "%"
 	if err := gormDB.
 		Where("title LIKE ? OR content LIKE ?", likeKeyword, likeKeyword).
@@ -137,9 +121,8 @@ func SearchNavItem(c *gin.Context) {
 		zap.L().Error("搜索失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "search failed"})
 		return
-
 	}
 
 	// 4. 返回结果
-	c.JSON(http.StatusOK, links)
+	c.JSON(http.StatusOK, navItems)
 }
