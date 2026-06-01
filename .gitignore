@@ -70,6 +70,12 @@ desktop.ini
 coverage/
 .playwright-mcp/
 
+# === IDE / tool configs ===
+.codebuddy/
+
+# === Compiled binaries ===
+backend/nav-server
+
 # === 临时文件 ===
 tmp_*.txt
 *.tmp

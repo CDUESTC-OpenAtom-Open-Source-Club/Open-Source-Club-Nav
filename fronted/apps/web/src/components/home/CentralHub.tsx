@@ -1188,24 +1188,20 @@ export default function CentralHub({
             .map((item) => ({
               title: String(item?.title || "").trim(),
               desc: String(item?.description || "").trim() || "后台新增资源",
-              url: String(item?.url || "").trim(),
+              url: String(item?.url || "").trim() || "#",
               tag: RESOURCE_SUB_DEFAULT_TAG[subModule],
             }))
-            .filter((item) => item.title && item.url);
+            .filter((item) => item.title);
 
-          const existingLinks = Array.isArray(category.links) ? category.links : [];
-          const seen = new Set(existingLinks.map((item) => `${item.title}::${item.url}`));
-          const appendedLinks = remoteLinks.filter((item) => {
-            const key = `${item.title}::${item.url}`;
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          });
+          // 后端有真实数据时完全替换模拟数据，不再追加
+          if (remoteLinks.length > 0) {
+            return {
+              ...category,
+              links: remoteLinks,
+            };
+          }
 
-          return {
-            ...category,
-            links: [...existingLinks, ...appendedLinks],
-          };
+          return category;
         });
 
         setResourceCategories(merged);
