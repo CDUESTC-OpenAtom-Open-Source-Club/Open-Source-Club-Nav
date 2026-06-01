@@ -1,96 +1,7 @@
 "use client";
-import styled from "styled-components";
+import styles from "./ThemeModeSwitch.module.css";
 
 export type ThemeMode = "light" | "dark" | "auto";
-
-const StyledWrapper = styled.div`
-  .switch {
-    font-size: inherit;
-    position: relative;
-    display: inline-block;
-    width: 4em;
-    height: 2.2em;
-    border-radius: 30px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    cursor: pointer;
-  }
-
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: #2a2a2a;
-    transition: 0.4s;
-    border-radius: 30px;
-    overflow: hidden;
-  }
-
-  .slider:before {
-    position: absolute;
-    content: "";
-    height: 1.2em;
-    width: 1.2em;
-    border-radius: 20px;
-    left: 0.5em;
-    bottom: 0.5em;
-    transition: 0.4s;
-    transition-timing-function: cubic-bezier(0.81, -0.04, 0.38, 1.5);
-    box-shadow: inset 8px -4px 0px 0px #fff;
-  }
-
-  .switch[data-checked="true"] .slider {
-    background-color: #00a6ff;
-  }
-
-  .switch[data-checked="true"] .slider:before {
-    transform: translateX(1.8em);
-    box-shadow: inset 15px -4px 0px 15px #ffcf48;
-  }
-
-  .star {
-    background-color: #fff;
-    border-radius: 50%;
-    position: absolute;
-    width: 5px;
-    transition: all 0.4s;
-    height: 5px;
-  }
-
-  .star_1 {
-    left: 2.5em;
-    top: 0.5em;
-  }
-
-  .star_2 {
-    left: 2.2em;
-    top: 1.2em;
-  }
-
-  .star_3 {
-    left: 3em;
-    top: 0.9em;
-  }
-
-  .switch[data-checked="true"] .slider .star {
-    opacity: 0;
-  }
-
-  .cloud {
-    width: 3.5em;
-    position: absolute;
-    bottom: -1.4em;
-    left: -1.1em;
-    opacity: 0;
-    transition: all 0.4s;
-  }
-
-  .switch[data-checked="true"] .slider .cloud {
-    opacity: 1;
-  }
-`;
 
 export function ThemeModeSwitch({
   compact,
@@ -104,16 +15,15 @@ export function ThemeModeSwitch({
   const nextMode = isDarkMode ? "light" : "dark";
 
   return (
-    <StyledWrapper
+    <div
+      className={styles.wrapper}
       style={{
         fontSize: compact ? "11px" : "15px",
-        display: "inline-block",
-        verticalAlign: "middle",
       }}
     >
       <button
         type="button"
-        className="switch"
+        className={styles.switch}
         role="switch"
         aria-checked={!isDarkMode}
         aria-label={isDarkMode ? "切换到白天模式" : "切换到夜间模式"}
@@ -127,17 +37,12 @@ export function ThemeModeSwitch({
           event.preventDefault();
           onThemeModeChange(nextMode);
         }}
-        style={{
-          border: "none",
-          padding: 0,
-          background: "transparent",
-        }}
       >
-        <span className="slider">
-          <span className="star star_1" />
-          <span className="star star_2" />
-          <span className="star star_3" />
-          <svg viewBox="0 0 16 16" className="cloud_1 cloud">
+        <span className={styles.slider}>
+          <span className={`${styles.star} ${styles.star1}`} />
+          <span className={`${styles.star} ${styles.star2}`} />
+          <span className={`${styles.star} ${styles.star3}`} />
+          <svg viewBox="0 0 16 16" className={styles.cloud}>
             <path
               transform="matrix(.77976 0 0 .78395-299.99-418.63)"
               fill="#fff"
@@ -146,6 +51,6 @@ export function ThemeModeSwitch({
           </svg>
         </span>
       </button>
-    </StyledWrapper>
+    </div>
   );
 }

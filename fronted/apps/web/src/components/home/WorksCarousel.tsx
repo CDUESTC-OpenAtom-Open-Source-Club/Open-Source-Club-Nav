@@ -13,7 +13,6 @@ import {
   Radar,
   Sparkles,
 } from "lucide-react";
-import { WORKS } from "@/data/works";
 import TechBackground from "./TechBackground";
 import { trackOutboundClick } from "@/lib/track-outbound";
 
@@ -238,32 +237,12 @@ const chooseGhostDirection = (
 };
 
 function getContributorsForWork(work: any, repoContributors: Record<string, any[]> = {}) {
-  // 优先使用 GitHub API 异步获取的真实贡献者
+  // 使用 GitHub API 异步获取的真实贡献者
   if (work.projectUrl && repoContributors[work.projectUrl] && repoContributors[work.projectUrl].length > 0) {
     return repoContributors[work.projectUrl];
   }
-
-  const basePool = [
-    { login: "muzimu217", avatar: "https://github.com/muzimu217.png", url: "https://github.com/muzimu217", contributions: 42 },
-    { login: "LRXZH", avatar: "https://github.com/LRXZH.png", url: "https://github.com/LRXZH", contributions: 28 },
-    { login: "CDUESTC-OpenAtom-Open-Source-Club", avatar: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club.png", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club", contributions: 12 }
-  ];
-
-  if (work.author === "Zhang Wei" || work.author === "CDUESTC-OpenAtom-Open-Source-Club") {
-    return [
-      { login: "muzimu217", avatar: "https://github.com/muzimu217.png", url: "https://github.com/muzimu217", contributions: 42 },
-      { login: "LRXZH", avatar: "https://github.com/LRXZH.png", url: "https://github.com/LRXZH", contributions: 28 },
-      { login: "CDUESTC-OpenAtom-Open-Source-Club", avatar: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club.png", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club", contributions: 12 }
-    ];
-  }
-  if (work.author === "Liu Fang" || work.author === "Chen Hao") {
-    return [
-      { login: "LRXZH", avatar: "https://github.com/LRXZH.png", url: "https://github.com/LRXZH", contributions: 28 },
-      { login: "muzimu217", avatar: "https://github.com/muzimu217.png", url: "https://github.com/muzimu217", contributions: 15 },
-      { login: "CDUESTC-OpenAtom-Open-Source-Club", avatar: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club.png", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club", contributions: 8 }
-    ];
-  }
-  return basePool;
+  // 无数据时返回空数组，不再使用硬编码 fallback
+  return [];
 }
 
 function CardBody({
@@ -554,7 +533,7 @@ function CardBody({
               >
                 <img
                   src={c.avatar}
-                  alt={c.login}
+                  alt={`${c.login} GitHub avatar`}
                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
               </a>
@@ -646,7 +625,7 @@ function WorkCard({
         textAlign: "left",
         ...style,
       }}
-      aria-label={`Focus ${work.title}`}
+      aria-label={isCenter ? `打开作品 ${work.title}` : `聚焦作品 ${work.title}`}
       title={isCenter ? work.desc : "查看详情"}
     >
       <CardBody
@@ -1561,8 +1540,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const [isMobile, setIsMobile] = useState(false);
   const [isTablet, setIsTablet] = useState(false);
   const [isShortViewport, setIsShortViewport] = useState(false);
-  const [worksData, setWorksData] = useState(WORKS);
-  const [worksSource, setWorksSource] = useState("fallback");
+  const [worksData, setWorksData] = useState<any[]>([]);
+  const [worksSource, setWorksSource] = useState("loading");
   const [hoveredRole, setHoveredRole] = useState(null);
   const [repoContributors, setRepoContributors] = useState({});
 
@@ -1612,18 +1591,27 @@ export default function WorksCarousel({ isDarkMode = false }) {
   useEffect(() => {
     const abortRef = new AbortController();
 
+    const parseTags = (tags: any): string[] => {
+      if (Array.isArray(tags)) return tags;
+      if (typeof tags === "string") {
+        try { const parsed = JSON.parse(tags); if (Array.isArray(parsed)) return parsed; } catch {}
+      }
+      return [];
+    };
+
     const fetchWorks = () => {
       fetch("/api/works", { signal: abortRef.signal })
         .then((res) => (res.ok ? res.json() : null))
         .then((payload) => {
-          if (!abortRef.signal.aborted && Array.isArray(payload?.works) && payload.works.length > 0) {
+          if (abortRef.signal.aborted) return;
+          if (Array.isArray(payload?.works) && payload.works.length > 0) {
             const mapped = payload.works.map((w: any) => ({
               id: w.id,
               title: w.title || "untitled",
               desc: w.description || "",
               author: w.author_name || "",
               avatar: w.author_avatar || (w.author_name || "").slice(0, 2).toUpperCase(),
-              tags: Array.isArray(w.tags) ? w.tags : [],
+              tags: parseTags(w.tags),
               color: w.color || "#0A84FF",
               status: w.status || "开发中",
               stars: w.stars || 0,
@@ -1637,6 +1625,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
             }));
             setWorksData(mapped);
             setWorksSource(payload.source || "api");
+          } else {
+            setWorksSource(payload?.source || "empty");
           }
         })
         .catch(() => {});
@@ -1687,9 +1677,10 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const controlDividerColor = isDarkMode ? "#334155" : "#E2EAF2";
   const stageMinHeight = isDenseDesktop ? 180 : isTablet ? 230 : 280;
   const stageBottomGap = isDenseDesktop ? 8 : 10;
+  const carouselStatus = `${currentIndex + 1} / ${total}: ${focused?.title || "N/A"}`;
 
   const go = (dir: number) => {
-    setCurrentIndex((i) => (i + dir + total) % total);
+    if (total > 0) setCurrentIndex((i) => (i + dir + total) % total);
   };
 
   useEffect(() => {
@@ -1737,11 +1728,12 @@ export default function WorksCarousel({ isDarkMode = false }) {
 
 
   const getCardStyle = (idx: number) => {
+    if (!total || !Number.isFinite(total)) return null;
     const diff = (idx - currentIndex + total) % total;
     const normalized = diff > total / 2 ? diff - total : diff;
     const absD = Math.abs(normalized);
 
-    if (absD > 2) return null;
+    if (!Number.isFinite(absD) || absD > 2) return null;
 
     const rotateStep = isDenseDesktop ? 8 : isTablet ? 9 : 10;
     const depthStep = isDenseDesktop ? 60 : isTablet ? 75 : 90;
@@ -1783,6 +1775,9 @@ export default function WorksCarousel({ isDarkMode = false }) {
 
   return (
     <div
+      role="region"
+      aria-label="作品展示轮播"
+      aria-roledescription="carousel"
       style={{
         display: "flex",
         flexDirection: "column",
@@ -1792,6 +1787,23 @@ export default function WorksCarousel({ isDarkMode = false }) {
         background: sectionBg,
       }}
     >
+      <span
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        {carouselStatus}
+      </span>
       <div
         style={{
           display: "flex",
@@ -1882,7 +1894,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   opacity: viewMode === "carousel" ? 1 : 0.45,
                   transition: "all 0.18s ease",
                 }}
-                aria-label={autoPlay ? "Pause autoplay" : "Resume autoplay"}
+                aria-label={autoPlay ? "暂停自动播放" : "继续自动播放"}
+                aria-pressed={autoPlay}
                 title={autoPlay ? "Pause autoplay" : "Resume autoplay"}
                 onMouseEnter={(e) => {
                   if (viewMode === "carousel") {
@@ -1921,7 +1934,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   opacity: viewMode === "carousel" ? 1 : 0.45,
                   transition: "all 0.18s ease",
                 }}
-                aria-label="Next work"
+                aria-label="下一项作品"
                 title="Next"
                 onMouseEnter={(e) => {
                   if (viewMode === "carousel") {
@@ -1973,7 +1986,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 cursor: "pointer",
                 transition: "all 0.18s ease",
               }}
-              aria-label={`Switch to ${mode} view`}
+              aria-label={mode === "carousel" ? "切换到轮播视图" : "切换到列表视图"}
               title={mode === "carousel" ? "Carousel" : "List"}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-1px)";
@@ -2120,7 +2133,8 @@ export default function WorksCarousel({ isDarkMode = false }) {
             border: `1px solid ${isDarkMode ? "rgba(51,65,85,0.72)" : "rgba(226,234,242,0.92)"}`,
             boxShadow: isFocused ? "inset 0 0 0 1px #BBDCF2" : "none",
           }}
-          aria-label="Member works carousel"
+          aria-label="成员作品轮播"
+          aria-roledescription="carousel"
         >
           <TechBackground />
 
@@ -2348,13 +2362,15 @@ export default function WorksCarousel({ isDarkMode = false }) {
             左右滑动查看作品
           </div>
 
-          <MobileWorkCard
-            work={worksData[currentIndex]}
-            isDarkMode={isDarkMode}
-            hoveredRole={hoveredRole}
-            setHoveredRole={setHoveredRole}
-            repoContributors={repoContributors}
-          />
+          {focused && (
+            <MobileWorkCard
+              work={focused}
+              isDarkMode={isDarkMode}
+              hoveredRole={hoveredRole}
+              setHoveredRole={setHoveredRole}
+              repoContributors={repoContributors}
+            />
+          )}
 
           <div
             style={{
@@ -2461,7 +2477,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 cursor: "pointer",
                 transition: "all 0.18s ease",
               }}
-              aria-label="Next work"
+              aria-label="下一项作品"
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-1px)";
                 e.currentTarget.style.boxShadow =

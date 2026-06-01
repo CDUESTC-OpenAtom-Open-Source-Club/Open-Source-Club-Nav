@@ -212,21 +212,25 @@ export default function HUDHeader({
           >
             <Radio size={12} color={isDarkMode ? "#60A5FA" : "#0A84FF"} />
             <span
+              aria-live="polite"
+              aria-label="社团标语"
+              role="status"
               style={{
                 fontSize: 12,
-                color: isDarkMode ? "#93C5FD" : "#0A84FF",
+                color: isDarkMode ? "#93C5FD" : "#005FCC",
                 fontWeight: 500,
                 fontFamily: '"Courier New", monospace',
                 letterSpacing: 0.5,
               }}
             >
-              {typeText}
+              {typeText || "KCOS 开放原子开源社团"}
               <span
+                aria-hidden="true"
                 style={{
                   display: "inline-block",
                   width: 6,
                   height: 12,
-                  background: isDarkMode ? "#93C5FD" : "#0A84FF",
+                  background: isDarkMode ? "#93C5FD" : "#005FCC",
                   verticalAlign: "middle",
                   marginLeft: 2,
                   animation: "blink 1s infinite",

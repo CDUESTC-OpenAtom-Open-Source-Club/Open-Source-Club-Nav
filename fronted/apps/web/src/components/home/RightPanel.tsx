@@ -25,7 +25,7 @@ type ActivityItem = {
   time: string;
   message: string;
   details?: string[];
-  actor: { avatar: string; login: string };
+  actor: { avatar: string; login: string; avatarUrl?: string | null };
   repo: string;
   branch?: string | null;
   commits?: number;
@@ -211,9 +211,18 @@ function ActivityCard({
               fontSize: 7,
               fontWeight: 700,
               color: item.color,
+              overflow: "hidden",
             }}
           >
-            {item.actor.avatar}
+            {item.actor.avatarUrl ? (
+              <img
+                src={item.actor.avatarUrl}
+                alt={item.actor.login}
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            ) : (
+              item.actor.avatar
+            )}
           </div>
           <span style={{ fontSize: 10, color: "#94A3B8" }}>{item.actor.login}</span>
           <span style={{ fontSize: 10, color: isDarkMode ? "#64748B" : "#CBD5E1" }}>•</span>

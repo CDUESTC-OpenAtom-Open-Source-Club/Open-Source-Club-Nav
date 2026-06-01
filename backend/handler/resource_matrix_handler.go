@@ -19,7 +19,9 @@ func SearchResourceMatrix(c *gin.Context) {
 	keyword := c.Query("keyword")
 	query := db
 	if keyword != "" {
-		query = query.Where("name LIKE ? OR category LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
+		query = query.Where("name LIKE ? OR category LIKE ?", "%"+keyword+"%", "%"+keyword+"%").Order("sort ASC")
+	} else {
+		query = query.Order("sort ASC") // 默认按sort字段排序
 	}
 
 	// 查询表数据

@@ -121,7 +121,7 @@ export default function GamesPage() {
 
           <div className="games-metrics">
             {[
-              { label: "操控方式", value: "鼠标 / 键盘 / 触屏", color: "#0A84FF" },
+              { label: "操控方式", value: "鼠标 / 键盘 / 触屏", color: "#005FCC" },
               { label: "游戏节奏", value: "新手慢速模式", color: "#10B981" },
               { label: "积分扩展", value: "排行榜", color: "#F59E0B" },
             ].map((item) => (
@@ -169,7 +169,7 @@ export default function GamesPage() {
                           }}
                         >
                           <span style={{ fontSize: 13, color: "#0F172A", fontWeight: 700 }}>{item.title}</span>
-                          <span style={{ fontSize: 11, color: "#64748B" }}>{item.description || item.url}</span>
+                          <span style={{ fontSize: 11, color: "#595959" }}>{item.description || item.url}</span>
                         </a>
                       );
                     })}

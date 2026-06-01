@@ -55,6 +55,7 @@ export default function HomePage() {
   const [isTabletViewport, setIsTabletViewport] = useState(false);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileActivityOpen, setMobileActivityOpen] = useState(false);
   const [mobileMenuCloseSignal, setMobileMenuCloseSignal] = useState(0);
   const [mobileScrollHint, setMobileScrollHint] = useState(null);
   const [githubUserProfiles, setGithubUserProfiles] = useState({});
@@ -62,6 +63,7 @@ export default function HomePage() {
   const adminTapTimerRef = useRef(null);
   const lastMobileScrollTopRef = useRef(0);
   const mobileActivityRef = useRef(null);
+  const mobileActivityScrollTimerRef = useRef(null);
   const aboutScrollRef = useRef(null);
   const aboutSectionRefs = useRef({});
   const activeCategoryParam = searchParams.get("section");
@@ -94,7 +96,7 @@ export default function HomePage() {
         "--card-bg-strong": "#FFFFFF",
         "--text-primary": "#0F172A",
         "--text-secondary": "#334155",
-        "--text-muted": "#64748B",
+        "--text-muted": "#595959",
         "--border-soft": "#E5E7EB",
         "--shadow-card": "0 8px 18px rgba(148,163,184,0.14)",
       };
@@ -176,14 +178,26 @@ export default function HomePage() {
   }, [closeMobileLayers]);
 
   const openActivityPanel = useCallback(() => {
+    setMobileActivityOpen(true);
     closeMobileLayers();
-    window.setTimeout(() => {
+    if (mobileActivityScrollTimerRef.current) {
+      window.clearTimeout(mobileActivityScrollTimerRef.current);
+    }
+    mobileActivityScrollTimerRef.current = window.setTimeout(() => {
       mobileActivityRef.current?.scrollIntoView({
         behavior: "smooth",
         block: "start",
       });
     }, 1050);
   }, [closeMobileLayers]);
+
+  useEffect(() => {
+    return () => {
+      if (mobileActivityScrollTimerRef.current) {
+        window.clearTimeout(mobileActivityScrollTimerRef.current);
+      }
+    };
+  }, []);
 
   const mobileNavSections = buildMobileNavSections({
     activeCategory,
@@ -295,6 +309,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!isMobileViewport) {
       setMobileMenuOpen(false);
+      setMobileActivityOpen(false);
     }
   }, [isMobileViewport]);
 
@@ -401,11 +416,10 @@ export default function HomePage() {
     };
   }, [aboutOpen]);
 
-  if (!booted) {
-    return <StartupSplash onComplete={handleBootComplete} />;
-  }
-
   return (
+    <>
+      {!booted && <StartupSplash onComplete={handleBootComplete} />}
+
     <div
       className={isDarkMode ? "home-theme-dark" : "home-theme-light"}
       data-kcos-theme-root="true"
@@ -495,7 +509,7 @@ export default function HomePage() {
             onClosePanel={() => handleCategorySelect(null)}
             isDarkMode={isDarkMode}
           />
-          {isMobileViewport && !mobileMenuOpen && (
+          {isMobileViewport && !mobileMenuOpen && mobileActivityOpen && (
             <div
               ref={mobileActivityRef}
               style={{
@@ -523,6 +537,7 @@ export default function HomePage() {
           type="button"
           data-ui-touch="true"
           aria-label={mobileScrollHint === "down" ? "滑到底部" : "滑到顶部"}
+          aria-describedby="mobile-scroll-jump-description"
           onClick={handleMobileScrollJump}
           style={{
             position: "fixed",
@@ -534,7 +549,7 @@ export default function HomePage() {
             borderRadius: "50%",
             border: `1px solid ${isDarkMode ? "rgba(96,165,250,0.42)" : "rgba(10,132,255,0.28)"}`,
             background: isDarkMode ? "rgba(15,23,42,0.88)" : "rgba(255,255,255,0.9)",
-            color: "#0A84FF",
+            color: "#005FCC",
             boxShadow: isDarkMode
               ? "0 14px 28px rgba(0,0,0,0.34)"
               : "0 12px 24px rgba(15,23,42,0.16)",
@@ -555,6 +570,22 @@ export default function HomePage() {
           )}
         </button>
       )}
+      <span
+        id="mobile-scroll-jump-description"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        点击后在页面顶部和底部之间快速切换。
+      </span>
 
       <div
         style={{
@@ -884,13 +915,28 @@ export default function HomePage() {
                   <div className="about-section-sub">
                     项目 / 组织 / 宣策 / 外联 / 秘书处
                   </div>
-                  <div className="about-grid-cards">
-                    {ORG_DEPARTMENTS.map((dept) => (
-                      <div key={dept.name} className="about-card">
-                        <div className="about-card-title">{dept.name}</div>
-                        <div className="about-card-text">{dept.duty}</div>
-                      </div>
-                    ))}
+                  <div className="about-org-chart">
+                    <div className="about-org-chart__leaders">
+                      <div className="about-org-chart__leader">指导老师</div>
+                      <div className="about-org-chart__leader">会长</div>
+                      <div className="about-org-chart__leader about-org-chart__leader--vice">副会长</div>
+                    </div>
+                    <div className="about-org-chart__trunk" />
+                    <div className="about-org-chart__heads">
+                      {ORG_DEPARTMENTS.map((dept) => (
+                        <div key={`head-${dept.name}`} className="about-org-chart__head">
+                          <div className="about-org-chart__head-title">{dept.name}部长</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="about-org-chart__details">
+                      {ORG_DEPARTMENTS.map((dept) => (
+                        <div key={`detail-${dept.name}`} className="about-org-chart__detail">
+                          <div className="about-org-chart__detail-title">{dept.name}</div>
+                          <div className="about-org-chart__detail-text">{dept.duty}</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </section>
 
@@ -1100,8 +1146,19 @@ export default function HomePage() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="about-member-link"
+                              aria-label={`打开 ${member.name} 的 GitHub 主页`}
+                              title="GitHub"
                             >
-                              GitHub
+                              <svg
+                                viewBox="0 0 16 16"
+                                width="16"
+                                height="16"
+                                fill="currentColor"
+                                aria-hidden="true"
+                                focusable="false"
+                              >
+                                <path d="M8 0.45C3.82 0.45 0.45 3.82 0.45 8c0 3.34 2.17 6.17 5.18 7.17 0.38 0.07 0.52-0.16 0.52-0.36 0-0.18-0.01-0.77-0.01-1.39-2.1 0.46-2.54-0.89-2.54-0.89-0.34-0.87-0.84-1.1-0.84-1.1-0.69-0.47 0.05-0.46 0.05-0.46 0.76 0.05 1.16 0.78 1.16 0.78 0.68 1.16 1.78 0.83 2.21 0.63 0.07-0.49 0.27-0.83 0.49-1.02-1.68-0.19-3.44-0.84-3.44-3.73 0-0.82 0.29-1.5 0.78-2.03-0.08-0.19-0.34-0.96 0.07-2 0 0 0.64-0.2 2.08 0.78A7.2 7.2 0 0 1 8 4.32c0.64 0 1.28 0.09 1.88 0.26 1.44-0.98 2.08-0.78 2.08-0.78 0.41 1.04 0.15 1.81 0.07 2 0.49 0.53 0.78 1.2 0.78 2.03 0 2.9-1.77 3.54-3.45 3.73 0.27 0.23 0.51 0.69 0.51 1.39 0 1-0.01 1.8-0.01 2.05 0 0.2 0.14 0.44 0.52 0.36A7.56 7.56 0 0 0 15.55 8C15.55 3.82 12.18 0.45 8 0.45Z" />
+                              </svg>
                             </a>
                           </div>
                         </div>
@@ -1303,14 +1360,16 @@ export default function HomePage() {
           min-height: 34px;
         }
         .about-member-link {
-          font-size: 11px;
-          color: #0A84FF;
+          width: 30px;
+          height: 30px;
+          color: #005FCC;
           text-decoration: none;
           border: 1px solid #BFDBFE;
           background: #EFF6FF;
-          border-radius: 999px;
-          padding: 4px 10px;
-          width: fit-content;
+          border-radius: 50%;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
           transition: all 0.18s ease;
         }
         .about-member-link:hover {
@@ -1324,6 +1383,178 @@ export default function HomePage() {
           justify-content: center;
           gap: 6px;
           flex-wrap: wrap;
+        }
+        .about-org-chart {
+          margin-top: 8px;
+          border: 1px solid #DBEAFE;
+          border-radius: 12px;
+          background: linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 100%);
+          padding: 12px 10px;
+          display: grid;
+          gap: 10px;
+        }
+        .about-org-chart__leaders {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 6px;
+          justify-items: center;
+        }
+        .about-org-chart__leader {
+          border: 1px solid #93C5FD;
+          border-radius: 10px;
+          background: #EFF6FF;
+          padding: 8px 10px;
+          text-align: center;
+          font-size: 12px;
+          font-weight: 700;
+          color: #1E3A8A;
+          min-width: min(320px, 100%);
+        }
+        .about-org-chart__leader--vice {
+          border-color: #BFDBFE;
+          background: #F8FBFF;
+        }
+        .about-org-chart__trunk {
+          height: 2px;
+          background: #BFDBFE;
+          border-radius: 999px;
+          margin: 1px 6%;
+        }
+        .about-org-chart__heads {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .about-org-chart__head {
+          border: 1px solid #DCE8F8;
+          border-radius: 10px;
+          background: #FFFFFF;
+          padding: 7px 8px;
+          min-height: 54px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          box-shadow: 0 5px 12px rgba(15,23,42,0.06);
+        }
+        .about-org-chart__head-title {
+          font-size: 11px;
+          font-weight: 700;
+          color: #1E293B;
+          line-height: 1.35;
+        }
+        .about-org-chart__details {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 8px;
+        }
+        .about-org-chart__detail {
+          border: 1px solid #E2E8F0;
+          border-radius: 10px;
+          background: #FFFFFF;
+          padding: 8px;
+          display: grid;
+          gap: 4px;
+          min-height: 120px;
+        }
+        .about-org-chart__detail-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: #1E293B;
+        }
+        .about-org-chart__detail-text {
+          font-size: 11px;
+          color: #475569;
+          line-height: 1.5;
+        }
+        .about-dept-flow {
+          display: none;
+          margin-top: 8px;
+          border: 1px solid #DBEAFE;
+          border-radius: 12px;
+          background: linear-gradient(180deg, #F8FBFF 0%, #FFFFFF 100%);
+          padding: 12px 10px;
+          display: grid;
+          gap: 10px;
+          position: relative;
+          overflow: hidden;
+        }
+        .about-dept-flow::before {
+          content: "";
+          position: absolute;
+          top: 46px;
+          left: 50%;
+          width: 2px;
+          height: calc(100% - 92px);
+          transform: translateX(-50%);
+          background: #BFDBFE;
+          opacity: 0.9;
+          pointer-events: none;
+        }
+        .about-dept-flow__top,
+        .about-dept-flow__bottom {
+          display: flex;
+          justify-content: center;
+          position: relative;
+          z-index: 1;
+        }
+        .about-dept-flow__mid {
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 8px;
+          position: relative;
+          z-index: 1;
+        }
+        .about-dept-flow__mid::before {
+          content: "";
+          position: absolute;
+          top: -7px;
+          left: 10%;
+          right: 10%;
+          height: 2px;
+          background: #BFDBFE;
+        }
+        .about-dept-flow__mid::after {
+          content: "";
+          position: absolute;
+          bottom: -7px;
+          left: 10%;
+          right: 10%;
+          height: 2px;
+          background: #BFDBFE;
+        }
+        .about-dept-node {
+          border: 1px solid #DCE8F8;
+          border-radius: 10px;
+          background: #FFFFFF;
+          padding: 8px;
+          display: grid;
+          gap: 4px;
+          min-height: 78px;
+          box-shadow: 0 6px 14px rgba(15,23,42,0.06);
+        }
+        .about-dept-node--hub {
+          min-width: min(320px, 88%);
+          text-align: center;
+          border-color: #93C5FD;
+          background: #EFF6FF;
+        }
+        .about-dept-node--result {
+          min-width: min(360px, 92%);
+          text-align: center;
+          border-color: #93C5FD;
+          background: #F0F9FF;
+        }
+        .about-dept-node__title {
+          font-size: 12px;
+          font-weight: 700;
+          color: #1E293B;
+          line-height: 1.3;
+        }
+        .about-dept-node__desc {
+          font-size: 11px;
+          color: #475569;
+          line-height: 1.45;
         }
         .about-timeline-card {
           position: relative;
@@ -1398,6 +1629,45 @@ export default function HomePage() {
           background: #0F172A !important;
           border-color: #334155 !important;
         }
+        .home-theme-dark .about-org-chart {
+          border-color: #334155;
+          background: #0F172A;
+        }
+        .home-theme-dark .about-org-chart__leader,
+        .home-theme-dark .about-org-chart__head,
+        .home-theme-dark .about-org-chart__detail {
+          border-color: #334155;
+          background: rgba(2,6,23,0.38);
+        }
+        .home-theme-dark .about-org-chart__leader {
+          color: #BFDBFE;
+        }
+        .home-theme-dark .about-org-chart__head-title,
+        .home-theme-dark .about-org-chart__detail-title {
+          color: #E2E8F0;
+        }
+        .home-theme-dark .about-org-chart__detail-text {
+          color: #94A3B8;
+        }
+        .home-theme-dark .about-dept-flow {
+          border-color: #334155;
+          background: #0F172A;
+        }
+        .home-theme-dark .about-dept-flow::before,
+        .home-theme-dark .about-dept-flow__mid::before,
+        .home-theme-dark .about-dept-flow__mid::after {
+          background: #334155;
+        }
+        .home-theme-dark .about-dept-node {
+          border-color: #334155;
+          background: rgba(2,6,23,0.38);
+        }
+        .home-theme-dark .about-dept-node__title {
+          color: #E2E8F0;
+        }
+        .home-theme-dark .about-dept-node__desc {
+          color: #94A3B8;
+        }
         [data-doubletap-armed="true"] {
           outline: 2px solid #38BDF8 !important;
           outline-offset: 2px !important;
@@ -1424,11 +1694,36 @@ export default function HomePage() {
           .about-nav button {
             min-width: 160px;
           }
+          .about-org-chart__heads,
+          .about-org-chart__details {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .about-org-chart__leaders {
+            grid-template-columns: 1fr;
+          }
+          .about-org-chart__trunk {
+            margin: 2px 0;
+          }
+          .about-dept-flow::before {
+            display: none;
+          }
+          .about-dept-flow__mid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+          }
+          .about-dept-flow__mid::before,
+          .about-dept-flow__mid::after {
+            display: none;
+          }
+          .about-dept-node--hub,
+          .about-dept-node--result {
+            min-width: 100%;
+          }
         }
         @media (min-width: 1201px) {
           .lg\\:hidden { display: none !important; }
         }
       `}</style>
     </div>
+    </>
   );
 }

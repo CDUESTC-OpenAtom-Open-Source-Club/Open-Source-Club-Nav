@@ -3,7 +3,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, BarChart3, Clock3, Eye, LayoutDashboard, MousePointerClick, ServerCog, Users } from "lucide-react";
-import { MOCK_HEALTH } from "@/data/mock/health";
 const MOCK_MODE = process.env.NEXT_PUBLIC_USE_MOCK_MODE === "true";
 
 type AdminUser = {
@@ -55,8 +54,39 @@ type HourStat = {
   link_clicks: number;
 };
 type StatMetricKey = "link_clicks" | "page_views" | "unique_visitors";
-type SystemInfo = { uptimeSec: number; cpuCores: number; mem: { usageRate: number } };
-type LinkHealth = { link_id: number; title: string; status_code: number | null; is_ok: number; message: string; checked_at: string };
+type SystemInfo = {
+  uptimeSec: number;
+  cpuCores: number;
+  mem: { usageRate: number };
+  network?: {
+    rxBytes: number | null;
+    txBytes: number | null;
+    totalBytes: number | null;
+    sampledAt: string;
+  };
+};
+
+const MOCK_SYSTEM_INFO: SystemInfo = {
+  uptimeSec: 3600,
+  cpuCores: 8,
+  mem: { usageRate: 42 },
+  network: {
+    rxBytes: 1.6 * 1024 * 1024 * 1024,
+    txBytes: 0.8 * 1024 * 1024 * 1024,
+    totalBytes: 2.4 * 1024 * 1024 * 1024,
+    sampledAt: new Date().toISOString(),
+  },
+};
+type LinkHealth = {
+  link_id: number;
+  title: string;
+  status_code: number | null;
+  is_ok: number;
+  message: string;
+  checked_at: string;
+  module?: NavModule;
+  resource_sub_module?: ResourceSubModule | null;
+};
 type LinkLog = {
   id: number;
   link_id: number | null;
@@ -127,26 +157,98 @@ async function readJsonSafe<T>(res: Response): Promise<T | null> {
   }
 }
 
-function formatLogDetail(detail: unknown): string {
-  if (detail === null || detail === undefined) return "-";
+function parseDetailObject(detail: unknown): Record<string, unknown> | null {
+  if (!detail) return null;
+  if (typeof detail === "object" && !Array.isArray(detail)) {
+    return detail as Record<string, unknown>;
+  }
   if (typeof detail === "string") {
     const text = detail.trim();
-    if (!text) return "-";
+    if (!text) return null;
     try {
       const parsed = JSON.parse(text);
-      return JSON.stringify(parsed);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
     } catch {
-      return text;
+      return { text };
     }
   }
-  if (typeof detail === "object") {
-    try {
-      return JSON.stringify(detail);
-    } catch {
-      return String(detail);
-    }
+  return null;
+}
+
+function moduleLabel(moduleValue: unknown, subModuleValue?: unknown): string {
+  const moduleKey = String(moduleValue || "");
+  if (moduleKey === "resource_matrix") {
+    const subKey = String(subModuleValue || "");
+    if (subKey === "campus") return "资源矩阵/校园";
+    if (subKey === "tools") return "资源矩阵/工具";
+    return "资源矩阵/智库";
   }
-  return String(detail);
+  if (moduleKey === "mini_games") return "小游戏";
+  if (moduleKey === "friend_links") return "友情链接";
+  return "未分类";
+}
+
+function toHumanDetail(log: LinkLog): string {
+  const detail = parseDetailObject(log.detail);
+  if (!detail) return "-";
+  const action = String(log.action || "").toLowerCase();
+
+  if (action.includes("health")) {
+    const checked = Number(detail.checked || 0);
+    const failed = Number(detail.failed || 0);
+    const reason = String(detail.reason || "");
+    const reasonText = reason === "manual_probe" ? "手动触发" : reason === "realtime_poll" ? "轮询触发" : "";
+    return `健康检测：共检测 ${checked} 项，异常 ${failed} 项${reasonText ? `（${reasonText}）` : ""}`;
+  }
+
+  if (action.includes("create_link")) {
+    const input = parseDetailObject(detail.input);
+    const title = String(input?.title || "");
+    const url = String(input?.url || "");
+    const moduleText = moduleLabel(input?.module, input?.resource_sub_module);
+    return `新增链接：${title || "未命名"}（${moduleText}）${url ? `，地址：${url}` : ""}`;
+  }
+
+  if (action.includes("update_link") || action.includes("disable_link") || action.includes("enable_link")) {
+    const changedFields = Array.isArray(detail.changed_fields)
+      ? detail.changed_fields.map((x) => String(x)).filter(Boolean)
+      : [];
+    const request = parseDetailObject(detail.request);
+    const moduleText = request
+      ? moduleLabel(request.module, request.resource_sub_module)
+      : "";
+    const modulePart = moduleText ? `，模块：${moduleText}` : "";
+    const changedPart = changedFields.length ? `，变更字段：${changedFields.join("、")}` : "";
+    const titlePart = request?.title ? `，标题：${String(request.title)}` : "";
+    return `更新链接${modulePart}${titlePart}${changedPart}`.replace(/^更新链接，/, "更新链接：");
+  }
+
+  if (action.includes("delete_link")) {
+    const before = parseDetailObject(detail.before);
+    const title = String(before?.title || "");
+    const moduleText = moduleLabel(before?.module, before?.resource_sub_module);
+    return `删除链接：${title || "未命名"}（${moduleText}）`;
+  }
+
+  if (action.includes("user")) {
+    const changedFields = Array.isArray(detail.changed_fields)
+      ? detail.changed_fields.map((x) => String(x)).filter(Boolean)
+      : [];
+    const hasPassword = Boolean(detail.request_password_masked);
+    if (hasPassword) return "用户操作：重置密码";
+    if (changedFields.includes("role")) return "用户操作：调整角色";
+    if (changedFields.length) return `用户操作：修改字段 ${changedFields.join("、")}`;
+    return "用户操作";
+  }
+
+  if (detail.text) return String(detail.text);
+  try {
+    return JSON.stringify(detail);
+  } catch {
+    return String(detail);
+  }
 }
 
 function getActionTag(action: string): { text: string; fg: string; bg: string } {
@@ -179,6 +281,60 @@ function getActionTag(action: string): { text: string; fg: string; bg: string } 
     return { text: "退出", fg: "#334155", bg: "#E2E8F0" };
   }
   return { text: action || "-", fg: "#475569", bg: "#F1F5F9" };
+}
+
+function formatDurationFromSec(totalSec: number): string {
+  const safe = Math.max(0, Math.floor(Number(totalSec || 0)));
+  const days = Math.floor(safe / 86400);
+  const hours = Math.floor((safe % 86400) / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  if (days > 0) {
+    return `${days}天 ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return "--";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let value = Math.max(0, bytes);
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const fixed = value >= 100 || unitIndex === 0 ? 0 : value >= 10 ? 1 : 2;
+  return `${value.toFixed(fixed)} ${units[unitIndex]}`;
+}
+
+function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
+  const source = input || ({} as SystemInfo);
+  const fallbackNetwork = {
+    rxBytes: MOCK_SYSTEM_INFO.network?.rxBytes ?? 0,
+    txBytes: MOCK_SYSTEM_INFO.network?.txBytes ?? 0,
+    totalBytes: MOCK_SYSTEM_INFO.network?.totalBytes ?? 0,
+    sampledAt: new Date().toISOString(),
+  };
+  const uptimeSec = Number(source.uptimeSec || 0) > 0 ? Number(source.uptimeSec) : MOCK_SYSTEM_INFO.uptimeSec;
+  const cpuCores = Number(source.cpuCores || 0) > 0 ? Number(source.cpuCores) : MOCK_SYSTEM_INFO.cpuCores;
+  const memUsage = Number(source.mem?.usageRate || 0);
+  const mem = {
+    usageRate: Number.isFinite(memUsage) && memUsage > 0 ? memUsage : MOCK_SYSTEM_INFO.mem.usageRate,
+  };
+  const totalBytesRaw = source.network?.totalBytes;
+  const hasRealNetwork = totalBytesRaw !== null && totalBytesRaw !== undefined && Number.isFinite(Number(totalBytesRaw));
+  const network: NonNullable<SystemInfo["network"]> = hasRealNetwork
+    ? {
+        rxBytes: source.network?.rxBytes === undefined ? null : source.network.rxBytes,
+        txBytes: source.network?.txBytes === undefined ? null : source.network.txBytes,
+        totalBytes: Number(totalBytesRaw),
+        sampledAt: source.network?.sampledAt || new Date().toISOString(),
+      }
+    : {
+        ...fallbackNetwork,
+      };
+  return { uptimeSec, cpuCores, mem, network };
 }
 
 function RepoTrendSparkline({
@@ -250,6 +406,7 @@ export default function AdminPage() {
   const [activeLinkModule, setActiveLinkModule] = useState<NavModule>("resource_matrix");
   const [activeResourceSubModule, setActiveResourceSubModule] = useState<ResourceSubModule>("think_tank");
   const [linksNavExpanded, setLinksNavExpanded] = useState(false);
+  const [focusedLinkId, setFocusedLinkId] = useState<number | null>(null);
   const [activeStatMetric, setActiveStatMetric] = useState<StatMetricKey>("link_clicks");
   const [statRange, setStatRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [hoveredMonthlyIndex, setHoveredMonthlyIndex] = useState<number | null>(null);
@@ -579,23 +736,22 @@ export default function AdminPage() {
     markSectionLoaded("popular");
   }, [markSectionLoaded]);
 
-  const loadOverview = useCallback(async () => {
-    await loadStats();
-
+  const loadSystem = useCallback(async () => {
     if (MOCK_MODE) {
-      setSystem({ uptimeSec: 3600, cpuCores: 8, mem: { usageRate: 42 } });
-      markSectionLoaded("overview");
+      setSystem(withSystemFallback(MOCK_SYSTEM_INFO));
       return;
     }
-
     const sysRes = await fetch("/api/admin/system", { cache: "no-store" });
     if (!sysRes.ok) throw new Error("加载系统信息失败");
     const sysData = await readJsonSafe<SystemInfo>(sysRes);
-    if (sysData) {
-      setSystem(sysData);
-    }
+    setSystem(withSystemFallback(sysData));
+  }, []);
+
+  const loadOverview = useCallback(async () => {
+    await loadStats();
+    await loadSystem();
     markSectionLoaded("overview");
-  }, [loadStats, markSectionLoaded]);
+  }, [loadStats, loadSystem, markSectionLoaded]);
 
   const loadLinks = useCallback(async () => {
     const search = new URLSearchParams({ module: activeLinkModule });
@@ -640,17 +796,26 @@ export default function AdminPage() {
   }, [markSectionLoaded]);
 
   const loadHealth = useCallback(async () => {
-    if (MOCK_MODE) {
-      setHealth(MOCK_HEALTH);
-      markSectionLoaded("health");
-      return;
-    }
-
     const healthRes = await fetch("/api/admin/link-health", { cache: "no-store" });
     if (!healthRes.ok) throw new Error("加载健康检测失败");
     const healthData = await readJsonSafe<{ health?: LinkHealth[] }>(healthRes);
     setHealth(healthData?.health || []);
     markSectionLoaded("health");
+  }, [markSectionLoaded]);
+
+  const fetchLinksForScope = useCallback(async (
+    module: NavModule,
+    resourceSubModule?: ResourceSubModule,
+  ) => {
+    const search = new URLSearchParams({ module });
+    if (module === "resource_matrix" && resourceSubModule) {
+      search.set("resource_sub_module", resourceSubModule);
+    }
+    const linksRes = await fetch(`/api/admin/links?${search.toString()}`);
+    if (!linksRes.ok) throw new Error("加载导航模块数据失败");
+    const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
+    setLinks(linksData?.links || []);
+    markSectionLoaded("links");
   }, [markSectionLoaded]);
 
   const loadLogs = useCallback(async () => {
@@ -737,15 +902,7 @@ export default function AdminPage() {
       resource_sub_module: nextSubModule,
     }));
     try {
-      const search = new URLSearchParams({ module: nextModule });
-      if (nextModule === "resource_matrix") {
-        search.set("resource_sub_module", nextSubModule);
-      }
-      const linksRes = await fetch(`/api/admin/links?${search.toString()}`);
-      if (!linksRes.ok) throw new Error("加载导航模块数据失败");
-      const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
-      setLinks(linksData?.links || []);
-      markSectionLoaded("links");
+      await fetchLinksForScope(nextModule, nextModule === "resource_matrix" ? nextSubModule : undefined);
     } catch {
       setError("加载导航模块数据失败");
     }
@@ -756,19 +913,44 @@ export default function AdminPage() {
     setLinkForm((prev) => ({ ...prev, resource_sub_module: nextSubModule }));
     if (activeLinkModule !== "resource_matrix") return;
     try {
-      const search = new URLSearchParams({
-        module: "resource_matrix",
-        resource_sub_module: nextSubModule,
-      });
-      const linksRes = await fetch(`/api/admin/links?${search.toString()}`);
-      if (!linksRes.ok) throw new Error("加载资源矩阵子模块数据失败");
-      const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
-      setLinks(linksData?.links || []);
-      markSectionLoaded("links");
+      await fetchLinksForScope("resource_matrix", nextSubModule);
     } catch {
       setError("加载资源矩阵子模块数据失败");
     }
   };
+
+  const jumpToLinkFromHealth = useCallback(async (item: LinkHealth) => {
+    const module = (item.module || "friend_links") as NavModule;
+    const resourceSubModule = (item.resource_sub_module || "think_tank") as ResourceSubModule;
+    setError("");
+    setActiveSection("links");
+    setLinksNavExpanded(true);
+    setActiveLinkModule(module);
+    if (module === "resource_matrix") {
+      setActiveResourceSubModule(resourceSubModule);
+    }
+    setLinkForm((prev) => ({
+      ...prev,
+      module,
+      resource_sub_module: module === "resource_matrix" ? resourceSubModule : prev.resource_sub_module,
+    }));
+    try {
+      await fetchLinksForScope(module, module === "resource_matrix" ? resourceSubModule : undefined);
+      setFocusedLinkId(item.link_id);
+    } catch {
+      setError("跳转到内容管理失败");
+    }
+  }, [fetchLinksForScope]);
+
+  useEffect(() => {
+    if (activeSection !== "links" || !focusedLinkId) return;
+    const timer = window.setTimeout(() => {
+      const row = document.getElementById(`admin-link-row-${focusedLinkId}`);
+      if (!row) return;
+      row.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [activeSection, focusedLinkId, links]);
 
   const handleSidebarSectionClick = (sectionId: string) => {
     if (sectionId === "links") {
@@ -776,6 +958,7 @@ export default function AdminPage() {
       scrollToSection(sectionId);
       return;
     }
+    setLinksNavExpanded(false);
     scrollToSection(sectionId);
   };
 
@@ -980,6 +1163,14 @@ export default function AdminPage() {
     return () => window.clearInterval(intervalId);
   }, [activeSection, loadHealth]);
 
+  useEffect(() => {
+    if (activeSection !== "overview") return;
+    const intervalId = window.setInterval(() => {
+      loadSystem().catch(() => {});
+    }, 5000);
+    return () => window.clearInterval(intervalId);
+  }, [activeSection, loadSystem]);
+
   const openAutoDetectDialog = () => {
     setAutoDetectDraftMinutes(String(autoDetectIntervalMinutes));
     setAutoDetectDialogOpen(true);
@@ -1105,19 +1296,30 @@ export default function AdminPage() {
                     width: 120,
                     height: 120,
                     borderRadius: "50%",
-                    background: `conic-gradient(#3B82F6 ${Math.min(100, Math.round((system?.uptimeSec ?? 0) / 1000))}%, #E2E8F0 0)`,
+                    background: "conic-gradient(#3B82F6 100%, #E2E8F0 0)",
                     display: "grid",
                     placeItems: "center",
                     boxShadow: "0 10px 24px rgba(59,130,246,0.25)",
                   }}
                 >
                   <div style={{ width: 90, height: 90, borderRadius: "50%", background: "#fff", border: "1px solid #DBEAFE", display: "grid", placeItems: "center", textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#64748B" }}>运行时长</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: "#1D4ED8" }}>{Math.floor((system?.uptimeSec ?? 0) / 3600)}h</div>
+                    <div style={{ fontSize: 11, color: "#64748B" }}>流量消耗量</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: "#1D4ED8", lineHeight: 1.25 }}>
+                      {formatBytes(system?.network?.totalBytes)}
+                    </div>
                   </div>
                 </div>
               </div>
               <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ display: "grid", gap: 4 }}>
+                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
+                    <span>运行时长</span>
+                    <span>{formatDurationFromSec(system?.uptimeSec ?? 0)}</span>
+                  </div>
+                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
+                    <div style={{ width: `${Math.min(100, Math.max(8, ((system?.uptimeSec ?? 0) / 86400) * 100))}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#93C5FD,#2563EB)" }} />
+                  </div>
+                </div>
                 <div style={{ display: "grid", gap: 4 }}>
                   <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
                     <span>CPU 核心数</span>
@@ -1138,7 +1340,7 @@ export default function AdminPage() {
                 </div>
                 <div style={{ marginTop: 2, fontSize: 12, color: "#64748B", display: "flex", justifyContent: "space-between" }}>
                   <span>服务状态实时更新</span>
-                  <span>Uptime: {system?.uptimeSec ?? 0}s</span>
+                  <span>{system?.network?.sampledAt ? `采样: ${String(system.network.sampledAt).replace("T", " ").slice(0, 19)}` : "采样: -"}</span>
                 </div>
               </div>
             </div>
@@ -1859,7 +2061,11 @@ export default function AdminPage() {
             </thead>
             <tbody>
               {links.map((item) => (
-                <tr key={item.id}>
+                <tr
+                  key={item.id}
+                  id={`admin-link-row-${item.id}`}
+                  style={focusedLinkId === item.id ? { background: "#EFF6FF" } : undefined}
+                >
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
@@ -1945,6 +2151,7 @@ export default function AdminPage() {
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
                 <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>监控对象</th>
+                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>来源</th>
                 <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>探测状态</th>
                 <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>最近探测时间</th>
               </tr>
@@ -1952,7 +2159,27 @@ export default function AdminPage() {
             <tbody>
               {(health.length ? health : [{ link_id: 0, title: "暂无数据", status_code: null, is_ok: 1, message: "", checked_at: "-" }]).map((h) => (
                 <tr key={h.link_id} style={{ background: h.is_ok ? "#fff" : "#FFF1F0" }}>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>{h.title || `#${h.link_id}`}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>
+                    {h.link_id ? (
+                      <button
+                        type="button"
+                        onClick={() => { void jumpToLinkFromHealth(h); }}
+                        className="admin-btn-ghost"
+                        style={{ padding: "2px 8px", height: "auto", borderRadius: 6 }}
+                      >
+                        {h.title || `#${h.link_id}`}
+                      </button>
+                    ) : (h.title || `#${h.link_id}`)}
+                  </td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }}>
+                    {(() => {
+                      const module = (h.module || "friend_links") as NavModule;
+                      const sub = (h.resource_sub_module || "think_tank") as ResourceSubModule;
+                      const moduleLabel = NAV_MODULE_META[module]?.label || "未知";
+                      if (module !== "resource_matrix") return moduleLabel;
+                      return `${moduleLabel} / ${RESOURCE_SUB_MODULE_META[sub]?.label || "智库"}`;
+                    })()}
+                  </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
                     <span style={{ color: h.is_ok ? "#059669" : "#DC2626", fontWeight: 700 }}>
                       {h.is_ok ? "运行正常" : "服务不可用"}
@@ -2166,7 +2393,7 @@ export default function AdminPage() {
 
 function formatLogObjectAndDetail(log: LinkLog): string {
   const target = log.link_id ? `${log.link_title ? `${log.link_title} ` : ""}(#${log.link_id})` : "-";
-  const detail = "detail" in log ? formatLogDetail(log.detail) : "-";
+  const detail = "detail" in log ? toHumanDetail(log) : "-";
   if (target === "-" && detail === "-") return "-";
   if (target === "-") return detail;
   if (detail === "-") return target;

@@ -267,11 +267,15 @@ export default function AdminLoginPage() {
             <label className="admin-login-pro-field">
               <span>用户名</span>
               <input
+                id="admin-username"
+                name="username"
+                type="text"
                 className="admin-login-pro-input"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="请输入用户名"
                 autoComplete="username"
+                required
               />
             </label>
 
@@ -279,12 +283,15 @@ export default function AdminLoginPage() {
               <span>密码</span>
               <div className="admin-login-pro-password">
                 <input
+                  id="admin-password"
+                  name="current-password"
                   className="admin-login-pro-input"
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
                   autoComplete="current-password"
+                  required
                 />
                 <button
                   type="button"
