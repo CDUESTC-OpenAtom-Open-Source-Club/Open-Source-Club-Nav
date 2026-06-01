@@ -1,6 +1,6 @@
 # 08 - 前端 Web 页面模块报告
 
-> 模块路径：`fronted/apps/web/src/app/`  
+> 模块路径：`frontend/apps/web/src/app/`  
 > 分析文件：`(site)/`, `(admin)/`, `api/`, `layout.tsx`, `globals.css`
 
 ---

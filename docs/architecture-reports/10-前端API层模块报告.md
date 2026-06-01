@@ -1,6 +1,6 @@
 # 10 - 前端 API 层模块报告
 
-> 模块路径：`fronted/apps/web/src/app/api/`  
+> 模块路径：`frontend/apps/web/src/app/api/`  
 > 分析文件：23 个 API Route 文件
 
 ---

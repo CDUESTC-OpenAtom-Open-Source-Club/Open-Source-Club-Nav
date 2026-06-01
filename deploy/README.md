@@ -133,7 +133,7 @@ echo "ssh-ed25519 AAAA..." >> /home/deploy/.ssh/authorized_keys
 
 | 变更范围 | 构建 | 部署 |
 |---|---|---|
-| `fronted/**` | web 镜像 | 重启 web |
+| `frontend/**` | web 镜像 | 重启 web |
 | `backend/**` | backend 镜像 | 重启 backend |
 | 两者都改 | 两个镜像 | 两个都重启 |
 | `backend/db/migrate/**` | backend 镜像 | 部署前备份 SQLite（保留最近 30 个） |

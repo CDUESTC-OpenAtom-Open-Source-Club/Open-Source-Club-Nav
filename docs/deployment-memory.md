@@ -7,7 +7,7 @@
 前端使用 Next.js standalone 输出：
 
 ```bash
-cd fronted/apps/web
+cd frontend/apps/web
 npm ci
 npm run build
 ```

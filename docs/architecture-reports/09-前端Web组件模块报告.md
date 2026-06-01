@@ -1,6 +1,6 @@
 # 09 - 前端 Web 组件模块报告
 
-> 模块路径：`fronted/apps/web/src/components/`  
+> 模块路径：`frontend/apps/web/src/components/`  
 > 分析文件：`home/`（12个文件）、`shared/`
 
 ---

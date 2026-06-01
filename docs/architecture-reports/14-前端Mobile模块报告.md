@@ -1,6 +1,6 @@
 # 14 - 前端 Mobile 模块报告
 
-> 模块路径：`fronted/apps/mobile/`  
+> 模块路径：`frontend/apps/mobile/`  
 > 技术栈：Expo 54 + React Native 0.81 + Expo Router
 
 ---
@@ -49,7 +49,7 @@ Mobile 模块是项目的移动端应用，负责：
 ### ⚠️ 中等问题
 
 4. **与 Web 端共享代码少**
-   - `fronted/shared/` 只有 2 个文件
+   - `frontend/shared/` 只有 2 个文件
    - Mobile 和 Web 之间的类型、工具、逻辑复用率低
    - **建议**：提取共享的 types、services、utils
 
@@ -85,7 +85,7 @@ Mobile 模块是项目的移动端应用，负责：
 
 1. **依赖审计**：移除未使用的依赖
 2. **减少补丁**：寻找兼容的替代方案
-3. **提取共享代码**：在 `fronted/shared/` 中共享类型和逻辑
+3. **提取共享代码**：在 `frontend/shared/` 中共享类型和逻辑
 4. **统一 React 版本**：与 Web 端保持一致
 5. **优化 polyfill**：按需加载
 
