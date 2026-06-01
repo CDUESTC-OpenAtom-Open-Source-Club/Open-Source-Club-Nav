@@ -8,12 +8,12 @@ backend/nav-gateway
 
 # === Frontend ===
 # 构建产物
-fronted/apps/web/dist-prod/
-fronted/apps/web/.next/
-fronted/apps/web/build/
-fronted/apps/web/out/
-fronted/apps/mobile/dist/
-fronted/apps/mobile/web-build/
+frontend/apps/web/dist-prod/
+frontend/apps/web/.next/
+frontend/apps/web/build/
+frontend/apps/web/out/
+frontend/apps/mobile/dist/
+frontend/apps/mobile/web-build/
 
 # === Go ===
 # 编译产物

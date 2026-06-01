@@ -1,0 +1,68 @@
+.wrapper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.switch {
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  background: rgba(255, 255, 255, 0.78);
+  border-radius: 999px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.slider {
+  width: 42px;
+  height: 22px;
+  border-radius: 999px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
+  transition: all 220ms ease;
+}
+
+.switch[data-checked="true"] .slider {
+  justify-content: flex-start;
+  background: linear-gradient(90deg, #bfdbfe 0%, #dbeafe 100%);
+}
+
+.slider::after {
+  content: "";
+  width: 18px;
+  height: 18px;
+  margin: 2px;
+  border-radius: 50%;
+  background: #f8fafc;
+  box-shadow: 0 2px 6px rgba(2, 6, 23, 0.22);
+}
+
+.star {
+  position: absolute;
+  width: 2px;
+  height: 2px;
+  background: #bfdbfe;
+  border-radius: 50%;
+  opacity: 0.9;
+}
+
+.star1 { right: 8px; top: 6px; }
+.star2 { right: 12px; top: 11px; }
+.star3 { right: 6px; top: 14px; }
+
+.switch[data-checked="true"] .star {
+  opacity: 0;
+}
+
+.cloud {
+  position: absolute;
+  left: 6px;
+  width: 12px;
+  height: 12px;
+  opacity: 0;
+}
+
+.switch[data-checked="true"] .cloud {
+  opacity: 1;
+}

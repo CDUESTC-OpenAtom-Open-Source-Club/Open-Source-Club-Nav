@@ -1,7 +1,7 @@
 services:
   web:
     build:
-      context: ./fronted/apps/web
+      context: ./frontend/apps/web
     image: openatom-club-nav-web:prod
     restart: unless-stopped
     environment:
