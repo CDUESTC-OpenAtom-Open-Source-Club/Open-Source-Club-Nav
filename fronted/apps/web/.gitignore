@@ -33,6 +33,8 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 dev-server*.log
+dev.out.log
+dev.err.log
 temp_*.txt
 *.tmp
 *.bak

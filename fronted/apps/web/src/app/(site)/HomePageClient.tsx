@@ -416,11 +416,10 @@ export default function HomePage() {
     };
   }, [aboutOpen]);
 
-  if (!booted) {
-    return <StartupSplash onComplete={handleBootComplete} />;
-  }
-
   return (
+    <>
+      {!booted && <StartupSplash onComplete={handleBootComplete} />}
+
     <div
       className={isDarkMode ? "home-theme-dark" : "home-theme-light"}
       data-kcos-theme-root="true"
@@ -1725,5 +1724,6 @@ export default function HomePage() {
         }
       `}</style>
     </div>
+    </>
   );
 }

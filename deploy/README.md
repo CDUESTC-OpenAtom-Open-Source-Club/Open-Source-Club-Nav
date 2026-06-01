@@ -40,17 +40,18 @@ ssh-keyscan -p <port> <host> 2>/dev/null
 /opt/openatom-club/
 ├── docker-compose.prod.yml    # 生产 compose（由仓库 deploy/ 同步）
 ├── deploy.sh                  # 部署脚本（由仓库 deploy/ 同步）
-├── .env                       # 当前运行的镜像 tag
+├── .env                       # 当前运行的镜像 tag（WEB_IMAGE / BACKEND_IMAGE）
 ├── .env.rollback              # 上一次的 .env（回滚用）
 ├── env/
-│   ├── web.env                # 前端环境变量（数据库连接等）
-│   └── mysql.env              # MySQL root 密码等
+│   └── web.env                # 前端环境变量（仅 Next.js 用的公开变量）
 ├── config/
 │   └── backend/
-│       └── config.local.yaml  # 后端配置（JWT secret、MySQL DSN）
+│       └── config.docker.yaml # 后端配置（SQLite path、JWT secret）
 └── backups/
-    └── mysql/                 # 数据库迁移前自动备份
+    └── sqlite/                # 数据库迁移前自动备份（保留最近 30 个）
 ```
+
+> SQLite 嵌入式数据库，数据持久化在 docker named volume `backend-data`（无需 mysql 容器）。
 
 ## 服务器初始化
 
@@ -78,7 +79,7 @@ sudo -u deploy docker login ghcr.io
 ### 4. 创建目录结构
 
 ```bash
-sudo mkdir -p /opt/openatom-club/{env,config/backend,backups/mysql}
+sudo mkdir -p /opt/openatom-club/{env,config/backend,backups/sqlite}
 sudo chown -R deploy:deploy /opt/openatom-club
 ```
 
@@ -90,30 +91,23 @@ WEB_IMAGE=ghcr.io/<owner>/<repo>-web:main
 BACKEND_IMAGE=ghcr.io/<owner>/<repo>-backend:main
 ```
 
-**`/opt/openatom-club/env/mysql.env`**：
+**`/opt/openatom-club/env/web.env`**（前端公开 env，目前可为空文件或仅放非敏感变量）：
 ```bash
-MYSQL_ROOT_PASSWORD=your-secure-password-here
-MYSQL_DATABASE=test_db
+# 例如 sentry / analytics 等 NEXT_PUBLIC_* 变量；
+# 数据库相关变量已不需要 —— 前端不再直连数据库。
 ```
 
-**`/opt/openatom-club/env/web.env`**：
-```bash
-MYSQL_HOST=mysql
-MYSQL_PORT=3306
-MYSQL_USER=root
-MYSQL_PASSWORD=your-secure-password-here
-MYSQL_DATABASE=test_db
-ADMIN_AUTH_SECRET=your-jwt-secret-here
-```
-
-**`/opt/openatom-club/config/backend/config.local.yaml`**：
+**`/opt/openatom-club/config/backend/config.docker.yaml`**：
 ```yaml
-mysql:
-  dsn: "root:your-secure-password-here@tcp(mysql:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
+database:
+  # 必须指向容器内 /app/data 目录（已挂载到 docker volume backend-data）
+  path: "/app/data/app.db"
 jwt:
-  secret: "your-jwt-secret-here"
+  secret: "your-jwt-secret-here"  # 生产请用 openssl rand -hex 32 生成
   expire: 3600
 ```
+
+> ⚠️ 文件名必须是 **`config.docker.yaml`**，docker-compose.prod.yml 按这个名字挂载。
 
 ### 6. 首次启动
 
@@ -142,7 +136,7 @@ echo "ssh-ed25519 AAAA..." >> /home/deploy/.ssh/authorized_keys
 | `fronted/**` | web 镜像 | 重启 web |
 | `backend/**` | backend 镜像 | 重启 backend |
 | 两者都改 | 两个镜像 | 两个都重启 |
-| `backend/db/migrate/**` | backend 镜像 | 部署前备份 MySQL |
+| `backend/db/migrate/**` | backend 镜像 | 部署前备份 SQLite（保留最近 30 个） |
 | 仅 `docs/**`、`README.md` | 不构建 | 不部署 |
 
 ### 健康检查与回滚
@@ -166,6 +160,7 @@ echo "ssh-ed25519 AAAA..." >> /home/deploy/.ssh/authorized_keys
 
 - SSH 连接必须验证 host key（通过 `SSH_KNOWN_HOSTS`），禁用 `StrictHostKeyChecking=no`
 - 部署用户只加入 `docker` 组，不给 root 权限
-- 数据库密码、JWT secret 等敏感信息只存在服务器的 `env/` 和 `config/` 目录
-- MySQL 端口只绑定 `127.0.0.1`，不对外暴露
+- JWT secret 等敏感信息只存在服务器的 `config/backend/config.docker.yaml`
+- SQLite 数据库为嵌入式文件，不暴露任何网络端口（更安全）
+- 数据库文件位于 docker volume `backend-data`，建议定期 cron 拷贝到对象存储
 - GitHub Actions 权限最小化：`contents: read` + `packages: write`

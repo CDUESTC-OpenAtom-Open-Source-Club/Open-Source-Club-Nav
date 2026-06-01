@@ -174,12 +174,14 @@ const HOME_INFO_CARDS = [
     value: "kcos.club",
     hint: "brand identity",
     color: "#0A84FF",
+    href: "https://kcos.club",
   },
   {
     title: "社团官网",
     value: "opensouce-club.top",
     hint: "official website",
     color: "#10B981",
+    href: "https://opensouce-club.top/",
   },
   {
     title: "活动状态",
@@ -1611,68 +1613,93 @@ export default function CentralHub({
                 marginTop: isDenseViewport ? 0 : 2,
               }}
             >
-              {HOME_INFO_CARDS.map((item) => (
-                <div
-                  key={item.title}
-                  style={{
-                    border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-                    borderRadius: 10,
-                    background: isDarkMode
-                      ? "rgba(15,23,42,0.88)"
-                      : "rgba(255,255,255,0.86)",
-                    backdropFilter: "blur(6px)",
-                    padding: isDenseViewport ? "5px 8px" : "7px 8px",
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: isDenseViewport ? 1 : 2,
-                    minHeight: isDenseViewport ? 44 : 56,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 8,
-                      color: "#94A3B8",
-                      textTransform: "uppercase",
-                      letterSpacing: 1,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 5,
-                    }}
-                  >
-                    <span
+              {HOME_INFO_CARDS.map((item) => {
+                const cardStyle = {
+                  border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                  borderRadius: 10,
+                  background: isDarkMode
+                    ? "rgba(15,23,42,0.88)"
+                    : "rgba(255,255,255,0.86)",
+                  backdropFilter: "blur(6px)",
+                  padding: isDenseViewport ? "5px 8px" : "7px 8px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: isDenseViewport ? 1 : 2,
+                  minHeight: isDenseViewport ? 44 : 56,
+                  textDecoration: "none",
+                  color: "inherit",
+                  cursor: item.href ? "pointer" : "default",
+                  transition: item.href ? "transform 0.15s ease, box-shadow 0.15s ease" : undefined,
+                };
+
+                const content = (
+                  <>
+                    <div
                       style={{
-                        width: 5,
-                        height: 5,
-                        borderRadius: "50%",
-                        background: item.color,
+                        fontSize: 8,
+                        color: "#94A3B8",
+                        textTransform: "uppercase",
+                        letterSpacing: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 5,
                       }}
-                    />
-                    {item.title}
+                    >
+                      <span
+                        style={{
+                          width: 5,
+                          height: 5,
+                          borderRadius: "50%",
+                          background: item.color,
+                        }}
+                      />
+                      {item.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: isDarkMode ? "#E2E8F0" : "#334155",
+                        lineHeight: 1.2,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.value}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 8,
+                        color: "#94A3B8",
+                        letterSpacing: 0.3,
+                      }}
+                    >
+                      {item.hint}
+                    </div>
+                  </>
+                );
+
+                if (item.href) {
+                  return (
+                    <a
+                      key={item.title}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={cardStyle}
+                    >
+                      {content}
+                    </a>
+                  );
+                }
+
+                return (
+                  <div key={item.title} style={cardStyle}>
+                    {content}
                   </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: isDarkMode ? "#E2E8F0" : "#334155",
-                      lineHeight: 1.2,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {item.value}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 8,
-                      color: "#94A3B8",
-                      letterSpacing: 0.3,
-                    }}
-                  >
-                    {item.hint}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
 

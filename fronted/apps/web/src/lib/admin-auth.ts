@@ -1,4 +1,9 @@
-﻿import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+﻿// ⚠️ DEPRECATED: 此文件已弃用。
+// 前端不再自建认证系统，所有认证逻辑统一由 Go 后端处理。
+// 前端 BFF 仅做 Cookie 透传代理。
+// 保留此文件仅供回滚参考，后续应完全删除。
+
+import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
 export type AdminRole = "super" | "editor";

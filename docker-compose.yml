@@ -9,11 +9,23 @@ services:
       PORT: "4000"
       HOSTNAME: 0.0.0.0
       NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_BACKEND_API_URL: http://backend:8080
     ports:
       - "4000:4000"
     depends_on:
-      mysql:
+      backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:4000/api/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+          cpus: "1.0"
 
   backend:
     build:
@@ -23,36 +35,23 @@ services:
     environment:
       GIN_MODE: release
       CONFIG_PATH: /app/config.yaml
+      DB_PATH: /app/data/app.db
     ports:
       - "8080:8080"
     volumes:
-      - ./backend/config.local.yaml:/app/config.yaml:ro
-    depends_on:
-      mysql:
-        condition: service_healthy
-
-  mysql:
-    image: mysql:8.0
-    container_name: openatom-club-nav-mysql
-    restart: unless-stopped
-    command:
-      - --performance-schema=OFF
-      - --innodb-buffer-pool-size=128M
-      - --max-connections=50
-      - --table-open-cache=256
-      - --thread-cache-size=8
-    environment:
-      MYSQL_ROOT_PASSWORD: "openatom_dev_password"
-      MYSQL_DATABASE: "test_db"
-    ports:
-      - "3306:3306"
-    volumes:
-      - mysql-data:/var/lib/mysql
+      - ./backend/config.docker.yaml:/app/config.yaml:ro
+      - backend-data:/app/data
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+          cpus: "0.5"
 
 volumes:
-  mysql-data:
+  backend-data:

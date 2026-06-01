@@ -1,8 +1,0 @@
-mysql:
-  dsn: "root:336699@tcp(127.0.0.1:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
-jwt:
-  secret: "change-me"
-  expire: 3600
-
-# 启动时会自动执行 backend/db/migrate/migrations 下的 SQL 迁移。
-# 首次部署只需先创建数据库，再启动服务即可完成建表和基础种子导入。

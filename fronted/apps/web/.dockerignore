@@ -1,12 +1,40 @@
 .next
 node_modules
 npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 环境变量文件（敏感信息不进镜像）
 .env
 .env.local
 .env.*.local
+
+# 构建产物和工具配置
 Dockerfile
 .dockerignore
 README.md
 docs
 database
 tsconfig.tsbuildinfo
+
+# IDE 和编辑器
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+
+# 测试
+__tests__
+*.test.*
+*.spec.*
+coverage
+
+# 调试日志
+dev.err.log
+dev.out.log
+*.log

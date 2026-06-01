@@ -4,16 +4,21 @@ package model
 import "time"
 
 type User struct {
-	ID           uint       `gorm:"primaryKey" json:"id"`
-	Email        string     `gorm:"column:email" json:"email"`
-	PasswordHash string     `gorm:"column:password_hash" json:"-"`
-	Role         string     `gorm:"column:role" json:"role"`
-	CreatedAt    time.Time  `gorm:"column:created_at" json:"created_at"`
-	UpdatedAt    time.Time  `gorm:"column:updated_at" json:"updated_at"`
-	DeletedAt    *time.Time `gorm:"column:deleted_at" json:"-"`
-	Username     string     `gorm:"column:username" json:"username"`
-	Password     string     `gorm:"-" json:"password,omitempty"`
-	Session      string     `gorm:"column:session" json:"-"`
+	ID              uint       `gorm:"primaryKey" json:"id"`
+	Email           string     `gorm:"column:email" json:"email"`
+	PasswordHash    string     `gorm:"column:password_hash" json:"-"`
+	Role            string     `gorm:"column:role" json:"role"`
+	Status          int        `gorm:"column:status;default:1" json:"status"`
+	LastLoginAt     *time.Time `gorm:"column:last_login_at" json:"last_login_at"`
+	LastLoginIP     string     `gorm:"column:last_login_ip" json:"last_login_ip"`
+	CreatedBy       *uint      `gorm:"column:created_by" json:"created_by"`
+	PasswordChangedAt *time.Time `gorm:"column:password_changed_at" json:"password_changed_at"`
+	CreatedAt       time.Time  `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt       time.Time  `gorm:"column:updated_at" json:"updated_at"`
+	DeletedAt       *time.Time `gorm:"column:deleted_at" json:"-"`
+	Username        string     `gorm:"column:username" json:"username"`
+	Password        string     `gorm:"-" json:"password,omitempty"`
+	Session         string     `gorm:"column:session" json:"-"`
 }
 
 func (User) TableName() string {

@@ -1,6 +1,77 @@
+# === Backend ===
+# 敏感配置文件（本地配置和主配置）
 backend/config.local.yaml
 backend/config.yaml
+# 编译产物
 backend/bin/
+backend/nav-gateway
+
+# === Frontend ===
+# 构建产物
 fronted/apps/web/dist-prod/
+fronted/apps/web/.next/
+fronted/apps/web/build/
+fronted/apps/web/out/
+fronted/apps/mobile/dist/
+fronted/apps/mobile/web-build/
+
+# === Go ===
+# 编译产物
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# 测试产物
+*.test
+*.out
+# Go workspace
+go.work
+go.work.sum
+
+# === 日志 ===
+*.log
+*.out.log
+*.err.log
+logs/
+
+# === Node / JS ===
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# === 环境变量 ===
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# === IDE ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+.classpath
+
+# === 操作系统 ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === 测试 & 覆盖率 ===
+coverage/
 .playwright-mcp/
+
+# === 临时文件 ===
 tmp_*.txt
+*.tmp
+*.bak
+*.temp
