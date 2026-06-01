@@ -76,11 +76,11 @@ func Run(ctx context.Context, db *gorm.DB) error {
 func ensureMigrationsTable(ctx context.Context, db *gorm.DB) error {
 	return db.WithContext(ctx).Exec(`
 CREATE TABLE IF NOT EXISTS schema_migrations (
-  version VARCHAR(64) NOT NULL PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  checksum CHAR(64) NOT NULL,
-  applied_at DATETIME(3) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  version TEXT NOT NULL PRIMARY KEY,
+  name TEXT NOT NULL,
+  checksum TEXT NOT NULL,
+  applied_at DATETIME NOT NULL
+)
 `).Error
 }
 

@@ -4,9 +4,10 @@ import (
 	"net/http"
 	"open-source-club-nav/backend/middleware"
 	"open-source-club-nav/backend/model"
+	"open-source-club-nav/backend/utils"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -32,36 +33,61 @@ func AdminLoginHandler(c *gin.Context) {
 		return
 	}
 
-	// 2. 从数据库获取管理员用户（校验role为super）
+	// 2. 从数据库获取管理员用户（支持 username 或 email 登录，角色为 super 或 editor）
 	db := c.MustGet("db").(*gorm.DB)
 	var user model.User
-	if err := db.Where("email = ? AND role = ?", req.Username, "super").First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"err": "管理员账号不存在"})
+	if err := db.Where("(username = ? OR email = ?) AND role IN ?", req.Username, req.Username, []string{"super", "editor"}).First(&user).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"err": "账号不存在或无权限"})
 		return
 	}
 
-	// 3. 校验密码（bcrypt解密）
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	// 3. 校验密码（兼容 scrypt 和 bcrypt）
+	ok, legacy := utils.VerifyPassword(req.Password, user.PasswordHash)
+	if !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"err": "密码错误"})
 		return
 	}
 
-	// 4. 签发管理员Cookie（或JWT）
-	// 生成session
+	// 如果是旧 bcrypt 哈希，登录成功后自动升级为 scrypt
+	if legacy {
+		newHash, err := utils.HashPassword(req.Password)
+		if err == nil {
+			db.Model(&user).Update("password_hash", newHash)
+		}
+	}
+
+	// 4. 签发管理员 Cookie
 	session := middleware.GenerateAdminSession(user.ID)
-	// 关键：把session写入admin表的session字段
 	if err := db.Model(&user).Update("session", session).Error; err != nil {
+		utils.Logger.Error("Session写入失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"err": "Session写入失败"})
 		return
 	}
-	// 设置Cookie
-	c.SetCookie("kcos_admin_session", session, 3600, "/", "localhost", false, true)
+
+	// 更新最后登录信息
+	db.Model(&user).Updates(map[string]interface{}{
+		"last_login_at":  gorm.Expr("CURRENT_TIMESTAMP"),
+		"last_login_ip":  c.ClientIP(),
+	})
+
+	// 记录登录审计
+	db.Create(&model.LoginAudit{
+		Username:   user.Username,
+		RemoteAddr: c.ClientIP(),
+		UserAgent:  c.GetHeader("User-Agent"),
+		Success:    true,
+		Reason:     "登录成功",
+	})
+
+	// 设置 Cookie（不绑定特定域名，支持跨域场景）
+	c.SetCookie("kcos_admin_session", session, 86400*7, "/", "", false, true)
 
 	// 5. 返回成功响应
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
-		"msg":  "管理员登录成功",
+		"msg":  "登录成功",
 		"data": gin.H{
+			"userId":   user.ID,
 			"username": user.Username,
 			"role":     user.Role,
 		},

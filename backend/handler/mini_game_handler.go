@@ -19,7 +19,9 @@ func SearchMiniGame(c *gin.Context) {
 	gameType := c.Query("game_type")
 	query := db
 	if gameType != "" {
-		query = query.Where("game_type = ?", gameType)
+		query = query.Where("game_type = ?", gameType).Order("sort ASC")
+	} else {
+		query = query.Order("sort ASC") // 默认按排序字段排序
 	}
 
 	// 查询数据

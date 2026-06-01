@@ -1,39 +1,79 @@
-# Database Migrations
+# Database
 
-后端现在使用应用内置 SQL 迁移，不再依赖 MySQL 首次启动时的 `docker-entrypoint-initdb.d`。
+后端使用应用内置 SQL 迁移引擎，服务启动时自动执行。
 
-## 目录说明
+## 目录结构
 
-- `migrate/migrations/001_*.sql`：结构基线
-- `migrate/migrations/002_*.sql`：历史结构兼容修复
-- `migrate/migrations/003_*.sql`：基础种子数据
+```
+backend/db/
+├── migrate/
+│   ├── migrator.go                    # 迁移引擎（嵌入 SQL、校验 checksum、按序执行）
+│   └── migrations/
+│       ├── 001_schema.sql             # 全量表结构定义（14 张表）
+│       ├── 002_seed_accounts.sql      # 种子用户账号（admin / editor）
+│       └── 003_seed_data.sql          # 全量业务种子数据
+└── README.md
+```
+
+## 迁移文件说明
+
+| 文件 | 职责 |
+|------|------|
+| `001_schema.sql` | 所有表的 `CREATE TABLE IF NOT EXISTS`，包含完整字段和索引 |
+| `002_seed_accounts.sql` | 管理员和编辑账号（幂等 `ON DUPLICATE KEY UPDATE`） |
+| `003_seed_data.sql` | 全量业务数据：导航、资源、游戏、文章、作品、统计 |
 
 ## 启动行为
 
-服务启动后会自动：
+服务启动后自动：
 
 1. 连接 MySQL
 2. 创建 `schema_migrations` 版本表
-3. 按文件名顺序执行未应用的 SQL
-4. 记录已执行版本和校验和
+3. 按文件名顺序执行未应用的 SQL 迁移
+4. 记录已执行版本和 SHA-256 checksum
 
-已经执行过的迁移不会重复执行；如果迁移文件内容被改动，服务会因 checksum 不一致而拒绝启动。
+已执行的迁移不会重复执行；文件内容被改动会导致 checksum 不一致，服务拒绝启动。
 
-## 服务器部署
+## 数据库表（14 张）
 
-1. 创建数据库
-2. 配置 `backend/config.yaml` 或 `CONFIG_PATH`
-3. 启动后端服务
-4. 首次启动会自动完成建表和基础种子写入
+| 表名 | 说明 |
+|------|------|
+| `users` | 用户/管理员（role: super / editor / user） |
+| `nav_items` | 导航内容（资源矩阵 / 友情链接 / 小游戏） |
+| `resource_matrix` | 资源矩阵（智库 / 校园 / 工具） |
+| `mini_games` | 小游戏 |
+| `articles` | 文章 |
+| `works` | 社团作品 / GitHub 仓库 |
+| `daily_stats` | 每日统计 |
+| `daily_visits` | 每日访客明细 |
+| `metrics` | 事件指标（访问 / 点击） |
+| `login_audit` | 登录审计 |
+| `nav_item_health` | 链接健康检测 |
+| `nav_item_logs` | 操作日志 |
+| `misc` | 杂项 JSON 存储 |
+| `schema_migrations` | 迁移版本记录（系统表） |
 
-## 种子说明
+## 种子数据
 
-- `003_seed_core_data.sql` 会写入最小可用管理员账号 `admin`
-- 同时写入 3 条基础导航数据
-- 这批数据是幂等的，重复启动不会重复插入
+| 账号 | 用户名 | 密码 | 角色 |
+|------|--------|------|------|
+| 管理员 | `admin` | `admin123` | super |
+| 编辑 | `editor` | `admin123` | editor |
 
-## 后续约束
+业务数据：导航 28 条、资源矩阵 10 条、小游戏 3 条、文章 6 篇、作品 3 个、统计 7 天。
 
-- 新增表结构时，只能追加新的迁移文件，不能直接改历史迁移
-- 如需演示数据，单独新增 `9xx_demo_*.sql`
-- `users.password` 仅为兼容历史库保留，业务代码统一使用 `users.password_hash`
+## 部署步骤
+
+1. 创建 MySQL 数据库：
+   ```sql
+   CREATE DATABASE test_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+   ```
+2. 配置 `backend/config.yaml` 中的 DSN
+3. 启动后端，首次自动完成建表 + 种子写入
+
+## 约束
+
+- 新增表结构 → 追加 `004_xxx.sql`，不能改历史迁移
+- 已执行的迁移文件内容不可修改（checksum 校验）
+- 密码使用 scrypt 哈希，bcrypt 旧格式在登录时自动升级
+- `users.password` 仅兼容历史库，业务代码统一用 `users.password_hash`

@@ -1,0 +1,5 @@
+database:
+  path: "/app/data/app.db"
+jwt:
+  secret: "change-me"
+  expire: 3600

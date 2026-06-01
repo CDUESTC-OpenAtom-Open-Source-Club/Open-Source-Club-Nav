@@ -65,6 +65,7 @@ export default function LeftPanel({
   isDarkMode = false,
 }: LeftPanelProps) {
   const [remoteFriendLinks, setRemoteFriendLinks] = useState<LinkItem[]>([]);
+  const [remoteMiniGames, setRemoteMiniGames] = useState<LinkItem[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,6 +92,38 @@ export default function LeftPanel({
     void syncFriendLinks();
     const timer = window.setInterval(() => {
       void syncFriendLinks();
+    }, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const syncMiniGames = async () => {
+      try {
+        const res = await fetch("/api/links?module=mini_games", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => null);
+        const list = Array.isArray(data?.links) ? data.links : [];
+        if (cancelled) return;
+        const normalized = list
+          .map((item: { title?: unknown; url?: unknown }) => ({
+            title: String(item?.title || "").trim(),
+            url: String(item?.url || "").trim(),
+          }))
+          .filter((item: LinkItem) => item.title);
+        setRemoteMiniGames(normalized);
+      } catch {
+        // ignore network errors
+      }
+    };
+
+    void syncMiniGames();
+    const timer = window.setInterval(() => {
+      void syncMiniGames();
     }, 5000);
     return () => {
       cancelled = true;
@@ -342,41 +375,62 @@ export default function LeftPanel({
             paddingTop: 10,
           }}
         >
-          <a
-            href="/games"
-            data-ui-touch="true"
+          <div
             style={{
-              textDecoration: "none",
-              border: `1px solid ${isDarkMode ? "#334155" : "#BFDBFE"}`,
-              borderRadius: 10,
-              background: isDarkMode ? "linear-gradient(180deg, #1E293B, #0F172A)" : "linear-gradient(180deg, #FFFFFF, #F8FBFF)",
-              padding: "8px 9px",
+              fontSize: 8,
+              color: "#94A3B8",
+              letterSpacing: 1.7,
+              textTransform: "uppercase",
+              marginBottom: 6,
               display: "flex",
               alignItems: "center",
-              justifyContent: "space-between",
-              gap: 8,
-              transition: "all 0.18s ease",
+              gap: 5,
             }}
-            onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
-            onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
-              <Gamepad2 size={12} color="#0A84FF" />
-              <span
+            <Gamepad2 size={9} />
+            小游戏
+          </div>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+            {(remoteMiniGames.length > 0 ? remoteMiniGames : [{ title: "吃豆人小游戏", url: "/games" }]).map((item, idx) => (
+              <a
+                key={`${item.title}-${idx}`}
+                href={item.url}
+                data-ui-touch="true"
                 style={{
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: isDarkMode ? "#F8FAFC" : "#0F172A",
-                  overflow: "hidden",
-                  whiteSpace: "nowrap",
-                  textOverflow: "ellipsis",
+                  textDecoration: "none",
+                  border: `1px solid ${isDarkMode ? "#334155" : "#BFDBFE"}`,
+                  borderRadius: 8,
+                  background: isDarkMode ? "rgba(30,41,59,0.5)" : "#FFFFFF",
+                  padding: "6px 8px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  transition: "all 0.18s ease",
                 }}
+                onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
+                onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
               >
-                吃豆人小游戏
-              </span>
-            </span>
-            <ChevronRight size={12} color="#0A84FF" />
-          </a>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                  <Gamepad2 size={11} color="#0A84FF" />
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 600,
+                      color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {item.title}
+                  </span>
+                </span>
+                <ChevronRight size={11} color="#0A84FF" />
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </aside>

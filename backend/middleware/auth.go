@@ -3,13 +3,14 @@ package middleware
 
 import (
 	"net/http"
-	"open-source-club-nav/backend/model" // 导入你的Admin模型
+	"open-source-club-nav/backend/model"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 // SignAuth 改为Cookie鉴权（验证kcos_admin_session）
+// 验证通过后将 userID、username、role 写入 Context，供后续 RBAC 使用。
 func SignAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. 从Cookie中获取session
@@ -29,7 +30,12 @@ func SignAuth() gin.HandlerFunc {
 			return
 		}
 
-		// 3. 验证通过，继续执行后续接口
+		// 3. 将用户信息写入 Context，供 RequireRole 等中间件使用
+		c.Set("userID", admin.ID)
+		c.Set("username", admin.Username)
+		c.Set("role", admin.Role)
+
+		// 4. 验证通过，继续执行后续接口
 		c.Next()
 	}
 }
