@@ -1,0 +1,85 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap");
+
+body {
+  font-family: "Inter", sans-serif !important;
+}
+
+/* expo-router native-tabs web style override (migrated from removed patch) */
+.navigationMenuRoot {
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  position: fixed;
+  z-index: 10;
+  display: flex;
+  background-color: var(--expo-router-tabs-background-color, rgba(30, 30, 30, 0.88));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  height: 56px;
+  border-radius: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  box-sizing: border-box;
+  margin: 0;
+  max-width: 95vw;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  gap: 2px;
+}
+
+.navigationMenuTrigger {
+  border-radius: 24px;
+  padding: 6px 16px;
+  transition: background-color 0.2s ease, backdrop-filter 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  outline-color: var(--expo-router-tabs-tab-outline-color, rgba(255, 255, 255, 0.2));
+}
+
+.navigationMenuTrigger[data-state="active"] {
+  background-color: var(--expo-router-tabs-active-background-color, rgba(255, 255, 255, 0.15));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.navigationMenuTrigger:not([data-state="active"]):hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.tabIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--expo-router-tabs-icon-color, rgba(255, 255, 255, 0.6));
+  font-size: 18px;
+  width: 20px;
+  height: 20px;
+}
+
+.tabIcon > * {
+  color: inherit;
+}
+
+.navigationMenuTrigger[data-state="active"] .tabIcon {
+  color: var(--expo-router-tabs-active-icon-color, #ffffff);
+}
+
+.tabText {
+  font-weight: var(--expo-router-tabs-font-weight, 500);
+  font-size: var(--expo-router-tabs-font-size, 11px);
+  font-family: var(--expo-router-tabs-font-family);
+  font-style: var(--expo-router-tabs-font-style, normal);
+  opacity: var(--expo-router-tabs-text-opacity, 1);
+  color: var(--expo-router-tabs-text-color, rgba(255, 255, 255, 0.6));
+  white-space: nowrap;
+}
+
+.navigationMenuTrigger[data-state="active"] .tabText {
+  color: var(--expo-router-tabs-active-text-color, #ffffff);
+}

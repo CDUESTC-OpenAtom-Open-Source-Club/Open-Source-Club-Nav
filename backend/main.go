@@ -11,6 +11,7 @@ import (
 	migrateLib "github.com/golang-migrate/migrate/v4"
 	"go.uber.org/zap" // 新增zap的导入
 	"gorm.io/driver/mysql"
+
 	"gorm.io/gorm"
 )
 
@@ -28,14 +29,13 @@ func main() {
 		logger.Fatal("数据库连接失败", zap.Error(err))
 	}
 
-	// 第33-35行修改为：
 	migrateDSN := "mysql://" + cfg.BuildDSN()
 	if err := migrate.Run(migrateDSN); err != nil && err != migrateLib.ErrNoChange {
 		logger.Fatal("数据库迁移失败", zap.Error(err))
 	}
 	// ---------------------------------------------------
-
 	// 初始化路由
+
 	r := router.InitRouter(db, cfg)
 	r.Run()
 
@@ -43,5 +43,6 @@ func main() {
 	logger.Info("服务启动成功，监听端口: 8080")
 	if err := r.Run(":8080"); err != nil { // 补全err判断，去掉多余符号
 		logger.Fatal("服务启动失败", zap.Error(err))
+
 	}
 }

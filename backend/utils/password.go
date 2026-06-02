@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/scrypt"
 )
 
-// 与 Next BFF（fronted/apps/web/src/lib/admin-auth.ts）保持一致的口令哈希格式：
+// 与 Next BFF（frontend/apps/web/src/lib/admin-auth.ts）保持一致的口令哈希格式：
 //
 //	scrypt:<saltHex>:<digestHex>
 //

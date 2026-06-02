@@ -7,7 +7,7 @@
 ## 1. 当前统一原则
 
 - 权威文档位置：`docs/backend-api.md`
-- 前端实际消费接口：优先以 `fronted/apps/web/src/app/api/*` 为准
+- 前端实际消费接口：优先以 `frontend/apps/web/src/app/api/*` 为准
 - Go `backend/` 目录下接口：当前视为遗留/补充接口，未接入前端主流程前，不作为默认联调口径
 - 新接口上线前，必须先更新本文档
 
@@ -705,5 +705,5 @@ Query 参数：
 
 1. 新增接口前，先在 `docs/backend-api.md` 增加条目。
 2. 修改请求体、响应字段、鉴权规则前，先更新 `docs/backend-api.md`。
-3. `fronted/apps/web/docs/API.md` 和 `fronted/apps/web/src/app/api/README.md` 不再承载独立接口定义，只保留入口说明。
+3. `frontend/apps/web/docs/API.md` 和 `frontend/apps/web/src/app/api/README.md` 不再承载独立接口定义，只保留入口说明。
 4. 如果后续把 Next BFF 接口迁到 Go 后端，迁移后的唯一文档位置仍然是 `docs/backend-api.md`。

@@ -1,0 +1,25 @@
+.errorBox {
+  margin-bottom: 16px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.22);
+  color: #fecaca;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.forgotWrap {
+  margin-top: -8px;
+  text-align: right;
+}
+
+.forgotButton {
+  border: none;
+  background: transparent;
+  color: #93c5fd;
+  font-size: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
