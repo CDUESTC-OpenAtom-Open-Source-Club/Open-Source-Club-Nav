@@ -4,7 +4,6 @@ package handler
 import (
 	"net/http"
 	"open-source-club-nav/backend/config"
-	"open-source-club-nav/backend/utils"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(logger *zap.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenStr := c.GetHeader("Authorization")
 		// 兼容 "Bearer <token>" 格式
@@ -31,8 +30,9 @@ func AuthMiddleware() gin.HandlerFunc {
 			return []byte(cfg.JWT.Secret), nil
 		})
 
+		// 3. 把utils.Logger替换成注入的logger
 		if err != nil || !token.Valid {
-			utils.Logger.Warn("token验证失败", zap.Error(err))
+			logger.Warn("token验证失败", zap.Error(err)) // 用注入的logger
 			c.JSON(http.StatusUnauthorized, gin.H{"msg": "token无效"})
 			c.Abort()
 			return
