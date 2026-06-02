@@ -1,8 +1,13 @@
 package router
 
 import (
+	"open-source-club-nav/backend/config"
 	"open-source-club-nav/backend/handler"
 	"open-source-club-nav/backend/middleware"
+	"open-source-club-nav/backend/utils"
+	"strings"
+
+	"go.uber.org/zap"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -12,125 +17,133 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-func InitRouter(db *gorm.DB) *gin.Engine {
+func InitRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
+	logger := utils.InitLogger()
+	defer utils.SyncLogger(logger)
 
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:4000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Cookie"},
-		AllowCredentials: true,
-	}))
+	// 全局中间件
+	r.Use(middleware.InjectDB(db, logger))
+	r.Use(initCors(cfg))
 
-	r.Use(func(c *gin.Context) {
-		c.Set("db", db)
-		c.Next()
-	})
-
+	// Swagger
 	if gin.Mode() != gin.ReleaseMode {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	// Keep existing non-versioned auth and health endpoints.
-	publicGroup := r.Group("")
-	publicGroup.POST("/register", handler.RegisterHandler)
-	publicGroup.POST("/login", handler.LoginHandler)
-	publicGroup.GET("/healthz", handler.HealthzHandler)
-
-	// Dual stack: keep /api and add /api/v1.
-	registerAPIRoutes(r, "/api")
-	registerAPIRoutes(r, "/api/v1")
+	// 拆分路由：分别调用不同的注册函数
+	registerPublicRoutes(r.Group("/api"), logger)
+	registerBaseRoutes(r.Group(""), logger)
+	registerAdminRoutes(r.Group("/api/admin"))
+	registerMetricsRoutes(r.Group("/api/metrics"))
 
 	return r
 }
 
-func registerAPIRoutes(r *gin.Engine, apiPrefix string) {
-	publicGroup := r.Group(apiPrefix)
+// 1. 初始化CORS（拆分独立函数）
+func initCors(cfg *config.Config) gin.HandlerFunc {
+	corsOrigins := strings.Split(cfg.CORS.AllowedOrigins, ",")
+	return cors.New(cors.Config{
+		AllowOrigins:     corsOrigins,
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Cookie", "X-CSRF-Token"},
+		AllowCredentials: true,
+	})
+}
+
+// 3. 基础端点路由（拆分）
+func registerBaseRoutes(g *gin.RouterGroup, logger *zap.Logger) {
+	g.POST("/register", handler.RegisterHandler(logger))
+	g.POST("/login", handler.LoginHandler(logger))
+	g.GET("/healthz", handler.HealthzHandler)
+}
+
+// 4. 后台接口路由（拆分，包含鉴权）
+func registerAdminRoutes(g *gin.RouterGroup) {
+	// 登录接口（无需鉴权）
+	g.POST("/login", handler.AdminLoginHandler)
+
+	// 鉴权后的后台子路由
+	authG := g.Group("")
+	authG.Use(middleware.SignAuth())
 	{
-		publicGroup.GET("/nav/:id", handler.GetNavWithBusiness)
-		publicGroup.GET("/resources", handler.SearchResourceMatrix)
-		publicGroup.GET("/games", handler.SearchMiniGame)
-		publicGroup.GET("/articles", handler.SearchArticle)
-		publicGroup.GET("/links", handler.SearchNavItem)
-		publicGroup.GET("/works", handler.GetPublicWorks)
-		publicGroup.GET("/works/:id", handler.GetWorkByID)
-		publicGroup.GET("/content", handler.GetContentByType)
-	}
+		// 个人信息
+		authG.GET("/me", handler.GetAdminMe)
+		authG.POST("/logout", handler.AdminLogout)
 
-	adminGroup := r.Group(apiPrefix + "/admin")
+		// 文章子路由（继续拆分）
+		registerArticleRoutes(authG.Group("/articles"))
+		// 作品子路由
+		registerWorkRoutes(authG.Group("/works"))
+
+		// 其他后台功能
+		authG.GET("/stats", handler.GetAdminStats)
+		authG.GET("/logs", handler.GetAdminLogs)
+		authG.GET("/system", handler.GetAdminSystem)
+		authG.GET("/link-health", handler.GetLinkHealth)
+		authG.POST("/link-health", handler.CheckLinkHealth)
+		authG.GET("/login-audit", handler.GetLoginAuditLogs)
+
+		// 超级管理员子路由
+		registerSuperAdminRoutes(authG.Group(""))
+		// 资源/内容子路由
+		registerResourceRoutes(authG)
+	}
+}
+
+// 4.1 文章子路由（更细粒度拆分）
+func registerArticleRoutes(g *gin.RouterGroup) {
+	g.POST("", handler.CreateArticle)
+	g.GET("/:id", handler.GetArticle)
+	g.PUT("/:id", handler.UpdateArticle)
+	g.DELETE("/:id", handler.DeleteArticle)
+	g.GET("", handler.ListArticles)
+}
+
+// 4.2 作品子路由（更细粒度拆分）
+func registerWorkRoutes(g *gin.RouterGroup) {
+	g.GET("", handler.GetAllWorks)
+	g.POST("", handler.CreateWork)
+	g.DELETE("/:id", handler.DeleteWork)
+	g.PATCH("/:id", handler.UpdateWork)
+	g.POST("/sync", handler.SyncGitHubWorks)
+}
+
+// 4.3 超级管理员子路由
+func registerSuperAdminRoutes(g *gin.RouterGroup) {
+	superG := g.Group("")
+	superG.Use(handler.RequireRole("super"))
 	{
-		adminGroup.POST("/login", handler.AdminLoginHandler)
+		superG.GET("/users", handler.GetAdminUsers)
+		superG.POST("/users", handler.CreateAdminUser)
+		superG.DELETE("/users/:id", handler.DeleteAdminUser)
 	}
+}
 
-	authGroup := r.Group(apiPrefix + "/admin")
-	authGroup.Use(middleware.SignAuth())
+// 4.4 资源/内容子路由
+func registerResourceRoutes(g *gin.RouterGroup) {
+	// 链接
+	g.POST("/links", handler.CreateFriendLink)
+	g.PUT("/links/:id", handler.UpdateFriendLink)
+	// 资源矩阵
+	g.POST("/resources", handler.CreateResourceMatrix)
+	g.PUT("/resources/:id", handler.UpdateResourceMatrix)
+	// 小游戏
+	g.POST("/games", handler.CreateMiniGame)
+	g.PUT("/games/:id", handler.UpdateMiniGame)
+	// 内容
+	contentG := g.Group("/content")
+	contentG.Use(handler.RequireRole("editor", "super"))
 	{
-		authGroup.GET("/me", handler.GetAdminMe)
-		authGroup.POST("/logout", handler.AdminLogout)
-
-		articleGroup := authGroup.Group("/articles")
-		{
-			articleGroup.POST("", handler.CreateArticle)
-			articleGroup.GET("/:id", handler.GetArticle)
-			articleGroup.PUT("/:id", handler.UpdateArticle)
-			articleGroup.DELETE("/:id", handler.DeleteArticle)
-			articleGroup.GET("", handler.ListArticles)
-		}
-
-		worksGroup := authGroup.Group("/works")
-		{
-			worksGroup.GET("", handler.GetAllWorks)
-			worksGroup.POST("", handler.CreateWork)
-			worksGroup.DELETE("/:id", handler.DeleteWork)
-		}
-
-		authGroup.POST("/works/sync", handler.SyncGitHubWorks)
-		authGroup.PATCH("/works/:id", handler.UpdateWork)
-		authGroup.GET("/stats", handler.GetAdminStats)
-		authGroup.GET("/logs", handler.GetAdminLogs)
-		authGroup.GET("/system", handler.GetAdminSystem)
-		authGroup.GET("/link-health", handler.GetLinkHealth)
-		authGroup.POST("/link-health", handler.CheckLinkHealth)
-		authGroup.GET("/login-audit", handler.GetLoginAuditLogs)
-		authGroup.GET("/users", handler.RequireRole("super"), handler.GetAdminUsers)
-		authGroup.POST("/users", handler.RequireRole("super"), handler.CreateAdminUser)
-		authGroup.DELETE("/users/:id", handler.RequireRole("super"), handler.DeleteAdminUser)
+		contentG.POST("", handler.CreateContent)
+		contentG.PUT("/:id", handler.UpdateContent)
+		contentG.DELETE("/:id", handler.DeleteContent)
+		contentG.PUT("/:id/toggle", handler.ToggleContentActive)
 	}
+}
 
-	privateGroup := r.Group("")
-	privateGroup.Use(middleware.SignAuth())
-	{
-		adminLinkGroup := privateGroup.Group(apiPrefix + "/admin/links")
-		{
-			adminLinkGroup.POST("", handler.CreateFriendLink)
-			adminLinkGroup.PUT("/:id", handler.UpdateFriendLink)
-		}
-
-		adminResourceGroup := privateGroup.Group(apiPrefix + "/admin/resources")
-		{
-			adminResourceGroup.POST("", handler.CreateResourceMatrix)
-			adminResourceGroup.PUT("/:id", handler.UpdateResourceMatrix)
-		}
-
-		adminGameGroup := privateGroup.Group(apiPrefix + "/admin/games")
-		{
-			adminGameGroup.POST("", handler.CreateMiniGame)
-			adminGameGroup.PUT("/:id", handler.UpdateMiniGame)
-		}
-
-		contentGroup := privateGroup.Group(apiPrefix + "/content")
-		contentGroup.Use(handler.RequireRole("editor", "super"))
-		{
-			contentGroup.POST("", handler.CreateContent)
-			contentGroup.PUT("/:id", handler.UpdateContent)
-			contentGroup.DELETE("/:id", handler.DeleteContent)
-			contentGroup.PUT("/:id/toggle", handler.ToggleContentActive)
-		}
-	}
-
-	metricsGroup := r.Group(apiPrefix + "/metrics")
-	{
-		metricsGroup.POST("/visit", handler.RecordVisit)
-		metricsGroup.POST("/click", handler.RecordClick)
-	}
+// 5. 统计接口路由（拆分）
+func registerMetricsRoutes(g *gin.RouterGroup) {
+	g.POST("/visit", handler.RecordVisit)
+	g.POST("/click", handler.RecordClick)
 }

@@ -3,10 +3,9 @@ package handler
 
 import (
 	"net/http"
+	"open-source-club-nav/backend/model" // 替换为你的项目实际包名
 	"strconv"
 	"strings"
-
-	"open-source-club-nav/backend/model"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -74,7 +73,10 @@ func GetNavWithBusiness(c *gin.Context) {
 // @Success 200 {array} model.FriendLink "搜索结果列表"
 // @Router /api/links [get]
 func SearchNavItem(c *gin.Context) {
+	// 1. 获取请求参数
+
 	keyword := strings.TrimSpace(c.Query("keyword"))
+
 	if keyword == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "keyword is required"})
 		return
@@ -97,6 +99,7 @@ func SearchNavItem(c *gin.Context) {
 		}
 	}
 
+	var navItems []model.NavItem
 	// 2. 从Context中获取DB连接
 	db, ok := c.Get("db")
 	if !ok {
@@ -108,10 +111,8 @@ func SearchNavItem(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接类型错误"})
 		return
 	}
-
-	// 3. 模糊查询（标题或内容包含关键词）
-	var navItems []model.NavItem
 	likeKeyword := "%" + keyword + "%"
+	// 执行查询：带关键词模糊匹配 + 按id升序 + 分页
 	if err := gormDB.
 		Where("title LIKE ? OR content LIKE ?", likeKeyword, likeKeyword).
 		Order("id ASC").

@@ -181,6 +181,11 @@ func CreateWork(c *gin.Context) {
 		tagsJSON, _ = json.Marshal([]string{})
 	}
 	tagsRaw := json.RawMessage(tagsJSON)
+	// --- 新增解析逻辑 ---
+	var parsedTags model.Tags
+	if err := json.Unmarshal(tagsRaw, &parsedTags); err != nil {
+		parsedTags = model.Tags{}
+	}
 
 	featured := int8(1)
 	if input.IsFeatured != nil {
@@ -198,7 +203,7 @@ func CreateWork(c *gin.Context) {
 		Description:  input.Description,
 		AuthorName:   input.AuthorName,
 		AuthorAvatar: &authorAvatar,
-		Tags:         tagsRaw,
+		Tags:         parsedTags,
 		Color:        input.Color,
 		Status:       input.Status,
 		Stars:        input.Stars,
@@ -284,6 +289,11 @@ func SyncGitHubWorks(c *gin.Context) {
 		} else {
 			tagsRaw = json.RawMessage("[]")
 		}
+		// --- 新增解析tagsRaw的逻辑 ---
+		var parsedTags model.Tags
+		if err := json.Unmarshal(tagsRaw, &parsedTags); err != nil {
+			parsedTags = model.Tags{} // 解析失败给空值
+		}
 
 		archived := false
 		if a, ok := repo["archived"].(bool); ok {
@@ -321,7 +331,7 @@ func SyncGitHubWorks(c *gin.Context) {
 				Description:  description,
 				AuthorName:   ownerLogin,
 				AuthorAvatar: &authorAvatar,
-				Tags:         tagsRaw,
+				Tags:         parsedTags,
 				Color:        color,
 				Status:       status,
 				Stars:        stars,
@@ -337,7 +347,7 @@ func SyncGitHubWorks(c *gin.Context) {
 				"title":          name,
 				"description":    description,
 				"stars":          stars,
-				"tags":           tagsRaw,
+				"tags":           parsedTags,
 				"status":         status,
 				"last_synced_at": now,
 			})
@@ -380,6 +390,12 @@ func fetchGitHubRepos(db *gorm.DB) ([]model.Work, error) {
 			tagsRaw = json.RawMessage("[]")
 		}
 
+		// --- 解析tagsRaw为model.Tags（调整到这里，不在if archived块里）---
+		var parsedTags model.Tags
+		if err := json.Unmarshal(tagsRaw, &parsedTags); err != nil {
+			parsedTags = model.Tags{} // 解析失败给空值
+		}
+
 		archived := false
 		if a, ok := repo["archived"].(bool); ok {
 			archived = a
@@ -413,7 +429,7 @@ func fetchGitHubRepos(db *gorm.DB) ([]model.Work, error) {
 			Description:  description,
 			AuthorName:   ownerLogin,
 			AuthorAvatar: &authorAvatar,
-			Tags:         tagsRaw,
+			Tags:         parsedTags, // 替换为解析后的parsedTags
 			Color:        colors[i%len(colors)],
 			Status:       status,
 			Stars:        stars,
@@ -496,6 +512,12 @@ func enrichFromGitHub(work *model.Work, repoURL string) {
 	}
 	if lang, ok := data["language"].(string); ok && lang != "" {
 		b, _ := json.Marshal([]string{lang})
-		work.Tags = json.RawMessage(b)
+		tagsRaw := json.RawMessage(b)
+		// 解析tagsRaw为model.Tags
+		var parsedTags model.Tags
+		if err := json.Unmarshal(tagsRaw, &parsedTags); err != nil {
+			parsedTags = model.Tags{}
+		}
+		work.Tags = parsedTags
 	}
 }

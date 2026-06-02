@@ -3,74 +3,46 @@ package migrate
 import (
 	"context"
 	"crypto/sha256"
-	"embed"
 	"encoding/hex"
-	"fmt"
+	"io"
 	"io/fs"
+	"os"
 	"sort"
 	"strings"
-	"time"
 
+	"github.com/golang-migrate/migrate/v4"
 	"gorm.io/gorm"
+
+	// 如果你用MySQL，保留这行；用PostgreSQL则换成postgres
+	_ "github.com/golang-migrate/migrate/v4/database/mysql"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-//go:embed migrations/*.sql
-var migrationFiles embed.FS
+// 直接读取本地db/migrate/migrations文件夹
+var migrationFiles fs.FS = os.DirFS("db/migrate/migrations")
+
+// Run 用golang-migrate执行迁移
+// 参数dbDSN是数据库连接串，格式："mysql://用户名:密码@tcp(127.0.0.1:3306)/数据库名?charset=utf8mb4"
+func Run(dbDSN string) error {
+	// 迁移文件路径：对应你项目中migrations文件夹的位置（当前在db/migrate/migrations）
+	m, err := migrate.New(
+		"file://db/migrate/migrations",
+		dbDSN,
+	)
+	if err != nil {
+		return err
+	}
+
+	// 执行升级迁移（跑所有未执行的.up.sql）
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+	return nil
+}
 
 type migrationRecord struct {
-	Version  string
-	Checksum string
-}
-
-type migrationFile struct {
-	Name     string
-	Version  string
-	Checksum string
-	SQL      string
-}
-
-func Run(ctx context.Context, db *gorm.DB) error {
-	if err := ensureMigrationsTable(ctx, db); err != nil {
-		return err
-	}
-
-	applied, err := loadAppliedMigrations(ctx, db)
-	if err != nil {
-		return err
-	}
-
-	files, err := loadMigrationFiles()
-	if err != nil {
-		return err
-	}
-
-	for _, file := range files {
-		if record, ok := applied[file.Version]; ok {
-			if record.Checksum != file.Checksum {
-				return fmt.Errorf("migration checksum mismatch for %s", file.Name)
-			}
-			continue
-		}
-
-		statements := splitSQLStatements(file.SQL)
-		for _, stmt := range statements {
-			if err := db.WithContext(ctx).Exec(stmt).Error; err != nil {
-				return fmt.Errorf("apply migration %s: %w", file.Name, err)
-			}
-		}
-
-		if err := db.WithContext(ctx).Exec(
-			`INSERT INTO schema_migrations (version, name, checksum, applied_at) VALUES (?, ?, ?, ?)`,
-			file.Version,
-			file.Name,
-			file.Checksum,
-			time.Now().UTC(),
-		).Error; err != nil {
-			return fmt.Errorf("record migration %s: %w", file.Name, err)
-		}
-	}
-
-	return nil
+	Version  string `gorm:"column:version"`
+	Checksum string `gorm:"column:checksum"`
 }
 
 func ensureMigrationsTable(ctx context.Context, db *gorm.DB) error {
@@ -101,6 +73,14 @@ ORDER BY version ASC
 	return result, nil
 }
 
+type migrationFile struct {
+	Version  string // 迁移版本（比如"001"）
+	Name     string // 文件名
+	Content  []byte // 文件内容
+	Checksum string // 校验和
+	SQL      []byte // SQL语句
+}
+
 func loadMigrationFiles() ([]migrationFile, error) {
 	entries, err := fs.ReadDir(migrationFiles, "migrations")
 	if err != nil {
@@ -113,7 +93,14 @@ func loadMigrationFiles() ([]migrationFile, error) {
 			continue
 		}
 
-		content, err := migrationFiles.ReadFile("migrations/" + entry.Name())
+		// 替换原来的content, err := migrationFiles.ReadFile(...)
+		file, err := migrationFiles.Open("migrations/" + entry.Name())
+		if err != nil {
+			return nil, err
+		}
+		defer file.Close() // 记得关闭文件
+
+		content, err := io.ReadAll(file)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +110,7 @@ func loadMigrationFiles() ([]migrationFile, error) {
 			Name:     entry.Name(),
 			Version:  strings.TrimSuffix(entry.Name(), ".sql"),
 			Checksum: hex.EncodeToString(sum[:]),
-			SQL:      string(content),
+			SQL:      content,
 		})
 	}
 
