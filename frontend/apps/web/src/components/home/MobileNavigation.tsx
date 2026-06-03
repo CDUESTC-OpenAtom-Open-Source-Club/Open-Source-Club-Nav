@@ -91,7 +91,7 @@ function MobileActionButton({
         alignItems: "center",
         justifyContent: "center",
         cursor: "pointer",
-        color: active ? "#0A84FF" : isDarkMode ? "#CBD5E1" : "#334155",
+        color: active ? "#0A84FF" : "var(--text-secondary)",
         flexShrink: 0,
         padding: 0,
       }}
@@ -186,7 +186,7 @@ function NavSection({
           fontSize: 11,
           fontWeight: 700,
           letterSpacing: 1.2,
-          color: isDarkMode ? "#94A3B8" : "#64748B",
+          color: "var(--text-muted)",
           textTransform: "uppercase",
         }}
       >
@@ -203,14 +203,10 @@ function NavSection({
               style={{
                 width: "100%",
                 borderRadius: 18,
-                border: `1px solid ${item.active ? "#93C5FD" : isDarkMode ? "#334155" : "#E5E7EB"}`,
+                border: `1px solid ${item.active ? "#93C5FD" : "var(--border-soft)"}`,
                 background: item.active
-                  ? isDarkMode
-                    ? "rgba(30,64,175,0.18)"
-                    : "#EFF6FF"
-                  : isDarkMode
-                    ? "rgba(15,23,42,0.9)"
-                    : "rgba(255,255,255,0.96)",
+                  ? "var(--bg-control-active)"
+                  : "var(--card-bg-86)",
                 boxShadow: item.active
                   ? "0 10px 24px rgba(59,130,246,0.12)"
                   : "0 6px 18px rgba(15,23,42,0.04)",
@@ -240,12 +236,12 @@ function NavSection({
                     width: 40,
                     height: 40,
                     borderRadius: 14,
-                    border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-                    background: isDarkMode ? "#111827" : "#F8FAFC",
+                    border: "1px solid var(--border-soft)",
+                    background: "var(--bg-icon-2)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: item.active ? "#0A84FF" : isDarkMode ? "#CBD5E1" : "#64748B",
+                    color: item.active ? "#0A84FF" : "var(--text-muted)",
                     flexShrink: 0,
                   }}
                 >
@@ -265,14 +261,14 @@ function NavSection({
                       style={{
                         fontSize: 16,
                         fontWeight: 700,
-                        color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                        color: "var(--text-primary)",
                       }}
                     >
                       {item.label}
                     </span>
 
                     {item.external ? (
-                      <ExternalLink size={14} color={isDarkMode ? "#94A3B8" : "#64748B"} />
+                      <ExternalLink size={14} color="var(--text-muted)" />
                     ) : null}
                   </div>
 
@@ -282,7 +278,7 @@ function NavSection({
                         marginTop: 6,
                         fontSize: 12,
                         lineHeight: 1.5,
-                        color: isDarkMode ? "#94A3B8" : "#64748B",
+                        color: "var(--text-muted)",
                       }}
                     >
                       {item.description}
@@ -303,11 +299,11 @@ function NavSection({
                           key={child.id}
                           style={{
                             fontSize: 11,
-                            color: isDarkMode ? "#CBD5E1" : "#475569",
-                            border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                            color: "var(--text-chip)",
+                            border: "1px solid var(--border-soft)",
                             borderRadius: 999,
                             padding: "4px 8px",
-                            background: isDarkMode ? "#111827" : "#FFFFFF",
+                            background: "var(--card-bg-deep)",
                           }}
                         >
                           {child.label}
@@ -439,8 +435,8 @@ export function MobileNavigationPanel({
           width: "min(92vw, 420px)",
           maxWidth: "100%",
           height: "100%",
-          borderLeft: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-          background: isDarkMode ? "rgba(15,23,42,0.98)" : "rgba(255,255,255,0.98)",
+          borderLeft: "1px solid var(--border-soft)",
+          background: "var(--panel-bg-98)",
           boxShadow: "-18px 0 42px rgba(15,23,42,0.22)",
           transform: phase === "open" ? "translate3d(0, 0, 0)" : "translate3d(108%, 0, 0)",
           display: "flex",

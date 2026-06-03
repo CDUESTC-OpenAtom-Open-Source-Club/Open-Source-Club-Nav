@@ -1,68 +1,194 @@
 .wrapper {
-  display: inline-flex;
-  align-items: center;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .switch {
-  border: 1px solid rgba(148, 163, 184, 0.45);
-  background: rgba(255, 255, 255, 0.78);
-  border-radius: 999px;
-  padding: 2px;
+  font-size: inherit;
+  position: relative;
+  display: inline-block;
+  width: 4em;
+  height: 2.2em;
+  border-radius: 30px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   cursor: pointer;
+  border: none;
+  padding: 0;
+  background: transparent;
 }
 
 .slider {
-  width: 42px;
-  height: 22px;
-  border-radius: 999px;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  background: linear-gradient(90deg, #0f172a 0%, #1e293b 100%);
-  transition: all 220ms ease;
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #2a2a2a;
+  transition: 0.4s;
+  border-radius: 30px;
+  overflow: hidden;
+}
+
+.slider::before {
+  position: absolute;
+  content: "";
+  height: 1.2em;
+  width: 1.2em;
+  border-radius: 20px;
+  left: 0.5em;
+  bottom: 0.5em;
+  transition: 0.4s;
+  transition-timing-function: cubic-bezier(0.81, -0.04, 0.38, 1.5);
+  box-shadow: inset 8px -4px 0px 0px #fff;
+  z-index: 3;
 }
 
 .switch[data-checked="true"] .slider {
-  justify-content: flex-start;
-  background: linear-gradient(90deg, #bfdbfe 0%, #dbeafe 100%);
+  background-color: #00a6ff;
 }
 
-.slider::after {
-  content: "";
-  width: 18px;
-  height: 18px;
-  margin: 2px;
+.switch[data-checked="true"] .slider::before {
+  transform: translateX(1.8em);
+  box-shadow: inset 15px -4px 0px 15px #ffcf48;
+}
+
+/* ========== 太阳光芒旋转动画 ========== */
+.sunRays {
+  position: absolute;
+  width: 2.4em;
+  height: 2.4em;
+  left: -0.1em;
+  bottom: -0.1em;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  z-index: 2;
+  pointer-events: none;
+  /* 锥形渐变模拟光芒 */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    rgba(255, 207, 72, 0.35) 8deg,
+    transparent 16deg,
+    transparent 30deg,
+    rgba(255, 207, 72, 0.35) 38deg,
+    transparent 46deg,
+    transparent 60deg,
+    rgba(255, 207, 72, 0.35) 68deg,
+    transparent 76deg,
+    transparent 90deg,
+    rgba(255, 207, 72, 0.35) 98deg,
+    transparent 106deg,
+    transparent 120deg,
+    rgba(255, 207, 72, 0.35) 128deg,
+    transparent 136deg,
+    transparent 150deg,
+    rgba(255, 207, 72, 0.35) 158deg,
+    transparent 166deg,
+    transparent 180deg,
+    rgba(255, 207, 72, 0.35) 188deg,
+    transparent 196deg,
+    transparent 210deg,
+    rgba(255, 207, 72, 0.35) 218deg,
+    transparent 226deg,
+    transparent 240deg,
+    rgba(255, 207, 72, 0.35) 248deg,
+    transparent 256deg,
+    transparent 270deg,
+    rgba(255, 207, 72, 0.35) 278deg,
+    transparent 286deg,
+    transparent 300deg,
+    rgba(255, 207, 72, 0.35) 308deg,
+    transparent 316deg,
+    transparent 330deg,
+    rgba(255, 207, 72, 0.35) 338deg,
+    transparent 346deg,
+    transparent 360deg
+  );
   border-radius: 50%;
-  background: #f8fafc;
-  box-shadow: 0 2px 6px rgba(2, 6, 23, 0.22);
+  mask-image: radial-gradient(circle, transparent 38%, black 42%, black 100%);
+  -webkit-mask-image: radial-gradient(circle, transparent 38%, black 42%, black 100%);
+  animation: none;
+  transform: translateX(1.8em) translate(0.1em, 0.1em);
 }
 
+/* 白天模式：光芒可见 + 旋转 */
+.switch[data-checked="true"] .sunRays {
+  opacity: 1;
+  animation: sunRaysSpin 20s linear infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 207, 72, 0.6));
+}
+
+@keyframes sunRaysSpin {
+  from {
+    transform: translateX(1.8em) translate(0.1em, 0.1em) rotate(0deg);
+  }
+  to {
+    transform: translateX(1.8em) translate(0.1em, 0.1em) rotate(360deg);
+  }
+}
+
+/* ========== 星星（闪烁） ========== */
 .star {
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  background: #bfdbfe;
+  background-color: #fff;
   border-radius: 50%;
-  opacity: 0.9;
-}
-
-.star1 { right: 8px; top: 6px; }
-.star2 { right: 12px; top: 11px; }
-.star3 { right: 6px; top: 14px; }
-
-.switch[data-checked="true"] .star {
-  opacity: 0;
-}
-
-.cloud {
   position: absolute;
-  left: 6px;
-  width: 12px;
-  height: 12px;
-  opacity: 0;
+  width: 5px;
+  transition: opacity 0.4s;
+  height: 5px;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.6);
 }
 
-.switch[data-checked="true"] .cloud {
+.star1 {
+  left: 2.5em;
+  top: 0.5em;
+  animation: twinkle1 6s ease-in-out infinite;
+}
+
+.star2 {
+  left: 2.2em;
+  top: 1.2em;
+  animation: twinkle2 8s ease-in-out infinite;
+}
+
+.star3 {
+  left: 3em;
+  top: 0.9em;
+  animation: twinkle3 7s ease-in-out infinite;
+}
+
+/* 白天模式隐藏星星 */
+.switch[data-checked="true"] .slider .star {
+  opacity: 0;
+  animation: none;
+}
+
+@keyframes twinkle1 {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.6); }
+}
+
+@keyframes twinkle2 {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 0.2; transform: scale(0.5); }
+}
+
+@keyframes twinkle3 {
+  0%, 100% { opacity: 0.9; transform: scale(1); }
+  40% { opacity: 0.15; transform: scale(0.4); }
+  70% { opacity: 1; transform: scale(1.1); }
+}
+
+/* ========== 云朵 ========== */
+.cloud {
+  width: 3.5em;
+  position: absolute;
+  bottom: -1.4em;
+  left: -1.1em;
+  opacity: 0;
+  transition: all 0.4s;
+}
+
+.switch[data-checked="true"] .slider .cloud {
   opacity: 1;
 }

@@ -50,6 +50,7 @@ export function ThemeModeSwitch({
         }}
       >
         <span className={styles.slider}>
+          <span className={styles.sunRays} />
           <span className={`${styles.star} ${styles.star1}`} />
           <span className={`${styles.star} ${styles.star2}`} />
           <span className={`${styles.star} ${styles.star3}`} />

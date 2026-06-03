@@ -149,7 +149,7 @@ function HoverRevealCard({ item, direction, delay = 0, isDarkMode }) {
         className="hover-reveal-card__body"
         style={{
           fontSize: 11,
-          color: isDarkMode ? "#94A3B8" : "#64748B",
+          color: "var(--text-muted)",
           lineHeight: 1.5,
           opacity: isExpanded ? 1 : 0,
           maxHeight: isExpanded ? 90 : 0,
@@ -380,7 +380,7 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
             style={{
               fontSize: 20,
               fontWeight: 700,
-              color: isDarkMode ? "#F8FAFC" : "#0F172A",
+              color: "var(--text-primary)",
               margin: 0,
               lineHeight: 1.15,
             }}
@@ -399,8 +399,8 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
             width: 30,
             height: 30,
             borderRadius: "50%",
-            border: `1px solid ${isDarkMode ? "#475569" : "#E5E7EB"}`,
-            background: isDarkMode ? "#111827" : "white",
+            border: "1px solid var(--border-control)",
+            background: "var(--card-bg-deep)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -456,8 +456,8 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
                 minHeight: 84,
                 padding: "10px 12px",
                 borderRadius: 10,
-                border: `1px solid ${isHovered ? cat.color + "55" : isDarkMode ? "#334155" : "#E5E7EB"}`,
-                background: isDarkMode ? "#111827" : "white",
+                border: `1px solid ${isHovered ? cat.color + "55" : "var(--border-soft)"}`,
+                background: "var(--card-bg-deep)",
                 textDecoration: "none",
                 transition: "all 0.15s ease",
                 position: "relative",
@@ -514,7 +514,7 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
                 style={{
                   fontSize: 12,
                   fontWeight: 600,
-                  color: isDarkMode ? "#E2E8F0" : "#0F172A",
+                  color: "var(--text-bright)",
                   lineHeight: 1.25,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -564,7 +564,7 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
         style={{
           marginTop: 12,
           border: `1px solid ${cat.color}26`,
-          background: isDarkMode ? "#0F172A" : "white",
+          background: "var(--card-bg-strong)",
           borderRadius: 12,
           padding: "10px 12px",
           minHeight: 88,
@@ -580,7 +580,7 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                color: "var(--text-primary)",
               }}
             >
               {hovered.title}
@@ -869,7 +869,7 @@ export function MiniTapGame({ isDarkMode = false }) {
 
   const getTileStyle = (value) => {
     const palette = {
-      0: { bg: isDarkMode ? "#0F172A99" : "#FFFFFF99", color: "#94A3B8" },
+      0: { bg: "var(--bg-tile-empty)", color: "#94A3B8" },
       2: { bg: "#FEF3C7", color: "#7C2D12" },
       4: { bg: "#FDE68A", color: "#7C2D12" },
       8: { bg: "#FDBA74", color: "#7C2D12" },
@@ -910,11 +910,9 @@ export function MiniTapGame({ isDarkMode = false }) {
     <div
       style={{
         width: "88%",
-        border: `1px solid ${isDarkMode ? "#334155" : "#E2E8F0"}`,
+        border: "1px solid var(--border-soft)",
         borderRadius: 12,
-        background: isDarkMode
-          ? "rgba(15,23,42,0.75)"
-          : "rgba(255,255,255,0.9)",
+        background: "var(--card-bg-75)",
         padding: "9px 10px",
         display: "grid",
         gap: 8,
@@ -943,7 +941,7 @@ export function MiniTapGame({ isDarkMode = false }) {
             display: "flex",
             gap: 8,
             fontSize: 10,
-            color: isDarkMode ? "#CBD5E1" : "#64748B",
+            color: "var(--text-secondary)",
             flexWrap: "wrap",
             justifyContent: "flex-end",
           }}
@@ -966,11 +964,8 @@ export function MiniTapGame({ isDarkMode = false }) {
           position: "relative",
           height: 176,
           borderRadius: 10,
-          border: `1px solid ${isDarkMode ? "#334155" : "#BFDBFE"}`,
-          backgroundImage: `linear-gradient(${isDarkMode
-            ? "rgba(15,23,42,0.35), rgba(15,23,42,0.55)"
-            : "rgba(255,255,255,0.35), rgba(241,245,249,0.45)"
-            }), url(${MINI_GAME_BACKGROUND_URL})`,
+          border: "1px solid var(--border-mid)",
+          backgroundImage: `linear-gradient(var(--bg-board-gradient)), url(${MINI_GAME_BACKGROUND_URL})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           padding: 8,
@@ -995,7 +990,7 @@ export function MiniTapGame({ isDarkMode = false }) {
                 key={idx}
                 style={{
                   borderRadius: 8,
-                  border: `1px solid ${isDarkMode ? "#334155" : "#D1D5DB"}`,
+                  border: "1px solid var(--border-tag)",
                   background: style.bg,
                   color: style.color,
                   display: "flex",
@@ -1097,7 +1092,7 @@ export function MiniTapGame({ isDarkMode = false }) {
           }}
         >
           <span
-            style={{ fontSize: 10, color: isDarkMode ? "#94A3B8" : "#64748B" }}
+            style={{ fontSize: 10, color: "var(--text-muted)" }}
           >
             {hint}
           </span>
@@ -1446,7 +1441,7 @@ export default function CentralHub({
                 style={{
                   fontSize: 20,
                   fontWeight: 700,
-                  color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                  color: "var(--text-primary)",
                   letterSpacing: 1,
                   lineHeight: 1.1,
                 }}
@@ -1485,13 +1480,9 @@ export default function CentralHub({
                     style={{
                       minHeight: 54,
                       borderRadius: 12,
-                      border: `1px solid ${isDarkMode ? "rgba(148,163,184,0.22)" : `${item.color}24`}`,
-                      background: isDarkMode
-                        ? "rgba(15,23,42,0.72)"
-                        : "rgba(255,255,255,0.76)",
-                      boxShadow: isDarkMode
-                        ? "0 10px 20px rgba(0,0,0,0.18)"
-                        : "0 8px 18px rgba(148,163,184,0.12)",
+                      border: `1px solid var(--border-soft-rgba)`,
+                      background: "var(--card-bg)",
+                      boxShadow: "var(--shadow-card)",
                       backdropFilter: "blur(12px)",
                       WebkitBackdropFilter: "blur(12px)",
                       padding: "8px 9px",
@@ -1524,7 +1515,7 @@ export default function CentralHub({
                         style={{
                           fontSize: 11,
                           fontWeight: 700,
-                          color: isDarkMode ? "#E5EEF9" : "#1E293B",
+                          color: "var(--text-bright-2)",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
                           whiteSpace: "nowrap",
@@ -1537,7 +1528,7 @@ export default function CentralHub({
                       style={{
                         fontSize: 9,
                         lineHeight: 1.35,
-                        color: isDarkMode ? "#94A3B8" : "#64748B",
+                        color: "var(--text-muted)",
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
@@ -1565,12 +1556,10 @@ export default function CentralHub({
                   style={{
                     padding: "2px 9px",
                     borderRadius: 999,
-                    border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-                    background: isDarkMode
-                      ? "rgba(15,23,42,0.86)"
-                      : "rgba(255,255,255,0.8)",
+                    border: "1px solid var(--border-soft)",
+                    background: "var(--card-bg-86)",
                     fontSize: 9,
-                    color: isDarkMode ? "#CBD5E1" : "#374151",
+                    color: "var(--text-secondary)",
                     fontWeight: 500,
                     backdropFilter: "blur(8px)",
                     display: "flex",
@@ -1611,11 +1600,9 @@ export default function CentralHub({
             >
               {HOME_INFO_CARDS.map((item) => {
                 const cardStyle = {
-                  border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                  border: "1px solid var(--border-soft)",
                   borderRadius: 10,
-                  background: isDarkMode
-                    ? "rgba(15,23,42,0.88)"
-                    : "rgba(255,255,255,0.86)",
+                  background: "var(--card-bg-88)",
                   backdropFilter: "blur(6px)",
                   padding: isDenseViewport ? "5px 8px" : "7px 8px",
                   display: "flex",
@@ -1655,7 +1642,7 @@ export default function CentralHub({
                       style={{
                         fontSize: 11,
                         fontWeight: 600,
-                        color: isDarkMode ? "#E2E8F0" : "#334155",
+                        color: "var(--text-bright)",
                         lineHeight: 1.2,
                         overflow: "hidden",
                         textOverflow: "ellipsis",

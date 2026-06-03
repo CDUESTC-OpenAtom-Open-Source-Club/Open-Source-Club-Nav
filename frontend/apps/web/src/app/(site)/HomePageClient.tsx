@@ -79,26 +79,252 @@ export default function HomePage() {
   const isDarkMode = effectiveTheme === "dark";
   const themeVars = isDarkMode
     ? {
+        /* ── Page & Layout ── */
         "--page-bg": "#0B1220",
         "--panel-bg": "rgba(15,23,42,0.92)",
+        "--panel-bg-95": "rgba(15,23,42,0.95)",
+        "--panel-bg-98": "rgba(15,23,42,0.98)",
         "--card-bg": "rgba(15,23,42,0.72)",
         "--card-bg-strong": "#0F172A",
+        "--card-bg-86": "rgba(15,23,42,0.86)",
+        "--card-bg-88": "rgba(15,23,42,0.88)",
+        "--card-bg-82": "rgba(15,23,42,0.82)",
+        "--card-bg-75": "rgba(15,23,42,0.75)",
+        "--card-bg-68": "rgba(15,23,42,0.68)",
+        "--card-bg-62": "rgba(15,23,42,0.62)",
+        "--card-bg-42": "rgba(15,23,42,0.42)",
+        "--card-bg-24": "rgba(15,23,42,0.24)",
+        "--card-bg-deep": "#111827",
+        "--card-bg-semi": "rgba(30,41,59,0.5)",
+        "--card-bg-semi-78": "rgba(30,41,59,0.78)",
+        "--card-bg-semi-9": "rgba(15,23,42,0.9)",
+        "--card-bg-semi-active": "rgba(30,64,175,0.18)",
+        "--card-bg-semi-active-24": "rgba(30,64,175,0.24)",
+        "--card-bg-frost": "rgba(15,23,42,0.97)",
+        "--card-bg-frost-2": "rgba(15,23,42,0.94)",
+        "--card-bg-frost-3": "rgba(15,23,42,0.96)",
+        "--card-bg-overlay": "rgba(15,23,42,0.35)",
+        "--card-bg-blur": "rgba(15, 23, 42, 0.38)",
+        "--card-bg-work": "rgba(15,23,42,0.24)",
+        "--card-bg-work-m": "rgba(15,23,42,0.82)",
+        /* ── Text Colors ── */
         "--text-primary": "#F8FAFC",
         "--text-secondary": "#CBD5E1",
         "--text-muted": "#94A3B8",
+        "--text-dim": "#64748B",
+        "--text-bright": "#E2E8F0",
+        "--text-bright-2": "#E5EEF9",
+        "--text-link": "#93C5FD",
+        "--text-link-2": "#60A5FA",
+        "--text-desc": "#8EA3BE",
+        "--text-tag": "#9DB0C8",
+        "--text-nav-active": "#F8FAFC",
+        "--text-chip": "#CBD5E1",
+        "--text-control": "#CBD5E1",
+        "--text-control-active": "#93C5FD",
+        "--text-subtle": "#7A8EA5",
+        "--text-status": "#93C5FD",
+        "--text-status-bg": "rgba(30,41,59,0.4)",
+        "--text-footer": "#CBD5E1",
+        "--text-footer-sub": "#64748B",
+        /* ── Borders ── */
         "--border-soft": "#334155",
+        "--border-mid": "#475569",
+        "--border-light": "#E5E7EB",
+        "--border-chip": "#334155",
+        "--border-control": "#334155",
+        "--border-control-active": "rgba(59,130,246,0.22)",
+        "--border-control-active-solid": "#3B9CD744",
+        "--border-divider": "#334155",
+        "--border-tag": "#334155",
+        "--border-tag-2": "rgba(148,163,184,0.22)",
+        "--border-tag-3": "#334155",
+        "--border-avatar": "rgba(255,255,255,0.15)",
+        "--border-avatar-2": "#1E293B",
+        "--border-card-tag": "#334155",
+        "--border-card-tag-2": "rgba(148,163,184,0.18)",
+        "--border-status": "#334155",
+        "--border-section": "#334155",
+        "--border-soft-rgba": "rgba(148,163,184,0.22)",
+        "--border-soft-rgba-2": "rgba(255,255,255,0.06)",
+        "--border-soft-rgba-3": "rgba(255,255,255,0.12)",
+        "--border-soft-rgba-4": "rgba(96,165,250,0.42)",
+        "--border-active-soft": "rgba(51,65,85,0.95)",
+        /* ── Backgrounds ── */
+        "--bg-icon": "#1E293B",
+        "--bg-icon-2": "#0F172A",
+        "--bg-avatar": "rgba(255,255,255,0.06)",
+        "--bg-tag": "rgba(15,23,42,0.4)",
+        "--bg-tag-2": "rgba(15,23,42,0.42)",
+        "--bg-status": "rgba(30,41,59,0.4)",
+        "--bg-chip": "rgba(15,23,42,0.82)",
+        "--bg-control": "rgba(15,23,42,0.82)",
+        "--bg-control-active": "rgba(59,130,246,0.22)",
+        "--bg-btn-blue": "rgba(59,130,246,0.22)",
+        "--bg-btn-blue-active": "#F2FAFF",
+        "--bg-footer": "rgba(15,23,42,0.92)",
+        "--bg-scroll-btn": "rgba(15,23,42,0.88)",
+        "--bg-glow": "rgba(10,132,255,0.16)",
+        "--bg-glow-2": "rgba(6,229,204,0.12)",
+        "--bg-about-overlay": "rgba(15,23,42,0.55)",
+        "--bg-about": "rgba(15,23,42,0.98)",
+        "--bg-about-header": "rgba(15,23,42,0.94)",
+        "--bg-about-btn": "rgba(15,23,42,0.92)",
+        "--bg-tile-empty": "#0F172A99",
+        "--bg-board-gradient": "rgba(15,23,42,0.35), rgba(15,23,42,0.55)",
+        /* ── Shadows ── */
         "--shadow-card": "0 12px 28px rgba(0,0,0,0.28)",
+        "--shadow-hover": "0 5px 10px rgba(0,0,0,0.3)",
+        "--shadow-card-hover": "0 6px 14px rgba(0,0,0,0.4)",
+        "--shadow-float": "0 26px 64px rgba(0,0,0,0.44)",
+        "--shadow-scroll-btn": "0 14px 28px rgba(0,0,0,0.34)",
+        "--shadow-work-dark": "0 0 18px rgba(0,0,0,0.34), 0 8px 18px rgba(0,0,0,0.34)",
+        "--shadow-work-light": "0 0 16px rgba(0,0,0,0.4)",
+        "--shadow-work-hover": "0 8px 18px rgba(0,0,0,0.28)",
+        "--shadow-about": "0 26px 64px rgba(0,0,0,0.44)",
+        /* ── Misc ── */
+        "--hover-shadow": "0 5px 10px rgba(0,0,0,0.3)",
+        "--hover-border": "#3B82F6",
+        "--hover-border-2": "#475569",
+        "--hover-bg": "#0F172A",
+        "--hover-bg-2": "rgba(30,41,59,0.78)",
+        "--work-bg-hover": "rgba(30,41,59,0.78)",
+        "--list-border": "rgba(148,163,184,0.18)",
+        "--list-hover-border": "rgba(148,163,184,0.18)",
+        "--list-bg": "rgba(15,23,42,0.62)",
+        "--section-bg": "rgba(15,23,42,0.86)",
+        "--section-border": "#334155",
+        "--stage-overlay": "rgba(15,23,42,0.34)",
+        "--stage-border": "rgba(51,65,85,0.72)",
+        "--about-highlight-border": "#334155",
+        "--about-highlight-bg": "rgba(15,23,42,0.92)",
+        "--about-item-bg": "rgba(2,6,23,0.38)",
+        "--about-note-color": "#64748B",
+        "--about-nav-inactive-text": "#94A3B8",
       }
     : {
+        /* ── Page & Layout ── */
         "--page-bg": "#F3F6FA",
         "--panel-bg": "rgba(255,255,255,0.92)",
+        "--panel-bg-95": "rgba(255,255,255,0.95)",
+        "--panel-bg-98": "rgba(255,255,255,0.98)",
         "--card-bg": "rgba(255,255,255,0.86)",
         "--card-bg-strong": "#FFFFFF",
+        "--card-bg-86": "transparent",
+        "--card-bg-88": "rgba(255,255,255,0.86)",
+        "--card-bg-82": "rgba(255,255,255,0.82)",
+        "--card-bg-75": "rgba(255,255,255,0.9)",
+        "--card-bg-68": "rgba(255,255,255,0.7)",
+        "--card-bg-62": "#FCFDFE",
+        "--card-bg-42": "rgba(255,255,255,0.94)",
+        "--card-bg-24": "rgba(255,255,255,0.4)",
+        "--card-bg-deep": "#FAFBFC",
+        "--card-bg-semi": "#FFFFFF",
+        "--card-bg-semi-78": "#FFFFFF",
+        "--card-bg-semi-9": "rgba(255,255,255,0.96)",
+        "--card-bg-semi-active": "#EFF6FF",
+        "--card-bg-semi-active-24": "#EFF6FF",
+        "--card-bg-frost": "rgba(248,250,252,0.97)",
+        "--card-bg-frost-2": "rgba(255,255,255,0.92)",
+        "--card-bg-frost-3": "rgba(255,255,255,0.96)",
+        "--card-bg-overlay": "rgba(255, 255, 255, 0.4)",
+        "--card-bg-blur": "rgba(255,255,255,0.7)",
+        "--card-bg-work": "rgba(255,255,255,0.4)",
+        "--card-bg-work-m": "rgba(255,255,255,0.94)",
+        /* ── Text Colors ── */
         "--text-primary": "#0F172A",
         "--text-secondary": "#334155",
         "--text-muted": "#595959",
+        "--text-dim": "#64748B",
+        "--text-bright": "#0F172A",
+        "--text-bright-2": "#1E293B",
+        "--text-link": "#005FCC",
+        "--text-link-2": "#0A84FF",
+        "--text-desc": "#94A3B8",
+        "--text-tag": "#94A3B8",
+        "--text-nav-active": "#0F172A",
+        "--text-chip": "#5E6B7B",
+        "--text-control": "#7A8EA5",
+        "--text-control-active": "#3B9CD7",
+        "--text-subtle": "#7A8EA5",
+        "--text-status": "#2F7DD4",
+        "--text-status-bg": "#F7FBFF",
+        "--text-footer": "#94A3B8",
+        "--text-footer-sub": "#CBD5E1",
+        /* ── Borders ── */
         "--border-soft": "#E5E7EB",
+        "--border-mid": "#E5E7EB",
+        "--border-light": "#E5E7EB",
+        "--border-chip": "#E4ECF4",
+        "--border-control": "#E2EAF2",
+        "--border-control-active": "#F2FAFF",
+        "--border-control-active-solid": "#3B9CD744",
+        "--border-divider": "#E2EAF2",
+        "--border-tag": "#E6EDF5",
+        "--border-tag-2": "#E5E7EB",
+        "--border-tag-3": "#D7E5F5",
+        "--border-avatar": "rgba(0,0,0,0.05)",
+        "--border-avatar-2": "#FFFFFF",
+        "--border-card-tag": "#E6EDF5",
+        "--border-card-tag-2": "#EAF0F5",
+        "--border-status": "#D7E5F5",
+        "--border-section": "#EAF0F6",
+        "--border-soft-rgba": "rgba(148,163,184,0.22)",
+        "--border-soft-rgba-2": "rgba(0,0,0,0.06)",
+        "--border-soft-rgba-3": "rgba(255, 255, 255, 0.5)",
+        "--border-soft-rgba-4": "rgba(10,132,255,0.28)",
+        "--border-active-soft": "rgba(191,219,254,0.65)",
+        /* ── Backgrounds ── */
+        "--bg-icon": "#F1F5F9",
+        "--bg-icon-2": "#F8FAFC",
+        "--bg-avatar": "rgba(0,0,0,0.04)",
+        "--bg-tag": "#F8FBFF",
+        "--bg-tag-2": "transparent",
+        "--bg-status": "#F7FBFF",
+        "--bg-chip": "#FAFCFF",
+        "--bg-control": "rgba(255,255,255,0.82)",
+        "--bg-control-active": "#F2FAFF",
+        "--bg-btn-blue": "#F2FAFF",
+        "--bg-btn-blue-active": "#F2FAFF",
+        "--bg-footer": "rgba(255,255,255,0.9)",
+        "--bg-scroll-btn": "rgba(255,255,255,0.9)",
+        "--bg-glow": "rgba(10,132,255,0.12)",
+        "--bg-glow-2": "rgba(6,229,204,0.1)",
+        "--bg-about-overlay": "rgba(15,23,42,0.55)",
+        "--bg-about": "rgba(248,251,255,0.98)",
+        "--bg-about-header": "rgba(255,255,255,0.92)",
+        "--bg-about-btn": "rgba(255,255,255,0.92)",
+        "--bg-tile-empty": "#FFFFFF99",
+        "--bg-board-gradient": "rgba(255,255,255,0.35), rgba(241,245,249,0.45)",
+        /* ── Shadows ── */
         "--shadow-card": "0 8px 18px rgba(148,163,184,0.14)",
+        "--shadow-hover": "0 5px 10px rgba(15,23,42,0.08)",
+        "--shadow-card-hover": "0 6px 14px rgba(148,163,184,0.16)",
+        "--shadow-float": "0 26px 64px rgba(15,23,42,0.28)",
+        "--shadow-scroll-btn": "0 12px 24px rgba(15,23,42,0.16)",
+        "--shadow-work-dark": "0 0 14px rgba(148,163,184,0.14), 0 5px 14px rgba(148,163,184,0.14)",
+        "--shadow-work-light": "0 0 16px rgba(148,163,184,0.16)",
+        "--shadow-work-hover": "0 6px 12px rgba(148,163,184,0.14)",
+        "--shadow-about": "0 26px 64px rgba(15,23,42,0.28)",
+        /* ── Misc ── */
+        "--hover-shadow": "0 5px 10px rgba(15,23,42,0.08)",
+        "--hover-border": "#BFDBFE",
+        "--hover-border-2": "#E2E8F0",
+        "--hover-bg": "#FFFFFF",
+        "--hover-bg-2": "#FFFFFF",
+        "--work-bg-hover": "#FFFFFF",
+        "--list-border": "#EAF0F5",
+        "--list-hover-border": "#DCE6F2",
+        "--list-bg": "#FCFDFE",
+        "--section-bg": "transparent",
+        "--section-border": "#EAF0F6",
+        "--stage-overlay": "rgba(255,255,255,0.38)",
+        "--stage-border": "rgba(226,234,242,0.92)",
+        "--about-highlight-border": "#BFDBFE",
+        "--about-highlight-bg": "#EFF6FF",
+        "--about-item-bg": "#FFFFFF",
+        "--about-note-color": "#94A3B8",
+        "--about-nav-inactive-text": "#475569",
       };
 
   const handleBootComplete = useCallback(() => {
@@ -548,12 +774,10 @@ export default function HomePage() {
             width: 44,
             height: 44,
             borderRadius: "50%",
-            border: `1px solid ${isDarkMode ? "rgba(96,165,250,0.42)" : "rgba(10,132,255,0.28)"}`,
-            background: isDarkMode ? "rgba(15,23,42,0.88)" : "rgba(255,255,255,0.9)",
+            border: "1px solid var(--border-soft-rgba-4)",
+            background: "var(--bg-scroll-btn)",
             color: "#005FCC",
-            boxShadow: isDarkMode
-              ? "0 14px 28px rgba(0,0,0,0.34)"
-              : "0 12px 24px rgba(15,23,42,0.16)",
+            boxShadow: "var(--shadow-scroll-btn)",
             backdropFilter: "blur(12px)",
             WebkitBackdropFilter: "blur(12px)",
             display: "flex",
@@ -591,10 +815,8 @@ export default function HomePage() {
       <div
         style={{
           minHeight: isPhoneViewport ? 48 : "clamp(32px, 4vh, 38px)",
-          background: isDarkMode
-            ? "rgba(15,23,42,0.92)"
-            : "rgba(255,255,255,0.9)",
-          borderTop: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+          background: "var(--bg-footer)",
+          borderTop: "1px solid var(--border-soft)",
           display: "flex",
           alignItems: isPhoneViewport ? "flex-start" : "center",
           justifyContent: "space-between",
@@ -610,7 +832,7 @@ export default function HomePage() {
         <span
           style={{
             fontSize: isPhoneViewport ? 9 : "clamp(9px, 0.65vw, 10px)",
-            color: isDarkMode ? "#64748B" : "#CBD5E1",
+            color: "var(--text-footer-sub)",
             fontFamily: '"Courier New", monospace',
             letterSpacing: 1,
             whiteSpace: isPhoneViewport ? "normal" : "nowrap",
@@ -640,16 +862,14 @@ export default function HomePage() {
             onClick={() => setAboutOpen(true)}
             style={{
               fontSize: "clamp(9px, 0.65vw, 10px)",
-              color: isDarkMode ? "#CBD5E1" : "#94A3B8",
-              background: "transparent",
-              border: "none",
+              color: "var(--text-footer)",
               cursor: "pointer",
               padding: 0,
               transition: "color 0.15s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "#0A84FF")}
             onMouseLeave={(e) =>
-              (e.currentTarget.style.color = isDarkMode ? "#CBD5E1" : "#94A3B8")
+              (e.currentTarget.style.color = "var(--text-footer)")
             }
           >
             关于我们
@@ -665,15 +885,12 @@ export default function HomePage() {
               }
               style={{
                 fontSize: "clamp(9px, 0.65vw, 10px)",
-                color: isDarkMode ? "#CBD5E1" : "#94A3B8",
-                textDecoration: "none",
+                color: "var(--text-footer)",
                 transition: "color 0.15s",
               }}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#0A84FF")}
               onMouseLeave={(e) =>
-              (e.currentTarget.style.color = isDarkMode
-                ? "#CBD5E1"
-                : "#94A3B8")
+              (e.currentTarget.style.color = "var(--text-footer)")
               }
             >
               {item.label}
@@ -708,11 +925,9 @@ export default function HomePage() {
               width: isPhoneViewport ? "100%" : "min(1180px, 100%)",
               height: isPhoneViewport ? "min(94dvh, 860px)" : "min(88dvh, 860px)",
               borderRadius: isPhoneViewport ? 14 : 20,
-              border: `1px solid ${isDarkMode ? "rgba(51,65,85,0.95)" : "rgba(191,219,254,0.65)"}`,
-              background: isDarkMode ? "rgba(15,23,42,0.98)" : "rgba(248,251,255,0.98)",
-              boxShadow: isDarkMode
-                ? "0 26px 64px rgba(0,0,0,0.44)"
-                : "0 26px 64px rgba(15,23,42,0.28)",
+              border: "var(--border-active-soft)",
+              background: "var(--bg-about)",
+              boxShadow: "var(--shadow-about)",
               display: "flex",
               flexDirection: "column",
               position: "relative",
@@ -727,7 +942,7 @@ export default function HomePage() {
                 borderRadius: "50%",
                 right: -120,
                 top: -170,
-                background: isDarkMode ? "rgba(10,132,255,0.16)" : "rgba(10,132,255,0.12)",
+                background: "var(--bg-glow)",
                 pointerEvents: "none",
               }}
             />
@@ -739,7 +954,7 @@ export default function HomePage() {
                 borderRadius: "50%",
                 left: -90,
                 bottom: -130,
-                background: isDarkMode ? "rgba(6,229,204,0.12)" : "rgba(6,229,204,0.1)",
+                background: "var(--bg-glow-2)",
                 pointerEvents: "none",
               }}
             />
@@ -751,8 +966,8 @@ export default function HomePage() {
                 alignItems: "center",
                 gap: 20,
                 padding: isPhoneViewport ? "12px 14px" : "18px 20px",
-                borderBottom: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-                background: isDarkMode ? "rgba(15,23,42,0.94)" : "rgba(255,255,255,0.92)",
+                borderBottom: "var(--border-soft)",
+                background: "var(--bg-about-header)",
                 position: "relative",
               }}
             >
@@ -772,7 +987,7 @@ export default function HomePage() {
                   style={{
                     fontSize: isPhoneViewport ? 20 : 24,
                     fontWeight: 700,
-                    color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                    color: "var(--text-primary)",
                     lineHeight: 1.15,
                     marginTop: 4,
                   }}
@@ -788,10 +1003,10 @@ export default function HomePage() {
                   width: 32,
                   height: 32,
                   borderRadius: 10,
-                  border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-                  background: isDarkMode ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.92)",
+                  border: "var(--border-soft)",
+                  background: "var(--bg-about-btn)",
                   cursor: "pointer",
-                  color: isDarkMode ? "#CBD5E1" : "#94A3B8",
+                  color: "var(--text-chip)",
                   fontSize: 18,
                   lineHeight: 1,
                   transition: "all 0.2s ease",
@@ -826,14 +1041,10 @@ export default function HomePage() {
                           width: "100%",
                           border: isActive
                             ? "1px solid #93C5FD"
-                            : `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                            : "var(--border-soft)",
                           background: isActive
-                            ? isDarkMode
-                              ? "rgba(30,64,175,0.24)"
-                              : "#EFF6FF"
-                            : isDarkMode
-                              ? "rgba(15,23,42,0.88)"
-                              : "rgba(255,255,255,0.92)",
+                            ? "var(--card-bg-semi-active-24)"
+                            : "var(--card-bg-frost-2)",
                           borderRadius: 10,
                           padding: "8px 10px",
                           textAlign: "left",
@@ -862,12 +1073,8 @@ export default function HomePage() {
                             fontSize: 12,
                             fontWeight: 600,
                             color: isActive
-                              ? isDarkMode
-                                ? "#F8FAFC"
-                                : "#0F172A"
-                              : isDarkMode
-                                ? "#94A3B8"
-                                : "#475569",
+                              ? "var(--text-primary)"
+                              : "var(--about-nav-inactive-text)",
                           }}
                         >
                           {item.label}
@@ -1024,8 +1231,8 @@ export default function HomePage() {
 	                    <div
 	                      className="about-card"
 	                      style={{
-	                        borderColor: isDarkMode ? "#334155" : "#BFDBFE",
-	                        background: isDarkMode ? "rgba(15,23,42,0.92)" : "#EFF6FF",
+	                        borderColor: "var(--about-highlight-border)",
+	                        background: "var(--about-highlight-bg)",
 	                      }}
 	                    >
                       <div
@@ -1052,16 +1259,16 @@ export default function HomePage() {
                                   alignItems: "center",
                                   justifyContent: "space-between",
 	                                  gap: 8,
-	                                  border: `1px solid ${isDarkMode ? "#334155" : "#E2E8F0"}`,
+	                                  border: "var(--border-soft)",
 	                                  borderRadius: 8,
-	                                  background: isDarkMode ? "rgba(2,6,23,0.38)" : "#FFFFFF",
+	                                  background: "var(--about-item-bg)",
 	                                  padding: "5px 7px",
 	                                }}
 	                              >
 	                                <span
 	                                  style={{
 	                                    fontSize: 11,
-	                                    color: isDarkMode ? "#CBD5E1" : "#334155",
+	                                    color: "var(--text-secondary)",
 	                                    lineHeight: 1.4,
 	                                  }}
                                 >
@@ -1069,7 +1276,7 @@ export default function HomePage() {
                                   {item.note ? (
                                     <span
 	                                      style={{
-	                                        color: isDarkMode ? "#64748B" : "#94A3B8",
+	                                        color: "var(--about-note-color)",
 	                                        marginLeft: 3,
 	                                      }}
                                     >

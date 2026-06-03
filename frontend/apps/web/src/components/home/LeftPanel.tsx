@@ -34,18 +34,18 @@ const resetCategoryHoverStyle = (target: HTMLElement) => {
   target.style.boxShadow = "none";
 };
 
-const applyFriendLinkHoverStyle = (target: HTMLElement, isDark: boolean = false) => {
+const applyFriendLinkHoverStyle = (target: HTMLElement) => {
+  const cs = getComputedStyle(target);
   target.style.transform = "translateY(-1px)";
-  target.style.boxShadow = isDark
-    ? "0 5px 10px rgba(0,0,0,0.3)"
-    : "0 5px 10px rgba(15,23,42,0.08)";
-  target.style.borderColor = isDark ? "#3B82F6" : "#BFDBFE";
+  target.style.boxShadow = cs.getPropertyValue("--shadow-hover").trim() || "0 5px 10px rgba(15,23,42,0.08)";
+  target.style.borderColor = cs.getPropertyValue("--hover-border").trim() || "#BFDBFE";
 };
 
-const resetFriendLinkHoverStyle = (target: HTMLElement, isDark: boolean = false) => {
+const resetFriendLinkHoverStyle = (target: HTMLElement) => {
+  const cs = getComputedStyle(target);
   target.style.transform = "translateY(0)";
   target.style.boxShadow = "none";
-  target.style.borderColor = isDark ? "#334155" : "#E5E7EB";
+  target.style.borderColor = cs.getPropertyValue("--border-soft").trim() || "#E5E7EB";
 };
 
 type LeftPanelProps = {
@@ -147,10 +147,8 @@ export default function LeftPanel({
       style={{
         width: PANEL_WIDTH,
         minWidth: PANEL_WIDTH,
-        background: isDarkMode
-          ? "rgba(15,23,42,0.92)"
-          : "rgba(255,255,255,0.9)",
-        borderRight: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+        background: "var(--panel-bg)",
+        borderRight: "1px solid var(--border-soft)",
         display: "flex",
         flexDirection: "column",
         padding: "14px 0",
@@ -249,9 +247,7 @@ export default function LeftPanel({
                   borderRadius: 7,
                   background: isActive
                     ? `${cat.color}18`
-                    : isDarkMode
-                      ? "#1E293B"
-                      : "#F1F5F9",
+                    : "var(--bg-icon)",
                   border: `1px solid ${isActive ? cat.color + "40" : "#E5E7EB"}`,
                   display: "flex",
                   alignItems: "center",
@@ -271,12 +267,8 @@ export default function LeftPanel({
                     fontSize: 12,
                     fontWeight: 600,
                     color: isActive
-                      ? isDarkMode
-                        ? "#F8FAFC"
-                        : "#0F172A"
-                      : isDarkMode
-                        ? "#CBD5E1"
-                        : "#374151",
+                      ? "var(--text-primary)"
+                      : "var(--text-secondary)",
                     lineHeight: 1.2,
                   }}
                 >
@@ -336,9 +328,9 @@ export default function LeftPanel({
               data-ui-touch="true"
               style={{
                 textDecoration: "none",
-                border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                border: "1px solid var(--border-soft)",
                 borderRadius: 8,
-                background: isDarkMode ? "rgba(30,41,59,0.5)" : "#FFFFFF",
+                background: "var(--card-bg-semi)",
                 padding: "6px 8px",
                 display: "flex",
                 alignItems: "center",
@@ -346,13 +338,13 @@ export default function LeftPanel({
                 gap: 8,
                 transition: "all 0.18s ease",
               }}
-              onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
-              onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
+              onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget)}
+              onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget)}
             >
               <span
                 style={{
                   fontSize: 10,
-                  color: isDarkMode ? "#E2E8F0" : "#334155",
+                  color: "var(--text-bright)",
                   overflow: "hidden",
                   whiteSpace: "nowrap",
                   textOverflow: "ellipsis",
@@ -399,9 +391,9 @@ export default function LeftPanel({
                 data-ui-touch="true"
                 style={{
                   textDecoration: "none",
-                  border: `1px solid ${isDarkMode ? "#334155" : "#BFDBFE"}`,
+                  border: "1px solid var(--border-chip)",
                   borderRadius: 8,
-                  background: isDarkMode ? "rgba(30,41,59,0.5)" : "#FFFFFF",
+                  background: "var(--card-bg-semi)",
                   padding: "6px 8px",
                   display: "flex",
                   alignItems: "center",
@@ -409,8 +401,8 @@ export default function LeftPanel({
                   gap: 8,
                   transition: "all 0.18s ease",
                 }}
-                onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
-                onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget, isDarkMode)}
+                onMouseEnter={(e) => applyFriendLinkHoverStyle(e.currentTarget)}
+                onMouseLeave={(e) => resetFriendLinkHoverStyle(e.currentTarget)}
               >
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                   <Gamepad2 size={11} color="#0A84FF" />
@@ -418,7 +410,7 @@ export default function LeftPanel({
                     style={{
                       fontSize: 10,
                       fontWeight: 600,
-                      color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                      color: "var(--text-primary)",
                       overflow: "hidden",
                       whiteSpace: "nowrap",
                       textOverflow: "ellipsis",

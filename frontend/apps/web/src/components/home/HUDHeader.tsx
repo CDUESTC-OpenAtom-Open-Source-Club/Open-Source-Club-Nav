@@ -121,10 +121,8 @@ export default function HUDHeader({
     <header
       style={{
         height: compact ? 48 : HEADER_HEIGHT,
-        background: isDarkMode
-          ? "rgba(15,23,42,0.92)"
-          : "rgba(255,255,255,0.92)",
-        borderBottom: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+        background: "var(--panel-bg)",
+        borderBottom: "1px solid var(--border-soft)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         display: "flex",
@@ -151,12 +149,12 @@ export default function HUDHeader({
             width: compact ? 32 : 38,
             height: compact ? 32 : 38,
             borderRadius: "50%",
-            border: `1px solid ${isDarkMode ? "#475569" : "#BFDBFE"}`,
+            border: "1px solid var(--border-mid)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             overflow: "hidden",
-            background: isDarkMode ? "#0F172A" : "#FFFFFF",
+            background: "var(--bg-icon-2)",
             boxShadow: "0 2px 10px rgba(10,132,255,0.18)",
             flexShrink: 0,
           }}
@@ -180,7 +178,7 @@ export default function HUDHeader({
             style={{
               fontSize: compact ? 11 : 12,
               fontWeight: 600,
-              color: isDarkMode ? "#F8FAFC" : "#0F172A",
+              color: "var(--text-primary)",
               letterSpacing: 0.5,
             }}
           >
@@ -189,7 +187,7 @@ export default function HUDHeader({
           <div
             style={{
               fontSize: compact ? 8 : 9,
-              color: isDarkMode ? "#94A3B8" : "#64748B",
+              color: "var(--text-dim)",
               letterSpacing: compact ? 0.8 : 1.5,
               textTransform: "uppercase",
             }}
@@ -217,7 +215,7 @@ export default function HUDHeader({
               role="status"
               style={{
                 fontSize: 12,
-                color: isDarkMode ? "#93C5FD" : "#005FCC",
+                color: "var(--text-link)",
                 fontWeight: 500,
                 fontFamily: '"Courier New", monospace',
                 letterSpacing: 0.5,
@@ -230,7 +228,7 @@ export default function HUDHeader({
                   display: "inline-block",
                   width: 6,
                   height: 12,
-                  background: isDarkMode ? "#93C5FD" : "#005FCC",
+                  background: "var(--text-link)",
                   verticalAlign: "middle",
                   marginLeft: 2,
                   animation: "blink 1s infinite",
@@ -277,7 +275,7 @@ export default function HUDHeader({
               <div
                 style={{
                   fontSize: 9,
-                  color: isDarkMode ? "#94A3B8" : "#64748B",
+                  color: "var(--text-dim)",
                   textAlign: "right",
                   letterSpacing: 0.5,
                 }}

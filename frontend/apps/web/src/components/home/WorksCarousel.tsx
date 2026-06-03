@@ -305,7 +305,7 @@ function CardBody({
           <span
             style={{
               fontSize: 9,
-              color: isDarkMode ? "#94A3B8" : "#64748B",
+              color: "var(--text-muted)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -320,9 +320,9 @@ function CardBody({
             fontSize: 8,
             padding: "1px 6px",
             borderRadius: 999,
-            border: isDarkMode ? "1px solid #334155" : "1px solid #D7E5F5",
-            color: isDarkMode ? "#93C5FD" : "#2F7DD4",
-            background: isDarkMode ? "rgba(30,41,59,0.4)" : "#F7FBFF",
+            border: "var(--border-status)",
+            color: "var(--text-status)",
+            background: "var(--bg-status)",
             flexShrink: 0,
             maxWidth: 62,
             overflow: "hidden",
@@ -340,7 +340,7 @@ function CardBody({
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: isDarkMode ? "#F8FAFC" : "#1E293B",
+            color: "var(--text-primary)",
             lineHeight: 1.25,
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -352,7 +352,7 @@ function CardBody({
         <div
           style={{
             fontSize: 10,
-            color: isDarkMode ? "#94A3B8" : "#718096",
+            color: "var(--text-muted)",
             marginTop: 1,
             lineHeight: 1.35,
             overflow: "hidden",
@@ -366,10 +366,10 @@ function CardBody({
 
         {/* 激活卡片内部：新增 GitHub Contribution Graph 极小发光全息网格 */}
         {isCenter && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 7, borderTop: isDarkMode ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.03)", paddingTop: 6, flexShrink: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 7, borderTop: "var(--border-soft-rgba-2)", paddingTop: 6, flexShrink: 0 }}>
             <div style={{
               fontSize: 7.5,
-              color: isDarkMode ? "#64748B" : "#94A3B8",
+              color: "var(--text-dim)",
               letterSpacing: 0.5,
               textTransform: "uppercase",
               fontFamily: '"Courier New", monospace',
@@ -400,7 +400,7 @@ function CardBody({
                       const level = isActive ? (activeVal % 3) + 1 : 0; // 0, 1, 2, 3
 
                       const bg = level === 0
-                        ? (isDarkMode ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)")
+                        ? "var(--border-soft-rgba-2)"
                         : level === 1
                           ? `${work.color}22`
                           : level === 2
@@ -446,9 +446,9 @@ function CardBody({
               fontWeight: 600,
               padding: "2px 6px",
               borderRadius: 6,
-              border: isDarkMode ? "1px solid #334155" : "1px solid #E6EDF5",
-              color: isDarkMode ? "#CBD5E1" : "#728095",
-              background: isDarkMode ? "rgba(15,23,42,0.4)" : "#F8FBFF",
+              border: "var(--border-tag)",
+              color: "var(--text-chip)",
+              background: "var(--bg-tag)",
               display: "inline-flex",
               alignItems: "center"
             }}
@@ -476,7 +476,7 @@ function CardBody({
           justifyContent: "space-between",
           gap: 4,
           paddingTop: 5,
-          borderTop: isDarkMode ? "1px solid #334155" : "1px solid #EDF2F7",
+          borderTop: "var(--border-divider)",
           flexShrink: 0,
           position: "relative"
         }}
@@ -487,7 +487,7 @@ function CardBody({
             style={{
               fontSize: 10,
               fontWeight: 600,
-              color: isDarkMode ? "#94A3B8" : "#475569",
+              color: "var(--text-muted)",
               fontFamily: '"Courier New", monospace',
             }}
           >
@@ -511,12 +511,12 @@ function CardBody({
                   width: 16,
                   height: 16,
                   borderRadius: "50%",
-                  border: isDarkMode ? "1px solid #1E293B" : "1px solid #FFFFFF",
+                  border: "var(--border-avatar-2)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   padding: 0,
-                  background: isDarkMode ? "#0F172A" : "#E2E8F0",
+                  background: "var(--bg-icon-2)",
                   cursor: "pointer",
                   marginLeft: idx === 0 ? 0 : -4,
                   zIndex: arr.length - idx,
@@ -546,12 +546,12 @@ function CardBody({
                   position: "absolute",
                   bottom: 20,
                   right: 0,
-                  background: isDarkMode ? "rgba(15,23,42,0.96)" : "#FFFFFF",
+                  background: "var(--card-bg-frost-3)",
                   border: `1px solid ${work.color}bb`,
                   borderRadius: 4,
                   padding: "3px 6px",
                   fontSize: 7.5,
-                  color: isDarkMode ? "#F8FAFC" : "#0F172A",
+                  color: "var(--text-primary)",
                   whiteSpace: "nowrap",
                   zIndex: 999,
                   boxShadow: `0 2px 10px rgba(0,0,0,0.35)`,
@@ -606,10 +606,10 @@ function WorkCard({
         marginLeft: -98,
         marginTop: -108,
         height: 216,
-        background: isDarkMode ? "rgba(15,23,42,0.24)" : "rgba(255,255,255,0.4)",
+        background: "var(--card-bg-work)",
         backdropFilter: "blur(12px)",
         WebkitBackdropFilter: "blur(12px)",
-        border: `1px solid ${isCenter ? work.color + "55" : isDarkMode ? "#334155" : "#E5EDF5"}`,
+        border: `1px solid ${isCenter ? work.color + "55" : "var(--border-tag)"}`,
         borderRadius: 14,
         padding: "10px 10px",
         cursor: "pointer",
@@ -660,7 +660,7 @@ function MobileWorkCard({
         maxWidth: 332,
         margin: "0 auto",
         minHeight: 238,
-        background: isDarkMode ? "rgba(15,23,42,0.82)" : "rgba(255,255,255,0.94)",
+        background: "var(--card-bg-work-m)",
         border: `1px solid ${isDarkMode ? `${work.color}45` : `${work.color}2E`}`,
         borderRadius: 14,
         padding: "12px 12px",
@@ -690,10 +690,10 @@ function ListRow({
   work: any;
   isDarkMode?: boolean;
 }) {
-  const baseBorder = isDarkMode ? "rgba(148,163,184,0.18)" : "#EAF0F5";
+  const baseBorder = "var(--list-border)";
   const hoverBorder = isDarkMode ? `${work.color}66` : "#DCE6F2";
-  const baseBg = isDarkMode ? "rgba(15,23,42,0.62)" : "#FCFDFE";
-  const hoverBg = isDarkMode ? "rgba(30,41,59,0.78)" : "#FFFFFF";
+  const baseBg = "var(--list-bg)";
+  const hoverBg = "var(--work-bg-hover)";
 
   return (
     <button
@@ -725,9 +725,7 @@ function ListRow({
         e.currentTarget.style.borderColor = hoverBorder;
         e.currentTarget.style.background = hoverBg;
         e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow = isDarkMode
-          ? `0 8px 18px ${work.color}16, 0 8px 18px rgba(0,0,0,0.28)`
-          : "0 6px 12px rgba(148,163,184,0.14)";
+        e.currentTarget.style.boxShadow = "var(--shadow-work-hover)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = baseBorder;
@@ -752,7 +750,7 @@ function ListRow({
           style={{
             fontSize: 12,
             fontWeight: 600,
-            color: isDarkMode ? "#E5EEF9" : "#0F172A",
+            color: "var(--text-bright-2)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -763,7 +761,7 @@ function ListRow({
         <div
           style={{
             fontSize: 10,
-            color: isDarkMode ? "#8EA3BE" : "#94A3B8",
+            color: "var(--text-desc)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
@@ -781,9 +779,9 @@ function ListRow({
               fontSize: 8,
               padding: "1px 6px",
               borderRadius: 999,
-              border: `1px solid ${isDarkMode ? "rgba(148,163,184,0.22)" : "#E5E7EB"}`,
-              color: isDarkMode ? "#9DB0C8" : "#94A3B8",
-              background: isDarkMode ? "rgba(15,23,42,0.42)" : "transparent",
+              border: "var(--border-tag-2)",
+              color: "var(--text-tag)",
+              background: "var(--bg-tag-2)",
             }}
           >
             {t}
@@ -799,7 +797,7 @@ function ListRow({
           style={{
             fontSize: 10,
             fontWeight: 600,
-            color: isDarkMode ? "#CBD5E1" : "#374151",
+            color: "var(--text-secondary)",
             fontFamily: '"Courier New", monospace',
           }}
         >
@@ -815,7 +813,7 @@ function InsightCard({ icon: Icon, label, value, tint, isDarkMode = false }: any
     <div
       style={{
         border: `1px solid ${isDarkMode ? "rgba(255,255,255,0.06)" : `${tint}24`}`,
-        background: isDarkMode ? "rgba(15,23,42,0.24)" : "#FFFFFF",
+        background: "var(--card-bg-work)",
         backdropFilter: isDarkMode ? "blur(12px)" : "none",
         WebkitBackdropFilter: isDarkMode ? "blur(12px)" : "none",
         borderRadius: 11,
@@ -844,7 +842,7 @@ function InsightCard({ icon: Icon, label, value, tint, isDarkMode = false }: any
         <div
           style={{
             fontSize: 7.5,
-            color: isDarkMode ? "#64748B" : "#94A3B8",
+            color: "var(--text-dim)",
             letterSpacing: 0.2,
             textTransform: "uppercase",
             fontWeight: 700,
@@ -856,7 +854,7 @@ function InsightCard({ icon: Icon, label, value, tint, isDarkMode = false }: any
           style={{
             fontSize: 11,
             fontWeight: 700,
-            color: isDarkMode ? "#F8FAFC" : "#1E293B",
+            color: "var(--text-primary)",
             fontFamily: '"Courier New", monospace',
             marginTop: 1,
             whiteSpace: "nowrap",
@@ -1657,24 +1655,18 @@ export default function WorksCarousel({ isDarkMode = false }) {
     .slice(0, 5);
   const isDenseDesktop = isShortViewport && !isMobile;
   const desktopStageScale = isDenseDesktop ? 0.95 : isTablet ? 1 : 1.08;
-  const sectionBg = isDarkMode ? "rgba(15,23,42,0.86)" : "transparent";
-  const sectionBorder = isDarkMode ? "#334155" : "#EAF0F6";
-  const stageOverlayBg = isDarkMode
-    ? "rgba(15,23,42,0.34)"
-    : "rgba(255,255,255,0.38)";
-  const chipBorder = isDarkMode ? "#334155" : "#E4ECF4";
-  const chipBg = isDarkMode ? "rgba(15,23,42,0.82)" : "#FAFCFF";
-  const chipText = isDarkMode ? "#CBD5E1" : "#5E6B7B";
-  const controlBtnBorder = isDarkMode ? "#334155" : "#E2EAF2";
-  const controlBtnBg = isDarkMode
-    ? "rgba(15,23,42,0.82)"
-    : "rgba(255,255,255,0.82)";
-  const controlBtnActiveBg = isDarkMode
-    ? "rgba(59,130,246,0.22)"
-    : "#F2FAFF";
-  const controlBtnIconColor = isDarkMode ? "#CBD5E1" : "#7A8EA5";
-  const controlBtnActiveIconColor = isDarkMode ? "#93C5FD" : "#3B9CD7";
-  const controlDividerColor = isDarkMode ? "#334155" : "#E2EAF2";
+  const sectionBg = "var(--section-bg)";
+  const sectionBorder = "var(--section-border)";
+  const stageOverlayBg = "var(--stage-overlay)";
+  const chipBorder = "var(--border-chip)";
+  const chipBg = "var(--bg-chip)";
+  const chipText = "var(--text-chip)";
+  const controlBtnBorder = "var(--border-control)";
+  const controlBtnBg = "var(--bg-control)";
+  const controlBtnActiveBg = "var(--bg-control-active)";
+  const controlBtnIconColor = "var(--text-control)";
+  const controlBtnActiveIconColor = "var(--text-control-active)";
+  const controlDividerColor = "var(--border-control)";
   const stageMinHeight = isDenseDesktop ? 180 : isTablet ? 230 : 280;
   const stageBottomGap = isDenseDesktop ? 8 : 10;
   const carouselStatus = `${currentIndex + 1} / ${total}: ${focused?.title || "N/A"}`;
@@ -1821,7 +1813,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: isDarkMode ? "#E2E8F0" : "#0F172A",
+              color: "var(--text-bright)",
             }}
           >
             Member Works
@@ -2130,7 +2122,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
             borderRadius: 14,
             overflow: "hidden",
             outline: "none",
-            border: `1px solid ${isDarkMode ? "rgba(51,65,85,0.72)" : "rgba(226,234,242,0.92)"}`,
+            border: "var(--stage-border)",
             boxShadow: isFocused ? "inset 0 0 0 1px #BBDCF2" : "none",
           }}
           aria-label="成员作品轮播"

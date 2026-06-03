@@ -33,6 +33,13 @@ func main() {
 	if err := migrate.Run(migrateDSN); err != nil && err != migrateLib.ErrNoChange {
 		logger.Fatal("数据库迁移失败", zap.Error(err))
 	}
+
+	// 初始化 Redis
+	if err := utils.InitRedis(cfg.Redis.Addr, cfg.Redis.Password, cfg.Redis.DB); err != nil {
+		logger.Fatal("Redis 连接失败", zap.Error(err))
+	}
+	logger.Info("Redis 连接成功")
+
 	// ---------------------------------------------------
 	// 初始化路由
 
