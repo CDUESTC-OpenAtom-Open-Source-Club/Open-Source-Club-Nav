@@ -24,21 +24,20 @@ type LoginRequest struct {
 
 // RegisterHandler 只处理HTTP请求，业务逻辑交给service
 
-// 步骤1：修改RegisterHandler，添加logger参数
-func RegisterHandler(logger *zap.Logger) gin.HandlerFunc { // 新增logger参数
-	return func(c *gin.Context) { // 这里的c是gin.Context
-		var req RegisterRequest
+func RegisterHandler(logger *zap.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 直接用service的RegisterRequest类型
+		var req service.RegisterRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
-			// 替换utils.Logger为注入的logger
 			logger.Warn("注册参数错误", zap.Error(err))
 			c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误: " + err.Error()})
 			return
 		}
 
-		// 原有逻辑（获取DB、调用service等）
 		gormDB := middleware.GetDB(c)
 		userService := service.NewUserService(gormDB)
-		if err := userService.Register(service.RegisterRequest(req)); err != nil {
+		// 这里直接传req（已经是service.RegisterRequest类型）
+		if err := userService.Register(req); err != nil {
 			c.JSON(utils.ErrStatusCode(err), gin.H{"msg": err.Error()})
 			return
 		}

@@ -128,6 +128,7 @@ func registerResourceRoutes(g *gin.RouterGroup) {
 	// 资源矩阵
 	g.POST("/resources", handler.CreateResourceMatrix)
 	g.PUT("/resources/:id", handler.UpdateResourceMatrix)
+	g.DELETE("/resources/:id", handler.DeleteResourceMatrix)
 	// 小游戏
 	g.POST("/games", handler.CreateMiniGame)
 	g.PUT("/games/:id", handler.UpdateMiniGame)
@@ -135,10 +136,10 @@ func registerResourceRoutes(g *gin.RouterGroup) {
 	contentG := g.Group("/content")
 	contentG.Use(handler.RequireRole("editor", "super"))
 	{
+		contentG.GET("", handler.GetContentByType)
 		contentG.POST("", handler.CreateContent)
 		contentG.PUT("/:id", handler.UpdateContent)
 		contentG.DELETE("/:id", handler.DeleteContent)
-		contentG.PUT("/:id/toggle", handler.ToggleContentActive)
 	}
 }
 

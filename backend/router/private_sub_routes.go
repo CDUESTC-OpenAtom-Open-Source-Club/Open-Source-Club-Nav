@@ -41,7 +41,7 @@ func registerPrivateSubRoutes(g *gin.RouterGroup) {
 		contentGroup.POST("", handler.CreateContent)
 		contentGroup.PUT("/:id", handler.UpdateContent)
 		contentGroup.DELETE("/:id", handler.DeleteContent)
-		contentGroup.PUT("/:id/toggle", handler.ToggleContentActive)
+
 	}
 	// 5. 管理员列表接口（super权限）
 	g.GET("/backend/admin/list", handler.RequireRole("super"), handler.GetAdminListHandler(utils.Logger))

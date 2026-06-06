@@ -39,9 +39,9 @@ func SignAuth() gin.HandlerFunc {
 			return
 		}
 
-		// 3. 解析管理员信息并注入Context
-		var userInfo map[string]interface{}
-		if err := json.Unmarshal(userInfoBytes, &userInfo); err != nil {
+		// 改成（直接解析为model.User）：
+		var admin model.User
+		if err := json.Unmarshal(userInfoBytes, &admin); err != nil {
 			c.JSON(http.StatusUnauthorized, &utils.APIError{
 				Code:    http.StatusUnauthorized,
 				Message: "Session信息损坏",
@@ -49,13 +49,9 @@ func SignAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		// 将用户信息写入Context，供RequireRole等中间件使用
-		if admin, ok := userInfo["admin"].(model.User); ok {
-			c.Set("userID", admin.ID)
-			c.Set("username", admin.Username)
-			c.Set("role", admin.Role)
-		}
-		c.Set("admin_user", userInfo)
+		c.Set("userID", admin.ID)
+		c.Set("username", admin.Username)
+		c.Set("role", admin.Role)
 
 		// 4. 验证通过，继续执行后续接口
 		c.Next()

@@ -11,6 +11,8 @@ import (
 
 // SearchResourceMatrix 查询资源矩阵列表
 // 路由：GET /api/resources?module=resource_matrix
+// SearchResourceMatrix 查询资源矩阵列表
+// 路由：GET /api/resources?module=resource_matrix
 func SearchResourceMatrix(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
 	var resources []model.ResourceMatrix
@@ -19,9 +21,11 @@ func SearchResourceMatrix(c *gin.Context) {
 	keyword := c.Query("keyword")
 	query := db
 	if keyword != "" {
-		query = query.Where("name LIKE ? OR category LIKE ?", "%"+keyword+"%", "%"+keyword+"%").Order("sort ASC")
+		// 把sort换成id排序
+		query = query.Where("name LIKE ? OR category LIKE ?", "%"+keyword+"%", "%"+keyword+"%").Order("id ASC")
 	} else {
-		query = query.Order("sort ASC") // 默认按sort字段排序
+		// 把sort换成id排序
+		query = query.Order("id ASC")
 	}
 
 	// 查询表数据
@@ -36,6 +40,24 @@ func SearchResourceMatrix(c *gin.Context) {
 		"module": "resource_matrix",
 		"ok":     true,
 	})
+}
+
+// DeleteResourceMatrix 删除资源矩阵
+func DeleteResourceMatrix(c *gin.Context) {
+	// 1. 获取数据库实例
+	db := c.MustGet("db").(*gorm.DB)
+	// 2. 获取要删除的资源ID
+	id := c.Param("id")
+
+	// 3. 执行删除
+	var resource model.ResourceMatrix
+	if err := db.Delete(&resource, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除资源失败"})
+		return
+	}
+
+	// 4. 返回成功
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // CreateResourceMatrix 新增资源矩阵

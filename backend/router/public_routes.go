@@ -17,7 +17,7 @@ func registerPublicRoutes(g *gin.RouterGroup, logger *zap.Logger) { // 新增log
 
 	// 导航/资源等接口（保持不变）
 	g.GET("/nav/:id", handler.GetNavWithBusiness)
-	g.GET("/api/resources", handler.SearchResourceMatrix)
-	g.GET("/api/games", handler.SearchMiniGame)
-	g.GET("/api/articles", handler.SearchArticle)
+	g.GET("/resources", handler.SearchResourceMatrix)
+	g.GET("/games", handler.SearchMiniGame)
+	g.GET("/articles", handler.SearchArticle)
 }

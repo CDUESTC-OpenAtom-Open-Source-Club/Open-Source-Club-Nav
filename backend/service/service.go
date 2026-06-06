@@ -26,6 +26,7 @@ func NewUserService(db *gorm.DB) *UserService {
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required,min=8,max=256"`
+	Email    string `json:"email" binding:"required,email"` // 新增这行，同时加邮箱格式校验
 }
 
 // Register 执行注册业务逻辑
@@ -54,6 +55,7 @@ func (s *UserService) Register(req RegisterRequest) error {
 		Username:     req.Username,
 		PasswordHash: hashed,
 		Role:         "user", // 这里写死，防止前端注入role
+		Email:        req.Email,
 	}
 	if err := s.db.Create(&newUser).Error; err != nil {
 		utils.Logger.Error("注册失败", zap.Error(err))

@@ -1,13 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"open-source-club-nav/backend/middleware"
 	"open-source-club-nav/backend/model"
 	"open-source-club-nav/backend/utils"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -57,17 +58,28 @@ func AdminLoginHandler(c *gin.Context) {
 	}
 
 	// 4. 签发管理员 Cookie
-	session := middleware.GenerateAdminSession(user.ID)
-	if err := db.Model(&user).Update("session", session).Error; err != nil {
-		utils.Logger.Error("Session写入失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"err": "Session写入失败"})
-		return
-	}
+	sessionID := middleware.GenerateAdminSession(user.ID)
+
+	// 将用户信息存入Redis
+	userBytes, _ := json.Marshal(user)
+	utils.RedisClient.Set(
+		c.Request.Context(),
+		"admin_session:"+sessionID,
+		userBytes,
+		time.Hour*24*7,
+	)
+
+	// 不需要更新数据库的session字段了
+	// if err := db.Model(&user).Update("session", session).Error; err != nil {
+	// 	utils.Logger.Error("Session写入失败", zap.Error(err))
+	// 	c.JSON(http.StatusInternalServerError, gin.H{"err": "Session写入失败"})
+	// 	return
+	// }
 
 	// 更新最后登录信息
 	db.Model(&user).Updates(map[string]interface{}{
-		"last_login_at":  gorm.Expr("CURRENT_TIMESTAMP"),
-		"last_login_ip":  c.ClientIP(),
+		"last_login_at": gorm.Expr("CURRENT_TIMESTAMP"),
+		"last_login_ip": c.ClientIP(),
 	})
 
 	// 记录登录审计
@@ -80,7 +92,7 @@ func AdminLoginHandler(c *gin.Context) {
 	})
 
 	// 设置 Cookie（不绑定特定域名，支持跨域场景）
-	c.SetCookie("kcos_admin_session", session, 86400*7, "/", "", false, true)
+	c.SetCookie("kcos_admin_session", sessionID, 86400*7, "/", "", false, true)
 
 	// 5. 返回成功响应
 	c.JSON(http.StatusOK, gin.H{
