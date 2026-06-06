@@ -55,6 +55,12 @@ func registerAPIRoutes(r *gin.Engine, apiPrefix string) {
 		publicGroup.GET("/works", handler.GetPublicWorks)
 		publicGroup.GET("/works/:id", handler.GetWorkByID)
 		publicGroup.GET("/content", handler.GetContentByType)
+		publicGroup.GET("/activities", handler.GetActivities)
+		publicGroup.GET("/org-stats", handler.GetOrgStats)
+		publicGroup.GET("/github-users", handler.GetGitHubUsers)
+		publicGroup.GET("/github-contributors", handler.GetGitHubContributors)
+		publicGroup.GET("/system", handler.GetPublicSystem)
+		publicGroup.GET("/healthz", handler.HealthzHandler)
 	}
 
 	adminGroup := r.Group(apiPrefix + "/admin")

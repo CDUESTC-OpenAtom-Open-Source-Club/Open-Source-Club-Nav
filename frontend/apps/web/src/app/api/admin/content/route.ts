@@ -1,5 +1,4 @@
-// @route-desc BFF API route proxy/handler for /api/admin/content/route.ts
-import { fetchBackend } from "@/lib/backend-proxy";
+﻿import { fetchBackend } from "@/lib/backend-proxy";
 import { readJson, validateBody } from "@/lib/api-validate";
 import { z } from "zod";
 
@@ -33,7 +32,7 @@ export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) {
-    return Response.json({ error: "缺少 id" }, { status: 400 });
+    return Response.json({ error: "缂哄皯 id" }, { status: 400 });
   }
   return fetchBackend(request, `/api/content/${id}`);
 }
