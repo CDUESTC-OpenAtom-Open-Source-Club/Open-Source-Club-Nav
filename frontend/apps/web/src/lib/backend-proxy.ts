@@ -1,5 +1,7 @@
 const BACKEND_API_URL =
-  process.env.NEXT_PUBLIC_BACKEND_API_URL || "http://localhost:8080";
+  process.env.BACKEND_API_URL ||
+  process.env.NEXT_PUBLIC_BACKEND_API_URL ||
+  "http://localhost:8080";
 const BACKEND_API_PREFIX = process.env.BACKEND_API_PREFIX || "/api";
 
 export type FetchBackendOptions = {
@@ -8,12 +10,6 @@ export type FetchBackendOptions = {
   headers?: Record<string, string>;
 };
 
-/**
- * Proxy Next.js route request to backend service with:
- * - cookie passthrough
- * - JSON/body forwarding
- * - unified 502 fallback on network failure
- */
 export async function fetchBackend(
   request: Request,
   path: string,
@@ -71,7 +67,7 @@ export async function fetchBackend(
     return resp;
   } catch (error) {
     console.error(`[proxy] ${method} ${path} failed:`, error);
-    return Response.json({ error: "后端服务不可用" }, { status: 502 });
+    return Response.json({ error: "Backend service unavailable" }, { status: 502 });
   }
 }
 

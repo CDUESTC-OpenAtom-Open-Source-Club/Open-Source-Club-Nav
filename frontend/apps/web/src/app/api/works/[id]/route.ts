@@ -1,6 +1,4 @@
-// @route-desc BFF API route proxy/handler for /api/works/[id]/route.ts
-// 单个作品操作 - 代理到 Go 后端
-import { fetchBackend } from "@/lib/backend-proxy";
+﻿import { fetchBackend } from "@/lib/backend-proxy";
 
 export const revalidate = 60;
 

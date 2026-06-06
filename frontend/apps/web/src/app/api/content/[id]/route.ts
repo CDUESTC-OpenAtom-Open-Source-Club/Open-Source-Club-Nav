@@ -1,4 +1,3 @@
-// @route-desc BFF API route proxy/handler for /api/content/[id]/route.ts
 import { fetchBackend } from "@/lib/backend-proxy";
 
 export async function PUT(
