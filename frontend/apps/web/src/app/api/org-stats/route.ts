@@ -1,9 +1,7 @@
-// @route-desc BFF API route proxy/handler for /api/org-stats/route.ts
-import { fetchOrgStats } from "@/services/github";
+import { fetchBackend } from "@/lib/backend-proxy";
 
 export const revalidate = 60;
 
-export async function GET() {
-  const stats = await fetchOrgStats();
-  return Response.json(stats);
+export async function GET(request: Request) {
+  return fetchBackend(request, "/api/org-stats");
 }

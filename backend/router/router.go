@@ -1,20 +1,20 @@
 package router
 
 import (
+	"strings"
+	"time"
+
 	"open-source-club-nav/backend/config"
 	"open-source-club-nav/backend/handler"
 	"open-source-club-nav/backend/middleware"
 	"open-source-club-nav/backend/utils"
-	"strings"
-
-	"go.uber.org/zap"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 func InitRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
@@ -22,61 +22,89 @@ func InitRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	logger := utils.InitLogger()
 	defer utils.SyncLogger(logger)
 
-	// 全局中间件
 	r.Use(middleware.InjectDB(db, logger))
 	r.Use(initCors(cfg))
 
-	// Swagger
 	if gin.Mode() != gin.ReleaseMode {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	// 拆分路由：分别调用不同的注册函数
-	registerPublicRoutes(r.Group("/api"), logger)
 	registerBaseRoutes(r.Group(""), logger)
-	registerAdminRoutes(r.Group("/api/admin"))
-	registerMetricsRoutes(r.Group("/api/metrics"))
+	registerLegacyRoutes(r.Group(""), logger)
+	registerAPIRoutes(r, "/api", logger)
+	registerAPIRoutes(r, "/api/v1", logger)
 
 	return r
 }
 
-// 1. 初始化CORS（拆分独立函数）
 func initCors(cfg *config.Config) gin.HandlerFunc {
-	corsOrigins := strings.Split(cfg.CORS.AllowedOrigins, ",")
+	allowedOrigins := "http://localhost:4000"
+	if cfg != nil && strings.TrimSpace(cfg.CORS.AllowedOrigins) != "" {
+		allowedOrigins = cfg.CORS.AllowedOrigins
+	}
+
 	return cors.New(cors.Config{
-		AllowOrigins:     corsOrigins,
+		AllowOrigins:     splitCSV(allowedOrigins),
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Cookie", "X-CSRF-Token"},
 		AllowCredentials: true,
 	})
 }
 
-// 3. 基础端点路由（拆分）
 func registerBaseRoutes(g *gin.RouterGroup, logger *zap.Logger) {
-	g.POST("/register", handler.RegisterHandler(logger))
-	g.POST("/login", handler.LoginHandler(logger))
+	g.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler(logger))
+	g.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler(logger))
 	g.GET("/healthz", handler.HealthzHandler)
 }
 
-// 4. 后台接口路由（拆分，包含鉴权）
-func registerAdminRoutes(g *gin.RouterGroup) {
-	// 登录接口（无需鉴权）
-	g.POST("/login", handler.AdminLoginHandler)
+func registerLegacyRoutes(g *gin.RouterGroup, logger *zap.Logger) {
+	g.GET("/nav/search", handler.SearchNavItem)
 
-	// 鉴权后的后台子路由
+	backendGroup := g.Group("/backend")
+	backendGroup.Use(handler.AuthMiddleware(logger))
+	backendGroup.Use(handler.RequireRole("super"))
+	{
+		backendGroup.GET("/admin/list", handler.GetAdminListHandler(logger))
+	}
+}
+
+func registerAPIRoutes(r *gin.Engine, apiPrefix string, logger *zap.Logger) {
+	publicGroup := r.Group(apiPrefix)
+	{
+		publicGroup.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler(logger))
+		publicGroup.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler(logger))
+		publicGroup.GET("/healthz", handler.HealthzHandler)
+		publicGroup.GET("/nav/:id", handler.GetNavWithBusiness)
+		publicGroup.GET("/resources", handler.SearchResourceMatrix)
+		publicGroup.GET("/games", handler.SearchMiniGame)
+		publicGroup.GET("/articles", handler.SearchArticle)
+		publicGroup.GET("/links", handler.SearchNavItem)
+		publicGroup.GET("/works", handler.GetPublicWorks)
+		publicGroup.GET("/works/:id", handler.GetWorkByID)
+		publicGroup.GET("/content", handler.GetContentByType)
+		publicGroup.GET("/activities", handler.GetActivities)
+		publicGroup.GET("/org-stats", handler.GetOrgStats)
+		publicGroup.GET("/github-users", handler.GetGitHubUsers)
+		publicGroup.GET("/github-contributors", handler.GetGitHubContributors)
+		publicGroup.GET("/system", handler.GetPublicSystem)
+	}
+
+	registerAdminRoutes(r.Group(apiPrefix + "/admin"))
+	registerMetricsRoutes(r.Group(apiPrefix + "/metrics"))
+}
+
+func registerAdminRoutes(g *gin.RouterGroup) {
+	g.POST("/login", handler.RateLimit(3, time.Minute), handler.AdminLoginHandler)
+
 	authG := g.Group("")
 	authG.Use(middleware.SignAuth())
 	{
-		// 个人信息
 		authG.GET("/me", handler.GetAdminMe)
 		authG.POST("/logout", handler.AdminLogout)
 
-		// 文章子路由（继续拆分）
 		registerArticleRoutes(authG.Group("/articles"))
-		// 作品子路由
 		registerWorkRoutes(authG.Group("/works"))
 
-		// 其他后台功能
 		authG.GET("/stats", handler.GetAdminStats)
 		authG.GET("/logs", handler.GetAdminLogs)
 		authG.GET("/system", handler.GetAdminSystem)
@@ -84,14 +112,11 @@ func registerAdminRoutes(g *gin.RouterGroup) {
 		authG.POST("/link-health", handler.CheckLinkHealth)
 		authG.GET("/login-audit", handler.GetLoginAuditLogs)
 
-		// 超级管理员子路由
 		registerSuperAdminRoutes(authG.Group(""))
-		// 资源/内容子路由
 		registerResourceRoutes(authG)
 	}
 }
 
-// 4.1 文章子路由（更细粒度拆分）
 func registerArticleRoutes(g *gin.RouterGroup) {
 	g.POST("", handler.CreateArticle)
 	g.GET("/:id", handler.GetArticle)
@@ -100,7 +125,6 @@ func registerArticleRoutes(g *gin.RouterGroup) {
 	g.GET("", handler.ListArticles)
 }
 
-// 4.2 作品子路由（更细粒度拆分）
 func registerWorkRoutes(g *gin.RouterGroup) {
 	g.GET("", handler.GetAllWorks)
 	g.POST("", handler.CreateWork)
@@ -109,7 +133,6 @@ func registerWorkRoutes(g *gin.RouterGroup) {
 	g.POST("/sync", handler.SyncGitHubWorks)
 }
 
-// 4.3 超级管理员子路由
 func registerSuperAdminRoutes(g *gin.RouterGroup) {
 	superG := g.Group("")
 	superG.Use(handler.RequireRole("super"))
@@ -120,18 +143,14 @@ func registerSuperAdminRoutes(g *gin.RouterGroup) {
 	}
 }
 
-// 4.4 资源/内容子路由
 func registerResourceRoutes(g *gin.RouterGroup) {
-	// 链接
 	g.POST("/links", handler.CreateFriendLink)
 	g.PUT("/links/:id", handler.UpdateFriendLink)
-	// 资源矩阵
 	g.POST("/resources", handler.CreateResourceMatrix)
 	g.PUT("/resources/:id", handler.UpdateResourceMatrix)
-	// 小游戏
 	g.POST("/games", handler.CreateMiniGame)
 	g.PUT("/games/:id", handler.UpdateMiniGame)
-	// 内容
+
 	contentG := g.Group("/content")
 	contentG.Use(handler.RequireRole("editor", "super"))
 	{
@@ -142,8 +161,19 @@ func registerResourceRoutes(g *gin.RouterGroup) {
 	}
 }
 
-// 5. 统计接口路由（拆分）
 func registerMetricsRoutes(g *gin.RouterGroup) {
 	g.POST("/visit", handler.RecordVisit)
 	g.POST("/click", handler.RecordClick)
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+	return items
 }
