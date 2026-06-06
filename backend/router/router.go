@@ -1,63 +1,79 @@
 package router
 
 import (
+	"strings"
 	"time"
 
+	"open-source-club-nav/backend/config"
 	"open-source-club-nav/backend/handler"
 	"open-source-club-nav/backend/middleware"
+	"open-source-club-nav/backend/utils"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
-
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
-func InitRouter(db *gorm.DB) *gin.Engine {
+func InitRouter(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
+	logger := utils.InitLogger()
+	defer utils.SyncLogger(logger)
 
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:4000"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Cookie"},
-		AllowCredentials: true,
-	}))
-
-	r.Use(func(c *gin.Context) {
-		c.Set("db", db)
-		c.Next()
-	})
+	r.Use(middleware.InjectDB(db, logger))
+	r.Use(initCors(cfg))
 
 	if gin.Mode() != gin.ReleaseMode {
 		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	// Keep existing non-versioned auth and health endpoints.
-	publicGroup := r.Group("")
-	publicGroup.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler)
-	publicGroup.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler)
-	publicGroup.GET("/healthz", handler.HealthzHandler)
-
-	// Legacy endpoints kept for compatibility with main.
-	publicGroup.GET("/nav/search", handler.SearchNavItem)
-	backendGroup := r.Group("/backend")
-	backendGroup.Use(handler.AuthMiddleware())
-	backendGroup.Use(handler.RequireRole("super"))
-	{
-		backendGroup.GET("/admin/list", handler.GetAdminListHandler)
-	}
-
-	// Dual stack: keep /api and add /api/v1.
-	registerAPIRoutes(r, "/api")
-	registerAPIRoutes(r, "/api/v1")
+	registerBaseRoutes(r.Group(""), logger)
+	registerLegacyRoutes(r.Group(""), logger)
+	registerAPIRoutes(r, "/api", logger)
+	registerAPIRoutes(r, "/api/v1", logger)
 
 	return r
 }
 
-func registerAPIRoutes(r *gin.Engine, apiPrefix string) {
+func initCors(cfg *config.Config) gin.HandlerFunc {
+	allowedOrigins := "http://localhost:4000"
+	if cfg != nil && strings.TrimSpace(cfg.CORS.AllowedOrigins) != "" {
+		allowedOrigins = cfg.CORS.AllowedOrigins
+	}
+
+	return cors.New(cors.Config{
+		AllowOrigins:     splitCSV(allowedOrigins),
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Cookie", "X-CSRF-Token"},
+		AllowCredentials: true,
+	})
+}
+
+func registerBaseRoutes(g *gin.RouterGroup, logger *zap.Logger) {
+	g.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler(logger))
+	g.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler(logger))
+	g.GET("/healthz", handler.HealthzHandler)
+}
+
+func registerLegacyRoutes(g *gin.RouterGroup, logger *zap.Logger) {
+	g.GET("/nav/search", handler.SearchNavItem)
+
+	backendGroup := g.Group("/backend")
+	backendGroup.Use(handler.AuthMiddleware(logger))
+	backendGroup.Use(handler.RequireRole("super"))
+	{
+		backendGroup.GET("/admin/list", handler.GetAdminListHandler(logger))
+	}
+}
+
+func registerAPIRoutes(r *gin.Engine, apiPrefix string, logger *zap.Logger) {
 	publicGroup := r.Group(apiPrefix)
 	{
+		publicGroup.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler(logger))
+		publicGroup.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler(logger))
+		publicGroup.GET("/healthz", handler.HealthzHandler)
 		publicGroup.GET("/nav/:id", handler.GetNavWithBusiness)
 		publicGroup.GET("/resources", handler.SearchResourceMatrix)
 		publicGroup.GET("/games", handler.SearchMiniGame)
@@ -71,83 +87,93 @@ func registerAPIRoutes(r *gin.Engine, apiPrefix string) {
 		publicGroup.GET("/github-users", handler.GetGitHubUsers)
 		publicGroup.GET("/github-contributors", handler.GetGitHubContributors)
 		publicGroup.GET("/system", handler.GetPublicSystem)
-		publicGroup.GET("/healthz", handler.HealthzHandler)
 	}
 
-	adminGroup := r.Group(apiPrefix + "/admin")
+	registerAdminRoutes(r.Group(apiPrefix + "/admin"))
+	registerMetricsRoutes(r.Group(apiPrefix + "/metrics"))
+}
+
+func registerAdminRoutes(g *gin.RouterGroup) {
+	g.POST("/login", handler.RateLimit(3, time.Minute), handler.AdminLoginHandler)
+
+	authG := g.Group("")
+	authG.Use(middleware.SignAuth())
 	{
-		adminGroup.POST("/login", handler.AdminLoginHandler)
-	}
+		authG.GET("/me", handler.GetAdminMe)
+		authG.POST("/logout", handler.AdminLogout)
 
-	authGroup := r.Group(apiPrefix + "/admin")
-	authGroup.Use(middleware.SignAuth())
+		registerArticleRoutes(authG.Group("/articles"))
+		registerWorkRoutes(authG.Group("/works"))
+
+		authG.GET("/stats", handler.GetAdminStats)
+		authG.GET("/logs", handler.GetAdminLogs)
+		authG.GET("/system", handler.GetAdminSystem)
+		authG.GET("/link-health", handler.GetLinkHealth)
+		authG.POST("/link-health", handler.CheckLinkHealth)
+		authG.GET("/login-audit", handler.GetLoginAuditLogs)
+
+		registerSuperAdminRoutes(authG.Group(""))
+		registerResourceRoutes(authG)
+	}
+}
+
+func registerArticleRoutes(g *gin.RouterGroup) {
+	g.POST("", handler.CreateArticle)
+	g.GET("/:id", handler.GetArticle)
+	g.PUT("/:id", handler.UpdateArticle)
+	g.DELETE("/:id", handler.DeleteArticle)
+	g.GET("", handler.ListArticles)
+}
+
+func registerWorkRoutes(g *gin.RouterGroup) {
+	g.GET("", handler.GetAllWorks)
+	g.POST("", handler.CreateWork)
+	g.DELETE("/:id", handler.DeleteWork)
+	g.PATCH("/:id", handler.UpdateWork)
+	g.POST("/sync", handler.SyncGitHubWorks)
+}
+
+func registerSuperAdminRoutes(g *gin.RouterGroup) {
+	superG := g.Group("")
+	superG.Use(handler.RequireRole("super"))
 	{
-		authGroup.GET("/me", handler.GetAdminMe)
-		authGroup.POST("/logout", handler.AdminLogout)
-
-		articleGroup := authGroup.Group("/articles")
-		{
-			articleGroup.POST("", handler.CreateArticle)
-			articleGroup.GET("/:id", handler.GetArticle)
-			articleGroup.PUT("/:id", handler.UpdateArticle)
-			articleGroup.DELETE("/:id", handler.DeleteArticle)
-			articleGroup.GET("", handler.ListArticles)
-		}
-
-		worksGroup := authGroup.Group("/works")
-		{
-			worksGroup.GET("", handler.GetAllWorks)
-			worksGroup.POST("", handler.CreateWork)
-			worksGroup.DELETE("/:id", handler.DeleteWork)
-		}
-
-		authGroup.POST("/works/sync", handler.SyncGitHubWorks)
-		authGroup.PATCH("/works/:id", handler.UpdateWork)
-		authGroup.GET("/stats", handler.GetAdminStats)
-		authGroup.GET("/logs", handler.GetAdminLogs)
-		authGroup.GET("/system", handler.GetAdminSystem)
-		authGroup.GET("/link-health", handler.GetLinkHealth)
-		authGroup.POST("/link-health", handler.CheckLinkHealth)
-		authGroup.GET("/login-audit", handler.GetLoginAuditLogs)
-		authGroup.GET("/users", handler.RequireRole("super"), handler.GetAdminUsers)
-		authGroup.POST("/users", handler.RequireRole("super"), handler.CreateAdminUser)
-		authGroup.DELETE("/users/:id", handler.RequireRole("super"), handler.DeleteAdminUser)
+		superG.GET("/users", handler.GetAdminUsers)
+		superG.POST("/users", handler.CreateAdminUser)
+		superG.DELETE("/users/:id", handler.DeleteAdminUser)
 	}
+}
 
-	privateGroup := r.Group("")
-	privateGroup.Use(middleware.SignAuth())
+func registerResourceRoutes(g *gin.RouterGroup) {
+	g.POST("/links", handler.CreateFriendLink)
+	g.PUT("/links/:id", handler.UpdateFriendLink)
+	g.POST("/resources", handler.CreateResourceMatrix)
+	g.PUT("/resources/:id", handler.UpdateResourceMatrix)
+	g.POST("/games", handler.CreateMiniGame)
+	g.PUT("/games/:id", handler.UpdateMiniGame)
+
+	contentG := g.Group("/content")
+	contentG.Use(handler.RequireRole("editor", "super"))
 	{
-		adminLinkGroup := privateGroup.Group(apiPrefix + "/admin/links")
-		{
-			adminLinkGroup.POST("", handler.CreateFriendLink)
-			adminLinkGroup.PUT("/:id", handler.UpdateFriendLink)
-		}
+		contentG.POST("", handler.CreateContent)
+		contentG.PUT("/:id", handler.UpdateContent)
+		contentG.DELETE("/:id", handler.DeleteContent)
+		contentG.PUT("/:id/toggle", handler.ToggleContentActive)
+	}
+}
 
-		adminResourceGroup := privateGroup.Group(apiPrefix + "/admin/resources")
-		{
-			adminResourceGroup.POST("", handler.CreateResourceMatrix)
-			adminResourceGroup.PUT("/:id", handler.UpdateResourceMatrix)
-		}
+func registerMetricsRoutes(g *gin.RouterGroup) {
+	g.POST("/visit", handler.RecordVisit)
+	g.POST("/click", handler.RecordClick)
+}
 
-		adminGameGroup := privateGroup.Group(apiPrefix + "/admin/games")
-		{
-			adminGameGroup.POST("", handler.CreateMiniGame)
-			adminGameGroup.PUT("/:id", handler.UpdateMiniGame)
-		}
-
-		contentGroup := privateGroup.Group(apiPrefix + "/content")
-		contentGroup.Use(handler.RequireRole("editor", "super"))
-		{
-			contentGroup.POST("", handler.CreateContent)
-			contentGroup.PUT("/:id", handler.UpdateContent)
-			contentGroup.DELETE("/:id", handler.DeleteContent)
-			contentGroup.PUT("/:id/toggle", handler.ToggleContentActive)
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			items = append(items, trimmed)
 		}
 	}
-
-	metricsGroup := r.Group(apiPrefix + "/metrics")
-	{
-		metricsGroup.POST("/visit", handler.RecordVisit)
-		metricsGroup.POST("/click", handler.RecordClick)
-	}
+	return items
 }

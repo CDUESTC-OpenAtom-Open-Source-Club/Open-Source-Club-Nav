@@ -69,8 +69,8 @@ function ActivityCard({
       style={{
         padding: "10px 14px",
         borderRadius: 10,
-        border: `1px solid ${isDarkMode ? "#334155" : "#F1F5F9"}`,
-        background: isDarkMode ? "#111827" : "#FAFBFC",
+        border: "1px solid var(--border-soft)",
+        background: "var(--card-bg-deep)",
         display: "flex",
         gap: 10,
         alignItems: "flex-start",
@@ -80,14 +80,16 @@ function ActivityCard({
         cursor: "default",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = isDarkMode ? "#475569" : "#E2E8F0";
-        e.currentTarget.style.background = isDarkMode ? "#0F172A" : "#FFFFFF";
+        const cs = getComputedStyle(e.currentTarget);
+        e.currentTarget.style.borderColor = cs.getPropertyValue("--hover-border-2").trim();
+        e.currentTarget.style.background = cs.getPropertyValue("--hover-bg").trim();
         e.currentTarget.style.transform = "translateY(-1px)";
         e.currentTarget.style.boxShadow = "0 6px 12px rgba(15,23,42,0.16)";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = isDarkMode ? "#334155" : "#F1F5F9";
-        e.currentTarget.style.background = isDarkMode ? "#111827" : "#FAFBFC";
+        const cs = getComputedStyle(e.currentTarget);
+        e.currentTarget.style.borderColor = cs.getPropertyValue("--border-soft").trim();
+        e.currentTarget.style.background = cs.getPropertyValue("--card-bg-deep").trim();
         e.currentTarget.style.transform = "translateY(0)";
         e.currentTarget.style.boxShadow = "none";
       }}
@@ -136,7 +138,7 @@ function ActivityCard({
           <span
             style={{
               fontSize: 9,
-              color: isDarkMode ? "#64748B" : "#CBD5E1",
+              color: "var(--text-dim)",
               fontFamily: '"Courier New", monospace',
             }}
           >
@@ -147,7 +149,7 @@ function ActivityCard({
         <div
           style={{
             fontSize: 12,
-            color: isDarkMode ? "#E2E8F0" : "#374151",
+            color: "var(--text-bright)",
             marginTop: 4,
             fontWeight: 500,
             overflow: "hidden",
@@ -173,9 +175,9 @@ function ActivityCard({
                 style={{
                   fontSize: 10,
                   lineHeight: 1.45,
-                  color: isDarkMode ? "#CBD5E1" : "#64748B",
-                  background: isDarkMode ? "#0F172A" : "#F8FAFC",
-                  border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                  color: "var(--text-secondary)",
+                  background: "var(--card-bg-strong)",
+                  border: "1px solid var(--border-soft)",
                   borderRadius: 6,
                   padding: "4px 6px",
                   overflow: "hidden",
@@ -225,7 +227,7 @@ function ActivityCard({
             )}
           </div>
           <span style={{ fontSize: 10, color: "#94A3B8" }}>{item.actor.login}</span>
-          <span style={{ fontSize: 10, color: isDarkMode ? "#64748B" : "#CBD5E1" }}>•</span>
+          <span style={{ fontSize: 10, color: "var(--text-dim)" }}>•</span>
           <span
             style={{
               fontSize: 10,
@@ -246,8 +248,8 @@ function ActivityCard({
                 fontSize: 9,
                 color: "#94A3B8",
                 fontFamily: '"Courier New", monospace',
-                background: isDarkMode ? "#0F172A" : "#F8FAFC",
-                border: `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
+                background: "var(--card-bg-strong)",
+                border: "1px solid var(--border-soft)",
                 borderRadius: 4,
                 padding: "1px 6px",
                 display: "inline-block",
@@ -388,9 +390,9 @@ export default function RightPanel({
       style={{
         width: embedded ? "100%" : PANEL_WIDTH,
         minWidth: embedded ? "100%" : PANEL_WIDTH,
-        background: isDarkMode ? "rgba(15,23,42,0.92)" : "rgba(255,255,255,0.9)",
-        borderLeft: embedded ? "none" : `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}`,
-        borderTop: embedded ? `1px solid ${isDarkMode ? "#334155" : "#E5E7EB"}` : "none",
+        background: "var(--panel-bg)",
+        borderLeft: embedded ? "none" : "1px solid var(--border-soft)",
+        borderTop: embedded ? "1px solid var(--border-soft)" : "none",
         display: "flex",
         flexDirection: "column",
         overflowY: "auto",
@@ -400,19 +402,19 @@ export default function RightPanel({
       <div
         style={{
           padding: "16px 14px 12px",
-          borderBottom: `1px solid ${isDarkMode ? "#334155" : "#F1F5F9"}`,
+          borderBottom: "1px solid var(--border-divider)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           position: "sticky",
           top: embedded ? -1 : 0,
-          background: isDarkMode ? "rgba(15,23,42,0.95)" : "rgba(255,255,255,0.95)",
+          background: "var(--panel-bg-95)",
           backdropFilter: "blur(8px)",
           zIndex: 10,
         }}
       >
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: isDarkMode ? "#F8FAFC" : "#0F172A" }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
             成员动态
           </div>
           <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 2, letterSpacing: 0.5 }}>
@@ -426,7 +428,7 @@ export default function RightPanel({
             width: 28,
             height: 28,
             borderRadius: 7,
-            border: `1px solid ${isDarkMode ? "#475569" : "#E5E7EB"}`,
+            border: "1px solid var(--border-control)",
             background: "transparent",
             display: "flex",
             alignItems: "center",
@@ -446,13 +448,13 @@ export default function RightPanel({
         >
           <RefreshCw
             size={13}
-            color={isDarkMode ? "#CBD5E1" : "#94A3B8"}
+            color="var(--text-chip)"
             style={{ animation: loading ? "spin 0.8s linear infinite" : "none" }}
           />
         </button>
       </div>
 
-      <div style={{ padding: "8px 14px", borderBottom: `1px solid ${isDarkMode ? "#334155" : "#F1F5F9"}` }}>
+      <div style={{ padding: "8px 14px", borderBottom: "1px solid var(--border-divider)" }}>
         <div
           style={{
             display: "inline-flex",
@@ -495,9 +497,9 @@ export default function RightPanel({
             data-ui-touch="true"
             style={{
               borderRadius: 999,
-              border: `1px solid ${isDarkMode ? "#475569" : "#E5E7EB"}`,
+              border: "1px solid var(--border-control)",
               background: "transparent",
-              color: isDarkMode ? "#CBD5E1" : "#475569",
+              color: "var(--text-chip)",
               fontSize: 9,
               fontWeight: 600,
               padding: "4px 8px",
@@ -531,7 +533,7 @@ export default function RightPanel({
       <div
         style={{
           padding: "12px 14px",
-          borderTop: `1px solid ${isDarkMode ? "#334155" : "#F1F5F9"}`,
+          borderTop: "1px solid var(--border-divider)",
           display: "flex",
           justifyContent: "space-between",
         }}

@@ -1,39 +1,61 @@
-// middleware/auth.go
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
+
+	"open-source-club-nav/backend/utils" // 导入之前的utils（含Redis、APIError）
+
 	"open-source-club-nav/backend/model"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
+// SignAuth 基于Redis+安全Session的管理员Cookie鉴权
 // SignAuth 改为Cookie鉴权（验证kcos_admin_session）
 // 验证通过后将 userID、username、role 写入 Context，供后续 RBAC 使用。
 func SignAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 1. 从Cookie中获取session
+		// 1. 从Cookie获取管理员Session（对应登录时设置的"kcos_admin_session"）
 		session, err := c.Cookie("kcos_admin_session")
 		if err != nil || session == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"msg": "缺少管理员Session"})
+			c.JSON(http.StatusUnauthorized, &utils.APIError{
+				Code:    http.StatusUnauthorized,
+				Message: "缺少管理员Session,请登录",
+			})
 			c.Abort()
 			return
 		}
 
-		// 2. 从数据库验证session是否有效
-		db := c.MustGet("db").(*gorm.DB)
-		var admin model.User
-		if err := db.Where("session = ?", session).First(&admin).Error; err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"msg": "Session无效或已过期"})
+		// 2. 从Redis校验管理员Session（前缀用"admin_session:"）
+		ctx := c.Request.Context()
+		userInfoBytes, err := utils.RedisClient.Get(ctx, "admin_session:"+session).Bytes()
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, &utils.APIError{
+				Code:    http.StatusUnauthorized,
+				Message: "Session无效或已过期,请重新登录",
+			})
 			c.Abort()
 			return
 		}
 
-		// 3. 将用户信息写入 Context，供 RequireRole 等中间件使用
-		c.Set("userID", admin.ID)
-		c.Set("username", admin.Username)
-		c.Set("role", admin.Role)
+		// 3. 解析管理员信息并注入Context
+		var userInfo map[string]interface{}
+		if err := json.Unmarshal(userInfoBytes, &userInfo); err != nil {
+			c.JSON(http.StatusUnauthorized, &utils.APIError{
+				Code:    http.StatusUnauthorized,
+				Message: "Session信息损坏",
+			})
+			c.Abort()
+			return
+		}
+		// 将用户信息写入Context，供RequireRole等中间件使用
+		if admin, ok := userInfo["admin"].(model.User); ok {
+			c.Set("userID", admin.ID)
+			c.Set("username", admin.Username)
+			c.Set("role", admin.Role)
+		}
+		c.Set("admin_user", userInfo)
 
 		// 4. 验证通过，继续执行后续接口
 		c.Next()

@@ -1,156 +1,133 @@
-// handler/user_handler.go
 package handler
 
 import (
 	"net/http"
-	"open-source-club-nav/backend/model"
-	"open-source-club-nav/backend/utils"
-	"strings"
+	"open-source-club-nav/backend/middleware" // 假设你已经定义了middleware
+	"open-source-club-nav/backend/service"
+	"open-source-club-nav/backend/utils" // 假设你已经定义了utils
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-// RegisterHandler 用户注册接口（首字母大写，允许外部调用）
-// @Summary 用户注册
-// @Description 新用户注册，创建账号
-// @Tags 用户
-// @Accept json
-// @Produce json
-// @Param user body model.User true "注册信息"
-// @Success 200 {string} string "注册成功"
-// @Router /register [post]
-func RegisterHandler(c *gin.Context) {
-	// 1. 绑定请求参数
-	var reqUser model.User
-	if err := c.ShouldBindJSON(&reqUser); err != nil {
-		utils.Logger.Warn("注册参数错误", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误"})
-		return
-	}
-
-	// 1.1 基础输入校验
-	reqUser.Username = strings.TrimSpace(reqUser.Username)
-	if reqUser.Username == "" || reqUser.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "用户名和密码不能为空"})
-		return
-	}
-	if len(reqUser.Username) > 64 {
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "用户名长度不能超过64"})
-		return
-	}
-	if len(reqUser.Password) < 6 || len(reqUser.Password) > 256 {
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "密码长度需在6-256位之间"})
-		return
-	}
-
-	// 2. 获取DB连接
-	db, ok := c.Get("db")
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "数据库未初始化"})
-		return
-	}
-	gormDB := db.(*gorm.DB)
-
-	// 3. 密码加密（与 Next BFF 一致的 scrypt 格式，保证两层互通）
-	hashed, err := utils.HashPassword(reqUser.Password)
-	if err != nil {
-		utils.Logger.Error("密码加密失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败"})
-		return
-	}
-	reqUser.PasswordHash = hashed
-	reqUser.Role = "user" // 默认普通用户
-
-	// 4. 写入数据库
-	if err := gormDB.Create(&reqUser).Error; err != nil {
-		utils.Logger.Error("注册失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "注册失败"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"msg": "注册成功"})
+// 注意：这里的RegisterRequest和LoginRequest可以统一放到model/dto里，避免重复
+type RegisterRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required,min=6,max=256"`
 }
 
-// LoginHandler 用户登录接口
-// @Summary 用户登录
-// @Description 账号密码登录，获取Token
-// @Tags 用户
-// @Accept json
-// @Produce json
-// @Param user body model.User true "登录信息"
-// @Success 200 {string} string "token"
-// @Router /login [post]
-func LoginHandler(c *gin.Context) {
-	var reqUser model.User
-	if err := c.ShouldBindJSON(&reqUser); err != nil {
-		utils.Logger.Warn("登录参数错误", zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误"})
-		return
-	}
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
 
-	// 获取DB
-	// 替换user_handler.go里的c.Get("db")代码（比如第80行）
-	db, ok := c.Get("db")
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "数据库未初始化"})
-		return
-	}
-	gormDB := db.(*gorm.DB) // 后续用gormDB操作数据库
-	var dbUser model.User
-	if err := gormDB.Where("username = ?", reqUser.Username).First(&dbUser).Error; err != nil {
-		utils.Logger.Warn("用户不存在", zap.String("username", reqUser.Username))
-		c.JSON(http.StatusUnauthorized, gin.H{"msg": "账号或密码错误"})
-		return
-	}
+// RegisterHandler 只处理HTTP请求，业务逻辑交给service
 
-	// 验证密码（兼容历史 bcrypt 哈希，校验通过后自动重哈希为 scrypt）
-	ok, legacy := utils.VerifyPassword(reqUser.Password, dbUser.PasswordHash)
-	if !ok {
-		utils.Logger.Warn("密码错误", zap.String("username", reqUser.Username))
-		c.JSON(http.StatusUnauthorized, gin.H{"msg": "账号或密码错误"})
-		return
-	}
-	if legacy {
-		if newHash, herr := utils.HashPassword(reqUser.Password); herr == nil {
-			if uerr := gormDB.Model(&model.User{}).Where("id = ?", dbUser.ID).
-				Update("password_hash", newHash).Error; uerr != nil {
-				utils.Logger.Warn("历史口令重哈希失败", zap.Error(uerr))
-			}
+// 步骤1：修改RegisterHandler，添加logger参数
+func RegisterHandler(logger *zap.Logger) gin.HandlerFunc { // 新增logger参数
+	return func(c *gin.Context) { // 这里的c是gin.Context
+		var req RegisterRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			// 替换utils.Logger为注入的logger
+			logger.Warn("注册参数错误", zap.Error(err))
+			c.JSON(http.StatusBadRequest, gin.H{"msg": "参数错误: " + err.Error()})
+			return
 		}
-	}
 
-	// 生成Token
-	token, err := utils.GenerateToken(dbUser.Username, dbUser.Role)
-	if err != nil {
-		utils.Logger.Error("Token生成失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "登录失败"})
-		return
-	}
+		// 原有逻辑（获取DB、调用service等）
+		gormDB := middleware.GetDB(c)
+		userService := service.NewUserService(gormDB)
+		if err := userService.Register(service.RegisterRequest(req)); err != nil {
+			c.JSON(utils.ErrStatusCode(err), gin.H{"msg": err.Error()})
+			return
+		}
 
-	c.JSON(http.StatusOK, gin.H{"token": token})
+		c.JSON(http.StatusOK, gin.H{"msg": "注册成功"})
+	}
 }
 
-// GetAdminListHandler 获取管理员列表
-// @Summary 获取管理员列表
-// @Description 查看所有管理员账号
-// @Tags 管理员
-// @Produce json
-// @Success 200 {array} model.User "管理员列表"
-// @Router /backend/admin/list [get]
-func GetAdminListHandler(c *gin.Context) {
-	db, ok := c.Get("db")
-	if !ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "数据库未初始化"})
-		return
+// 给LoginHandler添加logger参数
+func LoginHandler(logger *zap.Logger) gin.HandlerFunc { // 新增logger参数
+	return func(c *gin.Context) { // 这里的c是gin.Context
+		var req LoginRequest
+		if err := c.ShouldBindJSON(&req); err != nil {
+			// 替换utils.Logger为注入的logger
+			logger.Warn("登录参数错误", zap.Error(err))
+			// 替换为统一的APIError响应
+			c.JSON(http.StatusBadRequest, &utils.APIError{
+				Code:    http.StatusBadRequest,
+				Message: "参数错误",
+			})
+			return
+		}
+
+		// 初始化service（原逻辑保留）
+		dbVal, ok := c.Get("db")
+		if !ok {
+			c.JSON(http.StatusInternalServerError, &utils.APIError{
+				Code:    http.StatusInternalServerError,
+				Message: "数据库未初始化",
+			})
+			return
+		}
+		gormDB, ok := dbVal.(*gorm.DB)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, &utils.APIError{
+				Code:    http.StatusInternalServerError,
+				Message: "数据库连接类型错误",
+			})
+			return
+		}
+		userService := service.NewUserService(gormDB)
+
+		// 调用service的登录方法（注意：变量名从token改成session）
+		session, err := userService.Login(service.LoginRequest(req))
+		if err != nil {
+			// 用utils的ErrStatusCode获取错误对应的HTTP状态码
+			c.JSON(utils.ErrStatusCode(err), err)
+			return
+		}
+
+		// ========== 新增：设置Session到Cookie ==========
+		c.SetCookie(
+			"kcos_user_session", // Cookie名（区分普通用户）
+			session,             // service返回的安全Session
+			86400,               // 过期时间：24小时（秒）
+			"/",                 // 全站可用
+			"",                  // 域名（留空为当前域名）
+			false,               // Secure：本地开发用false，HTTPS环境改true
+			true,                // HttpOnly：防止XSS攻击
+		)
+		// ========== Cookie设置结束 ==========
+
+		// 替换原有的"token"响应，改为统一的APIResponse
+		c.JSON(http.StatusOK, &utils.APIResponse{
+			Code:    0,
+			Message: "登录成功",
+		})
+	} // 补全这个闭合的}，之前可能漏了
+}
+
+func GetAdminListHandler(logger *zap.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		dbval, ok := c.Get("db")
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"msg": "数据库未初始化"})
+			return
+		}
+		gormDB, ok := dbval.(*gorm.DB)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"msg": "数据库连接类型错误"})
+			return
+		}
+		userService := service.NewUserService(gormDB)
+		admins, err := userService.GetAdminList()
+		if err != nil {
+			logger.Warn("获取管理员列表失败", zap.Error(err))
+			c.JSON(utils.ErrStatusCode(err), gin.H{"msg": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"data": admins})
 	}
-	gormDB := db.(*gorm.DB)
-	var admins []model.User
-	if err := gormDB.Where("role IN ?", []string{"super", "editor"}).Find(&admins).Error; err != nil {
-		utils.Logger.Error("查询管理员失败", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"msg": "查询失败"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"data": admins})
 }
