@@ -1,6 +1,8 @@
 package router
 
 import (
+	"time"
+
 	"open-source-club-nav/backend/handler"
 	"open-source-club-nav/backend/middleware"
 
@@ -33,9 +35,18 @@ func InitRouter(db *gorm.DB) *gin.Engine {
 
 	// Keep existing non-versioned auth and health endpoints.
 	publicGroup := r.Group("")
-	publicGroup.POST("/register", handler.RegisterHandler)
-	publicGroup.POST("/login", handler.LoginHandler)
+	publicGroup.POST("/register", handler.RateLimit(10, time.Minute), handler.RegisterHandler)
+	publicGroup.POST("/login", handler.RateLimit(20, time.Minute), handler.LoginHandler)
 	publicGroup.GET("/healthz", handler.HealthzHandler)
+
+	// Legacy endpoints kept for compatibility with main.
+	publicGroup.GET("/nav/search", handler.SearchNavItem)
+	backendGroup := r.Group("/backend")
+	backendGroup.Use(handler.AuthMiddleware())
+	backendGroup.Use(handler.RequireRole("super"))
+	{
+		backendGroup.GET("/admin/list", handler.GetAdminListHandler)
+	}
 
 	// Dual stack: keep /api and add /api/v1.
 	registerAPIRoutes(r, "/api")
