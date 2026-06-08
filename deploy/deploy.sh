@@ -50,30 +50,28 @@ else
   die ".env 文件不存在: ${ENV_FILE}"
 fi
 
-# ── SQLite 备份（仅在迁移文件变更时） ─────────────────────────────────────────
-# SQLite 是单文件 + WAL 模式，使用 .backup 命令做热备份，无需停服。
-# 如果 backend 容器还没启动（首次部署），跳过备份。
+# ── Database backup (only when migration files changed) ───────────────────────
 if [[ "${DB_CHANGED}" == "true" ]]; then
-  BACKUP_DIR="${DEPLOY_DIR}/backups/sqlite"
+  BACKUP_DIR="${DEPLOY_DIR}/backups/mysql"
   mkdir -p "${BACKUP_DIR}"
-  BACKUP_FILE="${BACKUP_DIR}/$(date '+%Y%m%d_%H%M%S')-${SHA}.db"
+  BACKUP_FILE="${BACKUP_DIR}/$(date '+%Y%m%d_%H%M%S')-${SHA}.sql"
 
-  if docker compose -f "${COMPOSE_FILE}" ps --status running --services 2>/dev/null | grep -qw backend; then
-    log "数据库迁移变更 detected，执行 SQLite 热备份..."
-    # 容器内执行 .backup 写到挂载的数据目录，再 cp 出来后删除临时文件
-    docker compose -f "${COMPOSE_FILE}" exec -T backend \
-      sh -c 'cp /app/data/app.db /app/data/.deploy-backup.db' \
-      && docker cp "$(docker compose -f "${COMPOSE_FILE}" ps -q backend)":/app/data/.deploy-backup.db "${BACKUP_FILE}" \
-      && docker compose -f "${COMPOSE_FILE}" exec -T backend rm -f /app/data/.deploy-backup.db \
-      && gzip "${BACKUP_FILE}" \
-      && log "SQLite 备份完成: ${BACKUP_FILE}.gz" \
-      || log "WARN: SQLite 备份失败，继续部署（建议手动检查）"
+  if docker compose -f "${COMPOSE_FILE}" ps --status running --services 2>/dev/null | grep -qw mysql; then
+    log "数据库迁移变更 detected，执行 MySQL 备份..."
+    if docker compose -f "${COMPOSE_FILE}" exec -T mysql sh -c \
+      'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction "$MYSQL_DATABASE"' \
+      > "${BACKUP_FILE}"; then
+      gzip "${BACKUP_FILE}"
+      log "MySQL 备份完成: ${BACKUP_FILE}.gz"
+    else
+      rm -f "${BACKUP_FILE}"
+      log "WARN: MySQL 备份失败，继续部署（建议手动检查）"
+    fi
   else
-    log "backend 容器未运行，跳过 SQLite 备份"
+    log "mysql 容器未运行，跳过数据库备份"
   fi
 
-  # 只保留最近 30 个备份
-  ls -1t "${BACKUP_DIR}"/*.db.gz 2>/dev/null | tail -n +31 | xargs -r rm -f
+  ls -1t "${BACKUP_DIR}"/*.sql.gz 2>/dev/null | tail -n +31 | xargs -r rm -f
 fi
 
 # ── 更新 .env 中的镜像变量 ────────────────────────────────────────────────────

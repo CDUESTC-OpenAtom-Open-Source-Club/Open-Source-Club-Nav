@@ -1,5 +1,15 @@
 mysql:
-  dsn: "root:change-me@tcp(127.0.0.1:3306)/test_db?charset=utf8mb4&parseTime=True&loc=Local"
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: "change-me"
+  database: test_db
 jwt:
   secret: "change-me"
   expire: 3600
+cors:
+  allowed_origins: "http://localhost:4000"
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
