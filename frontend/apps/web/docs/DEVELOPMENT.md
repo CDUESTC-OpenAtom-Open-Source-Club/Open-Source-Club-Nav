@@ -45,7 +45,12 @@
 - `src/app/api/admin/links/route.ts`
 - `src/app/api/admin/stats/route.ts`
 - `src/app/api/admin/link-health/route.ts`
+- `src/app/api/admin/login-audit/route.ts`
 - `src/app/api/admin/logs/route.ts`
+- `src/app/api/admin/works/sync/route.ts`
+- `src/app/api/admin/works/[id]/route.ts`
+- `src/app/api/admin/content/[id]/route.ts`
+- `src/app/api/admin/content/[id]/toggle/route.ts`
 - `src/app/api/admin/users/route.ts`
 - `src/lib/admin-auth.ts`
 - `src/lib/admin-db.ts`

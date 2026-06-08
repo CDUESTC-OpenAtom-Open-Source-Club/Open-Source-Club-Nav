@@ -30,7 +30,7 @@ export async function createWork(input: WorkCreateInput): Promise<Work> {
 
 export async function updateWork(id: number, input: WorkUpdateInput): Promise<Work | null> {
   try {
-    const data = await apiClient.patch<WorkResponse>(`/api/works/${id}`, input);
+    const data = await apiClient.patch<WorkResponse>(`/api/admin/works/${id}`, input);
     return data.work || null;
   } catch {
     return null;
@@ -39,7 +39,7 @@ export async function updateWork(id: number, input: WorkUpdateInput): Promise<Wo
 
 export async function deleteWork(id: number): Promise<boolean> {
   try {
-    const data = await apiClient.delete<WorkResponse>(`/api/works/${id}`);
+    const data = await apiClient.delete<WorkResponse>(`/api/admin/works/${id}`);
     return data.ok === true;
   } catch {
     return false;

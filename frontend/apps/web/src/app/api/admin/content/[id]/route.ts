@@ -13,5 +13,5 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return fetchBackend(request, `/api/content/${id}`, { method: "DELETE" });
+  return fetchBackend(request, `/api/content/${id}`);
 }

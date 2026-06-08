@@ -73,7 +73,8 @@ export async function createContent(input: ContentCreateInput): Promise<ContentI
 
 export async function updateContent(input: ContentUpdateInput): Promise<ContentItem | null> {
   try {
-    const data = await apiClient.put<ContentSingleResponse>("/api/admin/content", input);
+    const { id, ...payload } = input;
+    const data = await apiClient.put<ContentSingleResponse>(`/api/admin/content/${id}`, payload);
     return "data" in data ? (data.data ?? null) : (data as ContentItem);
   } catch {
     return null;
@@ -82,7 +83,7 @@ export async function updateContent(input: ContentUpdateInput): Promise<ContentI
 
 export async function toggleContentActive(id: number): Promise<ContentItem | null> {
   try {
-    const data = await apiClient.put<ContentSingleResponse>(`/api/content/${id}/toggle`);
+    const data = await apiClient.put<ContentSingleResponse>(`/api/admin/content/${id}/toggle`);
     return "data" in data ? (data.data ?? null) : (data as ContentItem);
   } catch {
     return null;
@@ -91,7 +92,7 @@ export async function toggleContentActive(id: number): Promise<ContentItem | nul
 
 export async function deleteContent(id: number): Promise<boolean> {
   try {
-    await apiClient.delete(`/api/content/${id}`);
+    await apiClient.delete(`/api/admin/content/${id}`);
     return true;
   } catch {
     return false;

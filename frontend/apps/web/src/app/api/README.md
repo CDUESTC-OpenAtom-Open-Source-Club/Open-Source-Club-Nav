@@ -8,6 +8,8 @@ This folder contains Next.js BFF routes used by web clients and SSR.
   They call local BFF endpoints such as `/api/admin/links`.
 - `src/app/api/*`: BFF layer for forwarding/auth/error shaping.  
   They communicate with Go backend endpoints.
+- Homepage/public BFF routes are read-only by default.
+- Admin-side writes are unified under `/api/admin/*`.
 
 ## Common Response Shape
 
@@ -20,6 +22,8 @@ This folder contains Next.js BFF routes used by web clients and SSR.
 - `GET /api/admin/me` -> `{ user: { id, username, role } }`
 - `GET /api/admin/links` -> `{ links: array }`
 - `POST /api/admin/links` -> `{ data?: object, link?: object }`
+- `PATCH /api/admin/works/:id` -> `{ work?: object }`
+- `PUT /api/admin/content/:id` -> `{ data?: object }`
 
 ## Validation
 

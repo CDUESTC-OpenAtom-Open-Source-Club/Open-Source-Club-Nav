@@ -10,16 +10,13 @@ FROM alpine:3.21 AS runner
 WORKDIR /app
 RUN apk add --no-cache ca-certificates curl tzdata \
     && adduser -D -H -s /sbin/nologin app \
-    && mkdir -p /app/data \
     && chown -R app:app /app
 COPY --from=builder /out/openatom-backend /app/openatom-backend
 COPY config.example.yaml /app/config.example.yaml
 USER app
 ENV GIN_MODE=release
 ENV CONFIG_PATH=/app/config.yaml
-ENV DB_PATH=/app/data/app.db
-# Go 运行时内存软上限 64MiB（SQLite 嵌入式 page cache 占额外内存），
-# 配合 96M 容器 limit，触发更积极 GC
+# Go runtime soft memory limit tuned for the backend container.
 ENV GOMEMLIMIT=64MiB
 ENV GOGC=50
 EXPOSE 8080
