@@ -20,7 +20,7 @@ export const SUPPORTED_GITHUB_ACTIVITY_TYPES = [
 export type GitHubActivityType =
   (typeof SUPPORTED_GITHUB_ACTIVITY_TYPES)[number];
 
-export type ActivitySource = "github" | "mock";
+export type ActivitySource = "github" | "error" | "";
 
 export interface GitHubActivityActor {
   login: string;
@@ -182,122 +182,6 @@ export const EVENT_TYPE_COLORS: Record<GitHubActivityType, string> = {
   WatchEvent: "#38BDF8",
   IssueCommentEvent: "#F97316",
 };
-
-export const MOCK_ACTIVITY: GitHubActivity[] = [
-  {
-    id: "evt_001",
-    type: "PushEvent",
-    actor: { login: "zhang-wei", avatar: "ZW" },
-    repo: "cdcas/course-assistant",
-    message: "push to main",
-    details: [
-      "feat: add conflict detection algorithm",
-      "fix: improve merge queue fallback",
-    ],
-    branch: "main",
-    commits: 3,
-    isMergedPr: false,
-    time: "2 分钟前",
-    color: "#0A84FF",
-  },
-  {
-    id: "evt_002",
-    type: "PullRequestEvent",
-    actor: { login: "liu-fang", avatar: "LF" },
-    repo: "cdcas/price-compare",
-    message: "PR opened: implement real-time price diff engine",
-    details: ["base: main", "head: feat/realtime"],
-    branch: "feat/realtime",
-    commits: 0,
-    isMergedPr: false,
-    time: "15 分钟前",
-    color: "#06E5CC",
-  },
-  {
-    id: "evt_003",
-    type: "CreateEvent",
-    actor: { login: "chen-hao", avatar: "CH" },
-    repo: "cdcas/moyuClock",
-    message: "init: project scaffold with Vite + TS",
-    details: ["create branch: main"],
-    branch: "main",
-    commits: 1,
-    isMergedPr: false,
-    time: "38 分钟前",
-    color: "#7C3AED",
-  },
-  {
-    id: "evt_004",
-    type: "IssuesEvent",
-    actor: { login: "wang-jing", avatar: "WJ" },
-    repo: "cdcas/openai-lab",
-    message: "issue: GPT streaming response bug",
-    details: ["opened by QA triage"],
-    branch: null,
-    commits: 0,
-    isMergedPr: false,
-    time: "1 小时前",
-    color: "#F59E0B",
-  },
-  {
-    id: "evt_005",
-    type: "PushEvent",
-    actor: { login: "li-ming", avatar: "LM" },
-    repo: "cdcas/campus-nav",
-    message: "push to hotfix/gps",
-    details: [
-      "fix: indoor positioning accuracy +12%",
-      "test: calibrate indoor beacon matrix",
-    ],
-    branch: "hotfix/gps",
-    commits: 2,
-    isMergedPr: false,
-    time: "2 小时前",
-    color: "#EF4444",
-  },
-  {
-    id: "evt_006",
-    type: "ReleaseEvent",
-    actor: { login: "zhao-yu", avatar: "ZY" },
-    repo: "cdcas/hexboard",
-    message: "release: v1.2.0 - plugin API",
-    details: ["tag: v1.2.0"],
-    branch: null,
-    commits: 0,
-    isMergedPr: false,
-    time: "3 小时前",
-    color: "#10B981",
-  },
-  {
-    id: "evt_007",
-    type: "PushEvent",
-    actor: { login: "sun-lei", avatar: "SL" },
-    repo: "cdcas/starlink-cli",
-    message: "push to feat/compression",
-    details: [
-      "perf: reduce binary size by 40%",
-      "build: strip optional native assets",
-    ],
-    branch: "feat/compression",
-    commits: 5,
-    isMergedPr: false,
-    time: "4 小时前",
-    color: "#38BDF8",
-  },
-  {
-    id: "evt_008",
-    type: "ForkEvent",
-    actor: { login: "huang-xin", avatar: "HX" },
-    repo: "cdcas/contrib-dashboard",
-    message: "forked from: github-stats/core",
-    details: ["new repo: huang-xin/contrib-dashboard"],
-    branch: null,
-    commits: 0,
-    isMergedPr: false,
-    time: "5 小时前",
-    color: "#EC4899",
-  },
-];
 
 const API_BASE = "https://api.github.com";
 

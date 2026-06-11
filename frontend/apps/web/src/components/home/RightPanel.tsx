@@ -15,7 +15,6 @@ import {
 import {
   EVENT_TYPE_LABELS,
   GITHUB_ORG,
-  MOCK_ACTIVITY,
 } from "@/data/githubActivity";
 
 type ActivityItem = {
@@ -294,13 +293,11 @@ export default function RightPanel({
   isDarkMode?: boolean;
   embedded?: boolean;
 }) {
-  const [activity, setActivity] = useState<ActivityItem[]>(
-    MOCK_ACTIVITY as ActivityItem[],
-  );
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
-  const [source, setSource] = useState("mock");
-  const [notice, setNotice] = useState("正在尝试连接 GitHub API...");
+  const [source, setSource] = useState("");
+  const [notice, setNotice] = useState("正在连接 GitHub API...");
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [activityLimit, setActivityLimit] = useState(DEFAULT_ACTIVITY_LIMIT);
   const fetchAbortRef = useRef<AbortController | null>(null);
@@ -328,22 +325,22 @@ export default function RightPanel({
 
       if (items.length > 0) {
         setActivity(items as ActivityItem[]);
-        setSource(payload?.source === "github" ? "github" : "mock");
+        setSource(payload?.source === "github" ? "github" : "error");
         setNotice(
           payload?.source === "github"
             ? `已连接 ${GITHUB_ORG} 的实时动态`
             : "",
         );
       } else {
-        setActivity(MOCK_ACTIVITY as ActivityItem[]);
-        setSource("mock");
-        setNotice("GitHub 暂无可用数据，已回退到本地模拟数据。");
+        setActivity([]);
+        setSource("error");
+        setNotice("GitHub 暂无可用活动数据。");
       }
     } catch {
       if (controller.signal.aborted) return;
-      setActivity(MOCK_ACTIVITY as ActivityItem[]);
-      setSource("mock");
-      setNotice("GitHub API 请求失败，已回退到本地模拟数据。");
+      setActivity([]);
+      setSource("error");
+      setNotice("GitHub API 请求失败，请检查网络后重试。");
     } finally {
       if (!controller.signal.aborted) {
         setLastUpdated(new Date());
@@ -373,7 +370,7 @@ export default function RightPanel({
   }, [refresh]);
 
   const diffLabel = getDiffLabel(lastUpdated, nowTs);
-  const sourceLabel = source === "github" ? "LIVE" : "";
+  const sourceLabel = source === "github" ? "LIVE" : source === "error" ? "OFFLINE" : "";
 
   const stats = useMemo(() => {
     const commits = activity.reduce((sum, item) => sum + (item.commits || 0), 0);

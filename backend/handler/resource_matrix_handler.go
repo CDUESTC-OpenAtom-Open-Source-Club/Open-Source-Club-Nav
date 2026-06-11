@@ -4,6 +4,7 @@ package handler
 import (
 	"net/http"
 	"open-source-club-nav/backend/model"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -56,6 +57,10 @@ func DeleteResourceMatrix(c *gin.Context) {
 		return
 	}
 
+	parsedID, _ := strconv.ParseUint(id, 10, 32)
+	uid := uint(parsedID)
+	logAction(db, c, "delete_resource", &uid, "删除资源 ID: "+id)
+
 	// 4. 返回成功
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
@@ -87,6 +92,8 @@ func CreateResourceMatrix(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	logAction(db, c, "create_resource", &resource.ID, "新增资源: "+resource.Name)
 
 	c.JSON(http.StatusOK, gin.H{"data": resource, "ok": true})
 }
@@ -134,6 +141,8 @@ func UpdateResourceMatrix(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	logAction(db, c, "update_resource", &resource.ID, "更新资源: "+resource.Name)
 
 	c.JSON(http.StatusOK, gin.H{"data": resource, "ok": true})
 }

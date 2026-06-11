@@ -17,9 +17,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	githubOrg = "CDUESTC-OpenAtom-Open-Source-Club"
-)
+var workColors = []string{"#0A84FF", "#06E5CC", "#7C3AED", "#F59E0B", "#EF4444", "#10B981", "#38BDF8", "#EC4899"}
 
 // GetPublicWorks 获取前台展示的作品列表（仅 is_featured=1）
 func GetPublicWorks(c *gin.Context) {
@@ -116,6 +114,7 @@ func UpdateWork(c *gin.Context) {
 
 	if len(updates) > 0 {
 		db.Model(&work).Updates(updates)
+		logAction(db, c, "update_work", &work.ID, "更新作品: "+work.Title)
 	}
 
 	db.First(&work, id)
@@ -233,6 +232,8 @@ func CreateWork(c *gin.Context) {
 		return
 	}
 
+	logAction(db, c, "create_work", &work.ID, "新增作品: "+work.Title)
+
 	c.JSON(http.StatusCreated, gin.H{"work": work})
 }
 
@@ -250,6 +251,10 @@ func DeleteWork(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "作品不存在"})
 		return
 	}
+
+	uid := uint(id)
+	logAction(db, c, "delete_work", &uid, "删除作品 ID: "+strconv.FormatUint(id, 10))
+
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
@@ -264,7 +269,6 @@ func SyncGitHubWorks(c *gin.Context) {
 		return
 	}
 
-	colors := []string{"#0A84FF", "#06E5CC", "#7C3AED", "#F59E0B", "#EF4444", "#10B981", "#38BDF8", "#EC4899"}
 	synced := 0
 
 	for i, repo := range repos {
@@ -275,7 +279,7 @@ func SyncGitHubWorks(c *gin.Context) {
 		htmlURL, _ := repo["html_url"].(string)
 		name, _ := repo["name"].(string)
 		description, _ := repo["description"].(string)
-		ownerLogin := githubOrg
+		ownerLogin := githubOrgFromEnv()
 		if owner, ok := repo["owner"].(map[string]interface{}); ok {
 			if login, ok := owner["login"].(string); ok {
 				ownerLogin = login
@@ -319,7 +323,7 @@ func SyncGitHubWorks(c *gin.Context) {
 		if len(runes) >= 2 {
 			authorAvatar = string(runes[:2])
 		}
-		color := colors[i%len(colors)]
+		color := workColors[i%len(workColors)]
 
 		var work model.Work
 		result := db.Where("repo_url = ?", htmlURL).First(&work)
@@ -355,6 +359,8 @@ func SyncGitHubWorks(c *gin.Context) {
 		}
 	}
 
+	logAction(db, c, "sync_works", nil, fmt.Sprintf("同步 GitHub 仓库: %d/%d", synced, len(repos)))
+
 	c.JSON(http.StatusOK, gin.H{"synced": synced, "total": len(repos)})
 }
 
@@ -365,7 +371,6 @@ func fetchGitHubRepos(db *gorm.DB) ([]model.Work, error) {
 		return nil, err
 	}
 
-	colors := []string{"#0A84FF", "#06E5CC", "#7C3AED", "#F59E0B", "#EF4444", "#10B981", "#38BDF8", "#EC4899"}
 	var works []model.Work
 
 	for i, repo := range repos {
@@ -375,7 +380,7 @@ func fetchGitHubRepos(db *gorm.DB) ([]model.Work, error) {
 		htmlURL, _ := repo["html_url"].(string)
 		name, _ := repo["name"].(string)
 		description, _ := repo["description"].(string)
-		ownerLogin := githubOrg
+		ownerLogin := githubOrgFromEnv()
 		if owner, ok := repo["owner"].(map[string]interface{}); ok {
 			if login, ok := owner["login"].(string); ok {
 				ownerLogin = login
@@ -430,7 +435,7 @@ func fetchGitHubRepos(db *gorm.DB) ([]model.Work, error) {
 			AuthorName:   ownerLogin,
 			AuthorAvatar: &authorAvatar,
 			Tags:         parsedTags, // 替换为解析后的parsedTags
-			Color:        colors[i%len(colors)],
+			Color:        workColors[i%len(workColors)],
 			Status:       status,
 			Stars:        stars,
 			PreviewURL:   previewURL,
@@ -445,7 +450,7 @@ func fetchGitHubRepos(db *gorm.DB) ([]model.Work, error) {
 
 // fetchGitHubRepoList 调用 GitHub API 获取组织仓库列表
 func fetchGitHubRepoList() ([]map[string]interface{}, error) {
-	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&sort=updated", githubOrg)
+	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&sort=updated", githubOrgFromEnv())
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Accept", "application/vnd.github.v3+json")
 

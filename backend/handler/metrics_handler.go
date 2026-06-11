@@ -26,10 +26,10 @@ func RecordVisit(c *gin.Context) {
 		visitorID = visitorID[:64]
 	}
 
-	// 更新 daily_stats.page_views（SQLite UPSERT）
+	// 更新 daily_stats.page_views（MySQL UPSERT）
 	db.Exec(`INSERT INTO daily_stats (stat_date, page_views, unique_visitors, link_clicks)
-		VALUES (date('now'), 1, 0, 0)
-		ON CONFLICT(stat_date) DO UPDATE SET page_views = page_views + 1`)
+		VALUES (CURDATE(), 1, 0, 0)
+		ON DUPLICATE KEY UPDATE page_views = page_views + 1`)
 
 	// 写入 metrics 记录
 	db.Create(&model.Metric{
@@ -37,14 +37,14 @@ func RecordVisit(c *gin.Context) {
 		VisitorID: &visitorID,
 	})
 
-	// 尝试写入 daily_visits（去重，SQLite OR IGNORE）
-	result := db.Exec("INSERT OR IGNORE INTO daily_visits (stat_date, visitor_id) VALUES (date('now'), ?)", visitorID)
+	// 尝试写入 daily_visits（去重，MySQL INSERT IGNORE）
+	result := db.Exec("INSERT IGNORE INTO daily_visits (stat_date, visitor_id) VALUES (CURDATE(), ?)", visitorID)
 	newVisitor := result.RowsAffected > 0
 
 	if newVisitor {
 		db.Exec(`INSERT INTO daily_stats (stat_date, page_views, unique_visitors, link_clicks)
-			VALUES (date('now'), 0, 1, 0)
-			ON CONFLICT(stat_date) DO UPDATE SET unique_visitors = unique_visitors + 1`)
+			VALUES (CURDATE(), 0, 1, 0)
+			ON DUPLICATE KEY UPDATE unique_visitors = unique_visitors + 1`)
 	}
 
 	c.JSON(http.StatusOK, gin.H{"newVisitor": newVisitor})
@@ -69,10 +69,10 @@ func RecordClick(c *gin.Context) {
 		return
 	}
 
-	// 更新 daily_stats.link_clicks（SQLite UPSERT）
+	// 更新 daily_stats.link_clicks（MySQL UPSERT）
 	db.Exec(`INSERT INTO daily_stats (stat_date, page_views, unique_visitors, link_clicks)
-		VALUES (date('now'), 0, 0, 1)
-		ON CONFLICT(stat_date) DO UPDATE SET link_clicks = link_clicks + 1`)
+		VALUES (CURDATE(), 0, 0, 1)
+		ON DUPLICATE KEY UPDATE link_clicks = link_clicks + 1`)
 
 	// 写入 metrics 记录
 	metric := model.Metric{

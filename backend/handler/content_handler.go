@@ -57,6 +57,8 @@ func CreateContent(c *gin.Context) {
 		return
 	}
 
+	logAction(gormDB, c, "create_content", &item.ID, "新增内容: "+item.Title)
+
 	c.JSON(http.StatusCreated, gin.H{"data": item})
 }
 
@@ -81,20 +83,88 @@ func UpdateContent(c *gin.Context) {
 		return
 	}
 
-	var item model.NavItem
-	if err := c.ShouldBindJSON(&item); err != nil {
+	var existing model.NavItem
+	if err := gormDB.First(&existing, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "内容不存在"})
+		return
+	}
+
+	var input struct {
+		ContentType *string `json:"content_type"`
+		SubType     *string `json:"sub_type"`
+		Icon        *string `json:"icon"`
+		Title       *string `json:"title"`
+		Description *string `json:"description"`
+		Content     *string `json:"content"`
+		Sort        *int    `json:"sort"`
+		Active      *int    `json:"active"`
+		Category    *string `json:"category"`
+		GameType    *string `json:"game_type"`
+		IconUrl     *string `json:"icon_url"`
+		CoverUrl    *string `json:"cover_url"`
+		LinkUrl     *string `json:"link_url"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
 		return
 	}
 
-	item.ID = uint(id)
-	if err := gormDB.Save(&item).Error; err != nil {
+	updates := make(map[string]interface{})
+	if input.ContentType != nil {
+		updates["content_type"] = *input.ContentType
+	}
+	if input.SubType != nil {
+		updates["sub_type"] = *input.SubType
+	}
+	if input.Icon != nil {
+		updates["icon"] = *input.Icon
+	}
+	if input.Title != nil {
+		updates["title"] = *input.Title
+	}
+	if input.Description != nil {
+		updates["description"] = *input.Description
+	}
+	if input.Content != nil {
+		updates["content"] = *input.Content
+	}
+	if input.Sort != nil {
+		updates["sort"] = *input.Sort
+	}
+	if input.Active != nil {
+		updates["active"] = *input.Active
+	}
+	if input.Category != nil {
+		updates["category"] = *input.Category
+	}
+	if input.GameType != nil {
+		updates["game_type"] = *input.GameType
+	}
+	if input.IconUrl != nil {
+		updates["icon_url"] = *input.IconUrl
+	}
+	if input.CoverUrl != nil {
+		updates["cover_url"] = *input.CoverUrl
+	}
+	if input.LinkUrl != nil {
+		updates["link_url"] = *input.LinkUrl
+	}
+
+	if len(updates) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "没有需要更新的字段"})
+		return
+	}
+
+	if err := gormDB.Model(&existing).Updates(updates).Error; err != nil {
 		zap.L().Error("更新内容失败", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新内容失败"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": item})
+	logAction(gormDB, c, "update_content", &existing.ID, "更新内容: "+existing.Title)
+
+	gormDB.First(&existing, id)
+	c.JSON(http.StatusOK, gin.H{"data": existing})
 }
 
 // DeleteContent 删除内容
@@ -122,6 +192,9 @@ func DeleteContent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除内容失败"})
 		return
 	}
+
+	parsedID := uint(id)
+	logAction(gormDB, c, "delete_content", &parsedID, "删除内容 ID: "+idStr)
 
 	c.JSON(http.StatusOK, gin.H{"message": "删除成功"})
 }

@@ -56,6 +56,8 @@ func CreateFriendLink(c *gin.Context) {
 		return
 	}
 
+	logAction(gormDB, c, "create_link", &link.ID, "新增友情链接: "+link.Title)
+
 	// 4. 返回结果（对齐上级格式）
 	c.JSON(http.StatusOK, gin.H{
 		"data":   link,
@@ -121,10 +123,51 @@ func UpdateFriendLink(c *gin.Context) {
 		return
 	}
 
+	logAction(gormDB, c, "update_link", &link.ID, "更新友情链接: "+link.Title)
+
 	// 6. 返回结果（对齐上级格式）
 	c.JSON(http.StatusOK, gin.H{
 		"data":   link,
 		"module": "friend_links",
 		"ok":     true,
 	})
+}
+
+// DeleteFriendLink 删除友情链接（DELETE /api/admin/links/:id 或 ?id=X）
+func DeleteFriendLink(c *gin.Context) {
+	db, ok := c.Get("db")
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接未初始化"})
+		return
+	}
+	gormDB, ok := db.(*gorm.DB)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接类型错误"})
+		return
+	}
+
+	id := c.Param("id")
+	if id == "" {
+		id = c.Query("id")
+	}
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少链接 ID"})
+		return
+	}
+
+	var link model.FriendLink
+	if err := gormDB.First(&link, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "友情链接不存在"})
+		return
+	}
+
+	if err := gormDB.Delete(&link).Error; err != nil {
+		zap.L().Error("删除友情链接失败", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败：" + err.Error()})
+		return
+	}
+
+	logAction(gormDB, c, "delete_link", &link.ID, "删除友情链接: "+link.Title)
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

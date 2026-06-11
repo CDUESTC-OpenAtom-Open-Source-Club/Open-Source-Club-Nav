@@ -78,6 +78,8 @@ func CreateMiniGame(c *gin.Context) {
 		return
 	}
 
+	logAction(db, c, "create_game", &game.ID, "新增游戏: "+game.Name)
+
 	// 返回成功结果
 	c.JSON(http.StatusOK, gin.H{"data": game, "ok": true})
 }
@@ -134,6 +136,37 @@ func UpdateMiniGame(c *gin.Context) {
 		return
 	}
 
+	logAction(db, c, "update_game", &game.ID, "更新游戏: "+game.Name)
+
 	// 6. 返回结果
 	c.JSON(http.StatusOK, gin.H{"data": game, "ok": true})
+}
+
+// DeleteMiniGame 删除小游戏（DELETE /api/admin/games/:id 或 ?id=X）
+func DeleteMiniGame(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+
+	id := c.Param("id")
+	if id == "" {
+		id = c.Query("id")
+	}
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少游戏 ID"})
+		return
+	}
+
+	var game model.MiniGame
+	if err := db.First(&game, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "小游戏不存在"})
+		return
+	}
+
+	if err := db.Delete(&game).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
+		return
+	}
+
+	logAction(db, c, "delete_game", &game.ID, "删除游戏: "+game.Name)
+
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }

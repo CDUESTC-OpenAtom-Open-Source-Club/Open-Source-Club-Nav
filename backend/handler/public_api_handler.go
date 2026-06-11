@@ -201,7 +201,7 @@ func githubOrgFromEnv() string {
 	if org := os.Getenv("NEXT_PUBLIC_GITHUB_ORG"); org != "" {
 		return org
 	}
-	return githubOrg
+	return "CDUESTC-OpenAtom-Open-Source-Club" // hardcoded fallback
 }
 
 func githubHeaders() map[string]string {

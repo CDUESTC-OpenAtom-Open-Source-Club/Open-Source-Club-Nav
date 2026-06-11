@@ -35,13 +35,13 @@ func (u *User) BeforeCreate(tx *gorm.DB) error {
 	if u.Username == "" {
 		return errors.New("用户名不能为空")
 	}
-	if u.Email == "" {
-		return errors.New("邮箱不能为空")
-	}
 	return nil
 }
 
 // BeforeUpdate 更新User时复用校验逻辑
 func (u *User) BeforeUpdate(tx *gorm.DB) error {
-	return u.BeforeCreate(tx)
+	if u.Username == "" {
+		return errors.New("用户名不能为空")
+	}
+	return nil
 }

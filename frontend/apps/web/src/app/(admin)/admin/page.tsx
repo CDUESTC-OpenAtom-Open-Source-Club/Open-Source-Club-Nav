@@ -3,8 +3,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, BarChart3, Clock3, Eye, LayoutDashboard, MousePointerClick, ServerCog, Users } from "lucide-react";
-const MOCK_MODE = process.env.NEXT_PUBLIC_USE_MOCK_MODE === "true";
-
 type AdminUser = {
   id: number;
   username: string;
@@ -66,17 +64,6 @@ type SystemInfo = {
   };
 };
 
-const MOCK_SYSTEM_INFO: SystemInfo = {
-  uptimeSec: 3600,
-  cpuCores: 8,
-  mem: { usageRate: 42 },
-  network: {
-    rxBytes: 1.6 * 1024 * 1024 * 1024,
-    txBytes: 0.8 * 1024 * 1024 * 1024,
-    totalBytes: 2.4 * 1024 * 1024 * 1024,
-    sampledAt: new Date().toISOString(),
-  },
-};
 type LinkHealth = {
   link_id: number;
   title: string;
@@ -107,45 +94,9 @@ const STAT_METRIC_META: Record<StatMetricKey, { label: string; short: string; co
 const baseSections = [
   { id: "overview", label: "首页" },
   { id: "links", label: "内容管理" },
-  { id: "popular", label: "热门仓库" },
   { id: "health", label: "健康检测" },
   { id: "logs", label: "操作日志" },
 ] as const;
-
-const MOCK_USERS: AdminUser[] = [
-  { id: 1, username: "demo-admin", role: "super", created_at: "2026-05-01T09:00:00", last_login_at: "2026-05-24T09:42:12" },
-  { id: 2, username: "editor-a", role: "editor", created_at: "2026-05-10T14:20:00", last_login_at: "2026-05-23T20:30:02" },
-];
-const MOCK_STATS: StatDay[] = [
-  { stat_date: "2026-05-24", page_views: 1560, unique_visitors: 432, link_clicks: 318 },
-];
-const MOCK_TREND7 = [
-  { stat_date: "2026-05-18", link_clicks: 96 },
-  { stat_date: "2026-05-19", link_clicks: 112 },
-  { stat_date: "2026-05-20", link_clicks: 84 },
-  { stat_date: "2026-05-21", link_clicks: 138 },
-  { stat_date: "2026-05-22", link_clicks: 126 },
-  { stat_date: "2026-05-23", link_clicks: 174 },
-  { stat_date: "2026-05-24", link_clicks: 161 },
-];
-const MOCK_HOURLY24: HourStat[] = Array.from({ length: 24 }).map((_, hour) => {
-  const pvSamples = [24, 18, 15, 11, 10, 15, 29, 44, 62, 76, 71, 79, 90, 96, 91, 85, 78, 74, 67, 61, 54, 47, 38, 30];
-  const uvSamples = [9, 8, 6, 5, 5, 7, 13, 21, 30, 35, 33, 38, 42, 45, 43, 40, 36, 34, 31, 28, 24, 21, 17, 13];
-  const clickSamples = [7, 6, 5, 4, 4, 6, 10, 15, 21, 26, 24, 29, 33, 35, 34, 31, 28, 27, 24, 22, 20, 17, 14, 11];
-  return {
-    hour,
-    page_views: pvSamples[hour],
-    unique_visitors: uvSamples[hour],
-    link_clicks: clickSamples[hour],
-  };
-});
-const MOCK_POPULAR = [
-  { repo: "facebook/react", url: "https://github.com/facebook/react", clicks: 174, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 18 }, { stat_date: "2026-05-19", clicks: 22 }, { stat_date: "2026-05-20", clicks: 25 }, { stat_date: "2026-05-21", clicks: 19 }, { stat_date: "2026-05-22", clicks: 27 }, { stat_date: "2026-05-23", clicks: 30 }, { stat_date: "2026-05-24", clicks: 33 }] },
-  { repo: "vercel/next.js", url: "https://github.com/vercel/next.js", clicks: 161, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 14 }, { stat_date: "2026-05-19", clicks: 20 }, { stat_date: "2026-05-20", clicks: 18 }, { stat_date: "2026-05-21", clicks: 24 }, { stat_date: "2026-05-22", clicks: 26 }, { stat_date: "2026-05-23", clicks: 28 }, { stat_date: "2026-05-24", clicks: 31 }] },
-  { repo: "reactjs/react.dev", url: "https://github.com/reactjs/react.dev", clicks: 126, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 10 }, { stat_date: "2026-05-19", clicks: 12 }, { stat_date: "2026-05-20", clicks: 15 }, { stat_date: "2026-05-21", clicks: 18 }, { stat_date: "2026-05-22", clicks: 20 }, { stat_date: "2026-05-23", clicks: 24 }, { stat_date: "2026-05-24", clicks: 27 }] },
-  { repo: "openatom", url: "https://github.com/openatom", clicks: 112, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 9 }, { stat_date: "2026-05-19", clicks: 11 }, { stat_date: "2026-05-20", clicks: 13 }, { stat_date: "2026-05-21", clicks: 15 }, { stat_date: "2026-05-22", clicks: 18 }, { stat_date: "2026-05-23", clicks: 22 }, { stat_date: "2026-05-24", clicks: 24 }] },
-  { repo: "nodejs/node", url: "https://github.com/nodejs/node", clicks: 84, isValid: true, trend7: [{ stat_date: "2026-05-18", clicks: 6 }, { stat_date: "2026-05-19", clicks: 8 }, { stat_date: "2026-05-20", clicks: 11 }, { stat_date: "2026-05-21", clicks: 12 }, { stat_date: "2026-05-22", clicks: 14 }, { stat_date: "2026-05-23", clicks: 15 }, { stat_date: "2026-05-24", clicks: 18 }] },
-];
 
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
   const text = await res.text();
@@ -310,17 +261,11 @@ function formatBytes(bytes: number | null | undefined): string {
 
 function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
   const source = input || ({} as SystemInfo);
-  const fallbackNetwork = {
-    rxBytes: MOCK_SYSTEM_INFO.network?.rxBytes ?? 0,
-    txBytes: MOCK_SYSTEM_INFO.network?.txBytes ?? 0,
-    totalBytes: MOCK_SYSTEM_INFO.network?.totalBytes ?? 0,
-    sampledAt: new Date().toISOString(),
-  };
-  const uptimeSec = Number(source.uptimeSec || 0) > 0 ? Number(source.uptimeSec) : MOCK_SYSTEM_INFO.uptimeSec;
-  const cpuCores = Number(source.cpuCores || 0) > 0 ? Number(source.cpuCores) : MOCK_SYSTEM_INFO.cpuCores;
+  const uptimeSec = Number(source.uptimeSec || 0);
+  const cpuCores = Number(source.cpuCores || 0);
   const memUsage = Number(source.mem?.usageRate || 0);
   const mem = {
-    usageRate: Number.isFinite(memUsage) && memUsage > 0 ? memUsage : MOCK_SYSTEM_INFO.mem.usageRate,
+    usageRate: Number.isFinite(memUsage) ? memUsage : 0,
   };
   const totalBytesRaw = source.network?.totalBytes;
   const hasRealNetwork = totalBytesRaw !== null && totalBytesRaw !== undefined && Number.isFinite(Number(totalBytesRaw));
@@ -332,51 +277,12 @@ function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
         sampledAt: source.network?.sampledAt || new Date().toISOString(),
       }
     : {
-        ...fallbackNetwork,
+        rxBytes: null,
+        txBytes: null,
+        totalBytes: 0,
+        sampledAt: new Date().toISOString(),
       };
   return { uptimeSec, cpuCores, mem, network };
-}
-
-function RepoTrendSparkline({
-  points,
-}: {
-  points: Array<{ stat_date: string; clicks: number }>;
-}) {
-  const width = 132;
-  const height = 34;
-  const safePoints = points.length
-    ? points
-    : Array.from({ length: 7 }).map((_, index) => ({
-        stat_date: `D${index + 1}`,
-        clicks: 0,
-      }));
-  const maxValue = Math.max(1, ...safePoints.map((item) => item.clicks || 0));
-  const stepX = safePoints.length > 1 ? width / (safePoints.length - 1) : width / 2;
-  const mapped = safePoints.map((item, index) => ({
-    ...item,
-    x: safePoints.length === 1 ? width / 2 : index * stepX,
-    y: height - ((item.clicks || 0) / maxValue) * (height - 8) - 4,
-  }));
-  const linePath = mapped.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(" ");
-  const areaPath = mapped.length
-    ? `${linePath} L ${mapped[mapped.length - 1].x.toFixed(2)} ${height} L ${mapped[0].x.toFixed(2)} ${height} Z`
-    : "";
-
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: 132, height: 34, display: "block" }} aria-label="近7天点击曲线">
-      <defs>
-        <linearGradient id="repoTrendFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#60A5FA" stopOpacity="0.24" />
-          <stop offset="100%" stopColor="#60A5FA" stopOpacity="0.03" />
-        </linearGradient>
-      </defs>
-      {areaPath ? <path d={areaPath} fill="url(#repoTrendFill)" /> : null}
-      {linePath ? <path d={linePath} fill="none" stroke="#2563EB" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" /> : null}
-      {mapped.map((point) => (
-        <circle key={`${point.stat_date}-${point.x}`} cx={point.x} cy={point.y} r="2.4" fill="#FFFFFF" stroke="#2563EB" strokeWidth="1.5" />
-      ))}
-    </svg>
-  );
 }
 
 export default function AdminPage() {
@@ -392,11 +298,8 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<LinkLog[]>([]);
   const [trend7, setTrend7] = useState<Array<{ stat_date: string; link_clicks: number }>>([]);
   const [hourly24, setHourly24] = useState<HourStat[]>([]);
-  const [popular, setPopular] = useState<Array<{ repo: string; url: string; clicks: number; trend7: Array<{ stat_date: string; clicks: number }>; isValid: boolean | null }>>([]);
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
-  const [hoveredTrendIndex, setHoveredTrendIndex] = useState<number | null>(null);
-  const [trendHovered, setTrendHovered] = useState(false);
   const [healthChecking, setHealthChecking] = useState(false);
   const [autoDetectDialogOpen, setAutoDetectDialogOpen] = useState(false);
   const [autoDetectEnabled, setAutoDetectEnabled] = useState(false);
@@ -411,8 +314,6 @@ export default function AdminPage() {
   const [statRange, setStatRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [hoveredMonthlyIndex, setHoveredMonthlyIndex] = useState<number | null>(null);
   const [hoveredHourlyIndex, setHoveredHourlyIndex] = useState<number | null>(null);
-  const [mockLinksResetDone, setMockLinksResetDone] = useState(false);
-
   const [linkForm, setLinkForm] = useState({
     title: "",
     url: "",
@@ -683,37 +584,12 @@ export default function AdminPage() {
     setLoadedSections((prev) => (prev[sectionId] ? prev : { ...prev, [sectionId]: true }));
   }, []);
   const loadStats = useCallback(async () => {
-    if (MOCK_MODE) {
-      setStats(MOCK_STATS);
-      setTrend7(MOCK_TREND7);
-      setHourly24(MOCK_HOURLY24);
-      setPopular(MOCK_POPULAR);
-      markSectionLoaded("popular");
-      return;
-    }
-
     const statsRes = await fetch("/api/admin/stats", { cache: "no-store" });
     if (!statsRes.ok) throw new Error("加载统计失败");
     const statsData = await readJsonSafe<{
       days?: StatDay[];
       stats?: StatDay[];
       trend7?: Array<{ stat_date: string; link_clicks: number }>;
-      popularCategories?: Array<{
-        repo: string;
-        url?: string;
-        sourceUrl?: string;
-        clicks: number;
-        trend7?: Array<{ stat_date: string; clicks: number }>;
-        isValid?: boolean | null;
-      }>;
-      popularRepos?: Array<{
-        repo: string;
-        url?: string;
-        sourceUrl?: string;
-        clicks: number;
-        trend7?: Array<{ stat_date: string; clicks: number }>;
-        isValid?: boolean | null;
-      }>;
       hourly24?: HourStat[];
       hourly?: HourStat[];
     }>(statsRes);
@@ -721,26 +597,9 @@ export default function AdminPage() {
     setStats(statsData?.days || statsData?.stats || []);
     setTrend7(statsData?.trend7 || []);
     setHourly24(statsData?.hourly24 || statsData?.hourly || []);
-
-    const popularSource = statsData?.popularCategories || statsData?.popularRepos || [];
-    setPopular(
-      popularSource.map((item) => ({
-        repo: item.repo,
-        url: item.url || item.sourceUrl || "",
-        clicks: Number(item.clicks || 0),
-        trend7: item.trend7 || [],
-        isValid: item.isValid ?? null,
-      })),
-    );
-
-    markSectionLoaded("popular");
   }, [markSectionLoaded]);
 
   const loadSystem = useCallback(async () => {
-    if (MOCK_MODE) {
-      setSystem(withSystemFallback(MOCK_SYSTEM_INFO));
-      return;
-    }
     const sysRes = await fetch("/api/admin/system", { cache: "no-store" });
     if (!sysRes.ok) throw new Error("加载系统信息失败");
     const sysData = await readJsonSafe<SystemInfo>(sysRes);
@@ -758,17 +617,11 @@ export default function AdminPage() {
     if (activeLinkModule === "resource_matrix") {
       search.set("resource_sub_module", activeResourceSubModule);
     }
-    if (MOCK_MODE && !mockLinksResetDone) {
-      search.set("reset", "1");
-    }
 
     const linksRes = await fetch(`/api/admin/links?${search.toString()}`, { cache: "no-store" });
     if (!linksRes.ok) throw new Error("加载链接失败");
     const linksData = await readJsonSafe<{ links?: LinkItem[] }>(linksRes);
     setLinks(linksData?.links || []);
-    if (MOCK_MODE && !mockLinksResetDone) {
-      setMockLinksResetDone(true);
-    }
     try {
       const healthRes = await fetch("/api/admin/link-health", { cache: "no-store" });
       if (healthRes.ok) {
@@ -779,15 +632,9 @@ export default function AdminPage() {
       // ignore health fetch failures on links tab
     }
     markSectionLoaded("links");
-  }, [activeLinkModule, activeResourceSubModule, markSectionLoaded, mockLinksResetDone]);
+  }, [activeLinkModule, activeResourceSubModule, markSectionLoaded]);
 
   const loadUsers = useCallback(async () => {
-    if (MOCK_MODE) {
-      setUsers(MOCK_USERS);
-      markSectionLoaded("users");
-      return;
-    }
-
     const usersRes = await fetch("/api/admin/users", { cache: "no-store" });
     if (!usersRes.ok) throw new Error("加载用户失败");
     const usersData = await readJsonSafe<{ users?: AdminUser[] }>(usersRes);
@@ -826,17 +673,12 @@ export default function AdminPage() {
       setLogs(logData?.logs || []);
       markSectionLoaded("logs");
     } catch {
-      if (MOCK_MODE) {
-        setLogs([]);
-        markSectionLoaded("logs");
-        return;
-      }
       throw new Error("加载日志失败");
     }
   }, [markSectionLoaded]);
 
   const loadSectionById = useCallback(async (sectionId: string, role: "super" | "editor") => {
-    if (sectionId === "overview" || sectionId === "popular") {
+    if (sectionId === "overview") {
       await loadOverview();
       return;
     }
@@ -873,7 +715,7 @@ export default function AdminPage() {
 
         setUser(me.user);
         await Promise.all([loadOverview(), loadLinks()]);
-        setLoadedSections({ overview: true, popular: true, links: true });
+        setLoadedSections({ overview: true, links: true });
       } catch {
         setError("加载后台数据失败");
       } finally {
@@ -969,10 +811,6 @@ export default function AdminPage() {
   };
 
   const logout = async () => {
-    if (MOCK_MODE) {
-      router.replace("/admin/login");
-      return;
-    }
     await fetch("/api/admin/logout", { method: "POST" }).catch(() => {});
     router.replace("/admin/login");
   };
@@ -1003,7 +841,7 @@ export default function AdminPage() {
       await Promise.all([
         loadLinks(),
         loadLogs().catch(() => {}),
-        loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
+        Promise.resolve(),
       ]);
     } catch (err) {
       setError(String((err as Error).message || "新增链接失败"));
@@ -1021,7 +859,7 @@ export default function AdminPage() {
       await Promise.all([
         loadLinks(),
         loadLogs().catch(() => {}),
-        loadedSections.popular ? loadStats().catch(() => {}) : Promise.resolve(),
+        Promise.resolve(),
       ]);
     } catch (err) {
       setError(String((err as Error).message || "删除链接失败"));
@@ -1030,12 +868,6 @@ export default function AdminPage() {
 
   const submitUser = async (e: FormEvent) => {
     e.preventDefault();
-    if (MOCK_MODE) {
-      const nextId = users.length ? Math.max(...users.map((x) => x.id)) + 1 : 1;
-      setUsers((prev) => [...prev, { id: nextId, username: userForm.username, role: userForm.role, created_at: new Date().toISOString(), last_login_at: null }]);
-      setUserForm({ username: "", password: "", role: "editor" });
-      return;
-    }
     setError("");
     try {
       const res = await fetch("/api/admin/users", {
@@ -1053,10 +885,6 @@ export default function AdminPage() {
   };
 
   const updateUser = async (targetUser: AdminUser, patch: Partial<Pick<AdminUser, "role">> & { password?: string }) => {
-    if (MOCK_MODE) {
-      setUsers((prev) => prev.map((item) => (item.id === targetUser.id ? { ...item, ...patch } : item)));
-      return;
-    }
     const res = await fetch("/api/admin/users", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -1090,10 +918,6 @@ export default function AdminPage() {
   };
 
   const removeUser = async (targetUser: AdminUser) => {
-    if (MOCK_MODE) {
-      setUsers((prev) => prev.filter((item) => item.id !== targetUser.id));
-      return;
-    }
     try {
       const res = await fetch(`/api/admin/users?id=${targetUser.id}`, { method: "DELETE" });
       const data = await readJsonSafe<{ error?: string }>(res);
@@ -1762,245 +1586,6 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-      ) : null}
-      {activeSection === "popular" ? (
-      <div className="admin-section-transition">
-      <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
-        <div className="admin-console-pagehead-title">热门仓库</div>
-        <div className="admin-console-pagehead-desc">聚合查看近 7 天点击走势与链接热度表现。</div>
-      </div>
-      <div id="popular" className="admin-card admin-console-chart-card admin-console-anchor-card" style={{ padding: 12 }}>
-        <div style={{ fontWeight: 700, marginBottom: 8 }}>近 7 天点击走势</div>
-        <div
-          className="admin-console-chart-surface"
-          style={{
-            minHeight: 220,
-            border: "1px dashed #93C5FD",
-            borderRadius: 10,
-            padding: 10,
-            background: "linear-gradient(180deg, rgba(255,255,255,0.74), rgba(239,246,255,0.82))",
-            position: "relative",
-            overflow: "hidden",
-          }}
-          onMouseEnter={() => setTrendHovered(true)}
-          onMouseLeave={() => {
-            setTrendHovered(false);
-            setHoveredTrendIndex(null);
-          }}
-        >
-          {hoveredTrendIndex !== null && lineChart.points[hoveredTrendIndex] ? (
-            <div
-              style={{
-                position: "absolute",
-                left: ((lineChart.points[hoveredTrendIndex].x / lineChart.width) * 100) + "%",
-                top: 18,
-                transform: "translateX(-50%)",
-                padding: "6px 9px",
-                borderRadius: 10,
-                border: "1px solid rgba(147,197,253,0.9)",
-                background: "rgba(255,255,255,0.96)",
-                boxShadow: "0 12px 28px rgba(37,99,235,0.14)",
-                pointerEvents: "none",
-                zIndex: 2,
-                display: "grid",
-                gap: 2,
-              }}
-            >
-              <div style={{ fontSize: 10, color: "#64748B" }}>
-                {String(lineChart.points[hoveredTrendIndex].stat_date).slice(5)}
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: "#1D4ED8" }}>
-                点击量：{lineChart.points[hoveredTrendIndex].link_clicks}
-              </div>
-            </div>
-          ) : null}
-          <svg
-            viewBox={"0 0 " + lineChart.width + " " + lineChart.height}
-            style={{ width: "100%", height: 220, display: "block", overflow: "visible" }}
-            aria-label="近7天点击走势折线图"
-            onMouseLeave={() => setHoveredTrendIndex(null)}
-          >
-            <defs>
-              <linearGradient id="trendAreaFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#60A5FA" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="#60A5FA" stopOpacity="0.02" />
-              </linearGradient>
-              <linearGradient id="trendLineGradient" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stopColor="#22D3EE" />
-                <stop offset="45%" stopColor="#3B82F6" />
-                <stop offset="100%" stopColor="#F472B6" />
-              </linearGradient>
-            </defs>
-
-            {lineChart.yTicks.map((tick) => (
-              <g key={`y-${tick.y}`}>
-                <line
-                  x1={lineChart.padding.left}
-                  x2={lineChart.width - lineChart.padding.right}
-                  y1={tick.y}
-                  y2={tick.y}
-                  stroke="#DBEAFE"
-                  strokeDasharray="4 4"
-                />
-                <text
-                  x={lineChart.padding.left - 10}
-                  y={tick.y + 4}
-                  textAnchor="end"
-                  fontSize="11"
-                  fill="#64748B"
-                >
-                  {tick.value}
-                </text>
-              </g>
-            ))}
-
-            {lineChart.points.map((point) => (
-              <line
-                key={`x-grid-${point.stat_date}`}
-                x1={point.x}
-                x2={point.x}
-                y1={lineChart.padding.top}
-                y2={lineChart.padding.top + lineChart.innerHeight}
-                stroke="#E5EEF9"
-              />
-            ))}
-
-            {hoveredTrendIndex !== null && lineChart.points[hoveredTrendIndex] ? (
-              <line
-                x1={lineChart.points[hoveredTrendIndex].x}
-                x2={lineChart.points[hoveredTrendIndex].x}
-                y1={lineChart.padding.top}
-                y2={lineChart.padding.top + lineChart.innerHeight}
-                stroke="#60A5FA"
-                strokeDasharray="5 4"
-                opacity="0.9"
-              />
-            ) : null}
-
-            {lineChart.areaPath ? (
-              <path d={lineChart.areaPath} fill="url(#trendAreaFill)" />
-            ) : null}
-            {lineChart.linePath ? (
-              <path
-                d={lineChart.linePath}
-                fill="none"
-                stroke={trendHovered ? "url(#trendLineGradient)" : "#2F80FF"}
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                style={{
-                  filter: trendHovered
-                    ? "drop-shadow(0 12px 22px rgba(244,114,182,0.24))"
-                    : "drop-shadow(0 10px 18px rgba(47,128,255,0.20))",
-                  transition: "filter 0.18s ease",
-                }}
-              />
-            ) : null}
-
-            {lineChart.points.map((point, index) => (
-              <g key={point.stat_date}>
-                <circle
-                  cx={point.x}
-                  cy={point.y}
-                  r={hoveredTrendIndex === index ? "8" : "5.5"}
-                  fill="#FFFFFF"
-                  stroke="#2F80FF"
-                  strokeWidth={hoveredTrendIndex === index ? "4" : "3"}
-                  style={{ transition: "all 0.18s ease" }}
-                />
-                <circle
-                  cx={point.x}
-                  cy={point.y}
-                  r="18"
-                  fill="transparent"
-                  onMouseEnter={() => setHoveredTrendIndex(index)}
-                />
-                <text
-                  x={point.x}
-                  y={lineChart.height - 10}
-                  textAnchor="middle"
-                  fontSize="11"
-                  fill="#64748B"
-                >
-                  {String(point.stat_date).slice(5)}
-                </text>
-              </g>
-            ))}
-          </svg>
-          {!trend7.length ? (
-            <div style={{ fontSize: 12, color: "#64748B", marginTop: 8 }}>暂无 7 天点击数据，图表区域已预留。</div>
-          ) : null}
-        </div>
-        <div style={{ fontWeight: 700, margin: "12px 0 8px" }}>热门链接（点击量）</div>
-        <div className="admin-console-chart-surface" style={{ minHeight: 140, border: "1px dashed #93C5FD", borderRadius: 10, padding: 10, background: "rgba(255,255,255,0.5)" }}>
-          <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: "#F8FAFD" }}>
-                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>链接名</th>
-                  <th style={{ textAlign: "right", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天总点击量</th>
-                  <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>近 7 天点击趋势图</th>
-                  <th style={{ textAlign: "center", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>当前状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(popular.length
-                  ? popular
-                  : Array.from({ length: 5 }).map((_, i) => ({ repo: `仓库${i + 1}`, url: "", clicks: 0, trend7: [], isValid: null }))).map((p, idx) => (
-                  <tr key={`${p.repo}-${idx}`}>
-                    <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155", fontWeight: 700, maxWidth: 280, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={String(p.repo)}>
-                      {p.repo || "-"}
-                    </td>
-                    <td
-                      style={{
-                        padding: "11px 14px",
-                        borderBottom: "1px solid #F1F5F9",
-                        textAlign: "center",
-                        color: "#1D4ED8",
-                        fontWeight: 700,
-                        fontVariantNumeric: "tabular-nums",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {p.clicks}
-                    </td>
-                    <td style={{ padding: "8px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                      <RepoTrendSparkline points={p.trend7 || []} />
-                    </td>
-                    <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", textAlign: "center" }}>
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          minWidth: 88,
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: p.isValid === true ? "#166534" : p.isValid === false ? "#B91C1C" : "#64748B",
-                          background: p.isValid === true ? "#DCFCE7" : p.isValid === false ? "#FEE2E2" : "#F1F5F9",
-                          border: `1px solid ${p.isValid === true ? "#86EFAC" : p.isValid === false ? "#FCA5A5" : "#CBD5E1"}`,
-                        }}
-                      >
-                        {p.isValid === true ? "有效" : p.isValid === false ? "异常" : "待检测"}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {!popular.length ? (
-                  <tr>
-                    <td colSpan={4} style={{ padding: "14px", color: "#64748B" }}>
-                      暂无热门仓库数据，图表区域已预留。
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      </div>
       ) : null}
 
 

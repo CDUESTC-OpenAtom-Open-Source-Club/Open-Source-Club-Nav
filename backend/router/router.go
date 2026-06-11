@@ -139,6 +139,7 @@ func registerSuperAdminRoutes(g *gin.RouterGroup) {
 	{
 		superG.GET("/users", handler.GetAdminUsers)
 		superG.POST("/users", handler.CreateAdminUser)
+		superG.PUT("/users", handler.UpdateAdminUser)
 		superG.DELETE("/users/:id", handler.DeleteAdminUser)
 	}
 }
@@ -147,6 +148,7 @@ func registerResourceRoutes(g *gin.RouterGroup) {
 	g.GET("/links", handler.SearchNavItem)
 	g.POST("/links", handler.CreateFriendLink)
 	g.PUT("/links/:id", handler.UpdateFriendLink)
+	g.DELETE("/links/:id", handler.DeleteFriendLink)
 	g.POST("/resources", handler.CreateResourceMatrix)
 	g.PUT("/resources/:id", handler.UpdateResourceMatrix)
 
@@ -154,6 +156,7 @@ func registerResourceRoutes(g *gin.RouterGroup) {
 	// 小游戏
 	g.POST("/games", handler.CreateMiniGame)
 	g.PUT("/games/:id", handler.UpdateMiniGame)
+	g.DELETE("/games/:id", handler.DeleteMiniGame)
 
 	contentG := g.Group("/content")
 	contentG.Use(handler.RequireRole("editor", "super"))

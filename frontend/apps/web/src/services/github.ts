@@ -1,6 +1,4 @@
-import { MOCK_ORG_STATS } from "@/data/mock/stats";
-
-const GITHUB_ORG = "CDUESTC-OpenAtom-Open-Source-Club";
+const GITHUB_ORG = process.env.NEXT_PUBLIC_GITHUB_ORG || process.env.GITHUB_ORG || "CDUESTC-OpenAtom-Open-Source-Club";
 
 function ghHeaders(): Record<string, string> {
   const h: Record<string, string> = { Accept: "application/vnd.github.v3+json" };
@@ -9,9 +7,6 @@ function ghHeaders(): Record<string, string> {
 }
 
 export async function fetchOrgStats() {
-  const USE_MOCK = process.env.USE_MOCK_DATA === "true";
-  if (USE_MOCK) return MOCK_ORG_STATS;
-
   try {
     const headers = ghHeaders();
     const [orgRes, membersRes, reposRes] = await Promise.all([
@@ -34,7 +29,7 @@ export async function fetchOrgStats() {
       source: "github",
     };
   } catch {
-    return { ...MOCK_ORG_STATS, source: "fallback" };
+    return { members: 0, projects: 0, stars: 0, source: "error" };
   }
 }
 

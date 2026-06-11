@@ -40,10 +40,21 @@ func SearchArticle(c *gin.Context) {
 func DeleteArticle(c *gin.Context) {
 	id := c.Param("id")
 	db := c.MustGet("db").(*gorm.DB)
+
+	var article model.Article
+	db.Where("id = ?", id).First(&article)
+
 	if err := db.Where("id = ?", id).Delete(&model.Article{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除失败"})
 		return
 	}
+
+	parsedID := uint(0)
+	if article.ID > 0 {
+		parsedID = article.ID
+	}
+	logAction(db, c, "delete_article", &parsedID, "删除文章: "+article.Title)
+
 	c.JSON(http.StatusOK, gin.H{"msg": "删除成功"})
 }
 
@@ -105,6 +116,8 @@ func CreateArticle(c *gin.Context) {
 		return
 	}
 
+	logAction(db, c, "create_article", &article.ID, "新增文章: "+article.Title)
+
 	// 返回成功结果
 	c.JSON(http.StatusOK, gin.H{"data": article, "ok": true})
 }
@@ -160,6 +173,8 @@ func UpdateArticle(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新失败"})
 		return
 	}
+
+	logAction(db, c, "update_article", &article.ID, "更新文章: "+article.Title)
 
 	c.JSON(http.StatusOK, gin.H{"msg": "更新成功", "data": article})
 }

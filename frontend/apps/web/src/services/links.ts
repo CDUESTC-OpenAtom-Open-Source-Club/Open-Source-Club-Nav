@@ -55,7 +55,3 @@ export async function updateLink(input: LinkUpdateInput): Promise<FriendLink | n
 export async function deleteLink(id: number): Promise<void> {
   await apiClient.delete(`/api/admin/links?id=${id}`);
 }
-
-export function resetMockLinksStore(): FriendLink[] {
-  return [];
-}
