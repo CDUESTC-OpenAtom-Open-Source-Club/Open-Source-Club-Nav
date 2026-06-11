@@ -256,6 +256,8 @@ jobs:
           DB_CHANGED: ${{ needs.detect.outputs.db_changed }}
           WEB_IMAGE: ${{ needs.detect.outputs.web_image_base }}:${{ github.sha }}
           BACKEND_IMAGE: ${{ needs.detect.outputs.backend_image_base }}:${{ github.sha }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
             "${DEPLOY_PATH}/deploy.sh" \
@@ -264,4 +266,6 @@ jobs:
               --backend-changed "${BACKEND_CHANGED}" \
               --db-changed "${DB_CHANGED}" \
               --web-image "${WEB_IMAGE}" \
-              --backend-image "${BACKEND_IMAGE}"
+              --backend-image "${BACKEND_IMAGE}" \
+              --registry-user "${REGISTRY_USER}" \
+              --registry-token "${REGISTRY_TOKEN}"
