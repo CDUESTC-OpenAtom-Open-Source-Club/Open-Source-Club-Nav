@@ -74,13 +74,9 @@ func GetNavWithBusiness(c *gin.Context) {
 // @Router /api/links [get]
 func SearchNavItem(c *gin.Context) {
 	// 1. 获取请求参数
-
 	keyword := strings.TrimSpace(c.Query("keyword"))
-
-	if keyword == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "keyword is required"})
-		return
-	}
+	module := strings.TrimSpace(c.Query("module"))
+	resourceSubModule := strings.TrimSpace(c.Query("resource_sub_module"))
 
 	limit := 20
 	if rawLimit := strings.TrimSpace(c.DefaultQuery("limit", "")); rawLimit != "" {
@@ -111,11 +107,27 @@ func SearchNavItem(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "数据库连接类型错误"})
 		return
 	}
-	likeKeyword := "%" + keyword + "%"
-	// 执行查询：带关键词模糊匹配 + 按id升序 + 分页
-	if err := gormDB.
-		Where("title LIKE ? OR content LIKE ?", likeKeyword, likeKeyword).
-		Order("id ASC").
+
+	query := gormDB.Model(&model.NavItem{})
+
+	// 支持 module（category）筛选
+	if module != "" {
+		query = query.Where("category = ?", module)
+		// 资源矩阵子模块：通过 content JSON 中的 resourceSubModule 筛选
+		if module == "resource_matrix" && resourceSubModule != "" {
+			query = query.Where("content LIKE ?", "%"+resourceSubModule+"%")
+		}
+	} else if keyword != "" {
+		likeKeyword := "%" + keyword + "%"
+		query = query.Where("title LIKE ? OR content LIKE ?", likeKeyword, likeKeyword)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "keyword or module is required"})
+		return
+	}
+
+	// 执行查询
+	if err := query.
+		Order("sort ASC").
 		Limit(limit).
 		Offset(offset).
 		Find(&navItems).Error; err != nil {
@@ -124,6 +136,10 @@ func SearchNavItem(c *gin.Context) {
 		return
 	}
 
-	// 4. 返回结果
-	c.JSON(http.StatusOK, navItems)
+	// 4. 返回结果（admin 前端期望 { links: [...] } 格式）
+	if module != "" {
+		c.JSON(http.StatusOK, gin.H{"links": navItems})
+	} else {
+		c.JSON(http.StatusOK, navItems)
+	}
 }
