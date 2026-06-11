@@ -1,0 +1,15 @@
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: "openatom_dev_password"
+  database: test_db
+jwt:
+  secret: "jwt-secrect-123"
+  expire: 3600
+cors:
+  allowed_origins: "*"
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0

@@ -7,14 +7,14 @@ GitHub Actions (push to main)
   ├─ detect: 识别变更文件
   ├─ test_frontend: lint + build (前端变更时)
   ├─ test_backend: go test (后端变更时)
-  ├─ build_web: 构建 + push 镜像 (前端变更时)
-  ├─ build_backend: 构建 + push 镜像 (后端变更时)
   └─ deploy: SSH 到服务器执行 deploy.sh
+       ├─ git fetch + checkout
+       ├─ 构建后端二进制 / 前端 standalone
+       ├─ PM2 重启对应服务
+       └─ 健康检查 + 回滚
 ```
 
-镜像推送到 GitHub Container Registry (GHCR)：
-- `ghcr.io/<owner>/<repo>-web:<sha>`
-- `ghcr.io/<owner>/<repo>-backend:<sha>`
+部署模式：**PM2 + 裸二进制**（不再使用 Docker）。
 
 ## GitHub Secrets 配置
 
@@ -38,86 +38,100 @@ ssh-keyscan -p <port> <host> 2>/dev/null
 
 ```
 /opt/openatom-club/
-├── docker-compose.prod.yml    # 生产 compose（由仓库 deploy/ 同步）
-├── deploy.sh                  # 部署脚本（由仓库 deploy/ 同步）
-├── .env                       # 当前运行的镜像 tag（WEB_IMAGE / BACKEND_IMAGE）
-├── .env.rollback              # 上一次的 .env（回滚用）
-├── env/
-│   └── web.env                # 前端环境变量（仅 Next.js 用的公开变量）
-├── config/
-│   └── backend/
-│       └── config.docker.yaml # 后端配置（SQLite path、JWT secret）
-└── backups/
-    └── sqlite/                # 数据库迁移前自动备份（保留最近 30 个）
+├── deploy/
+│   ├── deploy.sh                  # 部署脚本
+│   ├── ecosystem.config.js        # PM2 进程配置
+│   └── env/
+│       └── web.env                # 前端环境变量
+├── backend/
+│   ├── config.prod.yaml           # 生产配置（MySQL/Redis 直连 127.0.0.1）
+│   ├── bin/
+│   │   └── openatom-backend-linux-amd64
+│   └── ...
+├── frontend/apps/web/
+│   └── dist/                      # Next.js standalone 产物
+│       ├── server.js
+│       ├── .next/
+│       └── public/
+├── backups/mysql/                 # MySQL 备份（保留最近 30 个）
+└── .env.rollback                  # 回滚用
 ```
-
-> SQLite 嵌入式数据库，数据持久化在 docker named volume `backend-data`（无需 mysql 容器）。
 
 ## 服务器初始化
 
-### 1. 安装 Docker
+### 1. 安装依赖
 
 ```bash
-curl -fsSL https://get.docker.com | sh
-systemctl enable --now docker
+# Node.js 20+
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
+sudo apt install -y nodejs
+
+# Go（检查 go.mod 中的版本要求）
+sudo apt install -y golang
+
+# PM2
+sudo npm install -g pm2
+
+# MySQL 8.0 和 Redis 7（确保已安装并运行）
+sudo systemctl status mysql redis
 ```
 
 ### 2. 创建部署用户
 
 ```bash
 sudo useradd -m -s /bin/bash deploy
-sudo usermod -aG docker deploy
 ```
 
-### 3. 配置 GHCR 登录
+### 3. Clone 仓库
 
 ```bash
-sudo -u deploy docker login ghcr.io
-# 使用 GitHub PAT (read:packages 权限)
+sudo -u deploy git clone <repo-url> /opt/openatom-club
+sudo -u deploy git -C /opt/openatom-club remote set-url origin git@github.com:Dirinkbottle/Open-Source-Club-Nav.git
 ```
 
-### 4. 创建目录结构
+### 4. 配置后端
 
-```bash
-sudo mkdir -p /opt/openatom-club/{env,config/backend,backups/sqlite}
-sudo chown -R deploy:deploy /opt/openatom-club
-```
-
-### 5. 创建环境文件
-
-**`/opt/openatom-club/.env`**：
-```bash
-WEB_IMAGE=ghcr.io/<owner>/<repo>-web:main
-BACKEND_IMAGE=ghcr.io/<owner>/<repo>-backend:main
-```
-
-**`/opt/openatom-club/env/web.env`**（前端公开 env，目前可为空文件或仅放非敏感变量）：
-```bash
-# 例如 sentry / analytics 等 NEXT_PUBLIC_* 变量；
-# 数据库相关变量已不需要 —— 前端不再直连数据库。
-```
-
-**`/opt/openatom-club/config/backend/config.docker.yaml`**：
+编辑 `/opt/openatom-club/backend/config.prod.yaml`：
 ```yaml
-database:
-  # 必须指向容器内 /app/data 目录（已挂载到 docker volume backend-data）
-  path: "/app/data/app.db"
+mysql:
+  host: 127.0.0.1
+  port: 3306
+  user: root
+  password: "your-mysql-root-password"
+  database: test_db
 jwt:
-  secret: "your-jwt-secret-here"  # 生产请用 openssl rand -hex 32 生成
+  secret: "your-jwt-secret"  # openssl rand -hex 32
   expire: 3600
+cors:
+  allowed_origins: "https://your-domain.com"
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
 ```
 
-> ⚠️ 文件名必须是 **`config.docker.yaml`**，docker-compose.prod.yml 按这个名字挂载。
+或通过环境变量覆盖敏感字段：
+```bash
+export JWT_SECRET="your-jwt-secret"
+export MYSQL_PASSWORD="your-mysql-root-password"
+```
 
-### 6. 首次启动
+### 5. 配置前端环境变量
+
+编辑 `/opt/openatom-club/deploy/env/web.env`：
+```bash
+NODE_ENV=production
+USE_MOCK_DATA=false
+NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:8080
+```
+
+### 6. 配置 PM2 开机自启
 
 ```bash
 cd /opt/openatom-club
-cp /path/to/repo/deploy/docker-compose.prod.yml .
-cp /path/to/repo/deploy/deploy.sh .
-chmod +x deploy.sh
-docker compose -f docker-compose.prod.yml pull
-docker compose -f docker-compose.prod.yml up -d
+pm2 startup systemd -u deploy --hp /home/deploy
+pm2 start deploy/ecosystem.config.js
+pm2 save
 ```
 
 ### 7. 设置 SSH 密钥
@@ -133,34 +147,54 @@ echo "ssh-ed25519 AAAA..." >> /home/deploy/.ssh/authorized_keys
 
 | 变更范围 | 构建 | 部署 |
 |---|---|---|
-| `frontend/**` | web 镜像 | 重启 web |
-| `backend/**` | backend 镜像 | 重启 backend |
-| 两者都改 | 两个镜像 | 两个都重启 |
-| `backend/db/migrate/**` | backend 镜像 | 部署前备份 SQLite（保留最近 30 个） |
+| `frontend/**` | 构建 standalone | PM2 重启 openatom-web |
+| `backend/**` | 构建二进制 | PM2 重启 openatom-backend |
+| 两者都改 | 都构建 | 都重启 |
+| `backend/db/migrate/**` | 构建二进制 | 部署前备份 MySQL（保留最近 30 个） |
 | 仅 `docs/**`、`README.md` | 不构建 | 不部署 |
 
 ### 健康检查与回滚
 
 部署后自动执行健康检查（12 次，每次间隔 5 秒）：
-- 前端：`curl http://127.0.0.1:4000/api/healthz`
 - 后端：`curl http://127.0.0.1:8080/healthz`
+- 前端：`curl http://127.0.0.1:4000/api/healthz`
 
 如果健康检查失败：
-1. 恢复 `.env.rollback`（上一个镜像 tag）
-2. 重新启动对应服务
+
+1. git checkout 回上一个版本
+2. 重新构建并 PM2 restart
 3. 脚本退出非零，GitHub Actions 标红
 
 ### 并发控制
 
 使用 `flock` 文件锁 + GitHub Actions `concurrency` 确保：
+
 - 连续 push 到 main 串行执行，不互相覆盖
 - 服务器上同时只能运行一个部署进程
 
 ## 安全注意事项
 
 - SSH 连接必须验证 host key（通过 `SSH_KNOWN_HOSTS`），禁用 `StrictHostKeyChecking=no`
-- 部署用户只加入 `docker` 组，不给 root 权限
-- JWT secret 等敏感信息只存在服务器的 `config/backend/config.docker.yaml`
-- SQLite 数据库为嵌入式文件，不暴露任何网络端口（更安全）
-- 数据库文件位于 docker volume `backend-data`，建议定期 cron 拷贝到对象存储
-- GitHub Actions 权限最小化：`contents: read` + `packages: write`
+- JWT secret 等敏感信息通过环境变量或 `config.prod.yaml` 配置
+- MySQL root 密码建议通过 `MYSQL_PASSWORD` 环境变量传入，不要明文写入配置文件
+- GitHub Actions 权限最小化：`contents: read`
+- PM2 进程以 deploy 用户运行，不给 root 权限
+
+## 手动操作
+
+```bash
+# 查看 PM2 进程状态
+pm2 list
+
+# 查看日志
+pm2 logs openatom-backend
+pm2 logs openatom-web
+
+# 重启服务
+pm2 restart openatom-backend
+pm2 restart openatom-web
+
+# 手动部署（指定 SHA）
+cd /opt/openatom-club
+./deploy/deploy.sh --sha <commit-sha> --frontend-changed true --backend-changed true
+```
