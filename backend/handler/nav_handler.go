@@ -1,6 +1,6 @@
 // handler/nav_handler.go
 package handler
-
+// 测试部署不要管这行注释后续可删掉
 import (
 	"net/http"
 	"open-source-club-nav/backend/model" // 替换为你的项目实际包名
