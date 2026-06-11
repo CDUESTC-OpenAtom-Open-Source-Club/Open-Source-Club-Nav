@@ -144,6 +144,7 @@ func registerSuperAdminRoutes(g *gin.RouterGroup) {
 }
 
 func registerResourceRoutes(g *gin.RouterGroup) {
+	g.GET("/links", handler.SearchNavItem)
 	g.POST("/links", handler.CreateFriendLink)
 	g.PUT("/links/:id", handler.UpdateFriendLink)
 	g.POST("/resources", handler.CreateResourceMatrix)

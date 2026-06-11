@@ -4,14 +4,25 @@ import "time"
 
 type NavItem struct {
 	ID              uint      `gorm:"primaryKey" json:"id"`
-	Title           string    `gorm:"column:title" json:"title"`                         // 表中存在
-	Content         string    `gorm:"column:content" json:"content"`                     // 表中存在
-	CoverUrl        string    `gorm:"column:cover_url" json:"cover_url"`                 // 表中存在
-	LinkUrl         string    `gorm:"column:link_url" json:"link_url"`                   // 表中存在
-	CreatedAt       time.Time `json:"created_at"`                                        // 表中存在
-	UpdatedAt       time.Time `json:"updated_at"`                                        // 表中存在
-	BusinessTable   string    `gorm:"column:business_table" json:"business_table"`       // 表中存在
-	BusinessTableId int       `gorm:"column:business_table_id" json:"business_table_id"` // 表中存在
+	ContentType     string    `gorm:"column:content_type" json:"content_type"`
+	SubType         string    `gorm:"column:sub_type" json:"sub_type,omitempty"`
+	Icon            string    `gorm:"column:icon" json:"icon,omitempty"`
+	Title           string    `gorm:"column:title" json:"title"`
+	Description     string    `gorm:"column:description" json:"description"`
+	Content         string    `gorm:"column:content" json:"content"`
+	Sort            int       `gorm:"column:sort" json:"sort"`
+	Active          int       `gorm:"column:active" json:"active"`
+	Category        string    `gorm:"column:category" json:"category"`
+	GameType        string    `gorm:"column:game_type" json:"game_type,omitempty"`
+	IconUrl         string    `gorm:"column:icon_url" json:"icon_url,omitempty"`
+	CoverUrl        string    `gorm:"column:cover_url" json:"cover_url"`
+	LinkUrl         string    `gorm:"column:link_url" json:"link_url"`
+	CreatedBy       int       `gorm:"column:created_by" json:"created_by,omitempty"`
+	UpdatedBy       int       `gorm:"column:updated_by" json:"updated_by,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+	BusinessTable   string    `gorm:"column:business_table" json:"business_table,omitempty"`
+	BusinessTableId int       `gorm:"column:business_table_id" json:"business_table_id,omitempty"`
 }
 
 func (NavItem) TableName() string {
