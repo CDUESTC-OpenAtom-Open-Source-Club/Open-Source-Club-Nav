@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, BarChart3, Clock3, Eye, LayoutDashboard, MousePointerClick, ServerCog, Users } from "lucide-react";
+import { Activity, BarChart3, Clock3, Eye, GitBranch, LayoutDashboard, MousePointerClick, RefreshCw, Rocket, ServerCog, ShieldCheck, Users } from "lucide-react";
+import { checkUpdates, getDeployStatus, triggerDeploy, type DeployStatus } from "@/lib/api/admin-deploy";
 type AdminUser = {
   id: number;
   username: string;
@@ -83,6 +84,14 @@ type LinkLog = {
   actor_role: string;
   created_at: string;
   detail?: unknown;
+};
+
+const DEPLOY_PHASE_LABEL: Record<string, { label: string; color: string; bg: string }> = {
+  idle: { label: "空闲", color: "#475569", bg: "#F1F5F9" },
+  checking: { label: "检查中", color: "#1D4ED8", bg: "#DBEAFE" },
+  deploying: { label: "部署中", color: "#B45309", bg: "#FEF3C7" },
+  success: { label: "成功", color: "#047857", bg: "#D1FAE5" },
+  failed: { label: "失败", color: "#B91C1C", bg: "#FEE2E2" },
 };
 
 const STAT_METRIC_META: Record<StatMetricKey, { label: string; short: string; color: string; bg: string }> = {
@@ -301,6 +310,9 @@ export default function AdminPage() {
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
   const [healthChecking, setHealthChecking] = useState(false);
+  const [deployStatus, setDeployStatus] = useState<DeployStatus | null>(null);
+  const [deployLoading, setDeployLoading] = useState(false);
+  const [deployAction, setDeployAction] = useState<"idle" | "checking" | "triggering">("idle");
   const [autoDetectDialogOpen, setAutoDetectDialogOpen] = useState(false);
   const [autoDetectEnabled, setAutoDetectEnabled] = useState(false);
   const [autoDetectIntervalMinutes, setAutoDetectIntervalMinutes] = useState(15);
@@ -440,16 +452,10 @@ export default function AdminPage() {
 
   const sections = useMemo(
     () => (user && user.role === "super"
-      ? [...baseSections, { id: "users", label: "用户管理" as const }]
+      ? [...baseSections, { id: "deploy", label: "版本更新" as const }, { id: "users", label: "用户管理" as const }]
       : baseSections),
     [user],
   );
-
-  useEffect(() => {
-    if (user?.role !== "super" && activeSection === "users") {
-      setActiveSection("overview");
-    }
-  }, [activeSection, user]);
 
   const healthMapByLinkId = useMemo(() => {
     const map = new Map<number, LinkHealth>();
@@ -677,6 +683,12 @@ export default function AdminPage() {
     }
   }, [markSectionLoaded]);
 
+  const loadDeployStatus = useCallback(async () => {
+    const status = await getDeployStatus();
+    setDeployStatus(status);
+    markSectionLoaded("deploy");
+  }, [markSectionLoaded]);
+
   const loadSectionById = useCallback(async (sectionId: string, role: "super" | "editor") => {
     if (sectionId === "overview") {
       await loadOverview();
@@ -694,10 +706,14 @@ export default function AdminPage() {
       await loadLogs();
       return;
     }
+    if (sectionId === "deploy" && role === "super") {
+      await loadDeployStatus();
+      return;
+    }
     if (sectionId === "users" && role === "super") {
       await loadUsers();
     }
-  }, [loadHealth, loadLinks, loadLogs, loadOverview, loadUsers]);
+  }, [loadDeployStatus, loadHealth, loadLinks, loadLogs, loadOverview, loadUsers]);
 
   useEffect(() => {
     const init = async () => {
@@ -762,22 +778,22 @@ export default function AdminPage() {
   };
 
   const jumpToLinkFromHealth = useCallback(async (item: LinkHealth) => {
-    const module = (item.module || "friend_links") as NavModule;
+    const moduleKey = (item.module || "friend_links") as NavModule;
     const resourceSubModule = (item.resource_sub_module || "think_tank") as ResourceSubModule;
     setError("");
     setActiveSection("links");
     setLinksNavExpanded(true);
-    setActiveLinkModule(module);
-    if (module === "resource_matrix") {
+    setActiveLinkModule(moduleKey);
+    if (moduleKey === "resource_matrix") {
       setActiveResourceSubModule(resourceSubModule);
     }
     setLinkForm((prev) => ({
       ...prev,
-      module,
-      resource_sub_module: module === "resource_matrix" ? resourceSubModule : prev.resource_sub_module,
+      module: moduleKey,
+      resource_sub_module: moduleKey === "resource_matrix" ? resourceSubModule : prev.resource_sub_module,
     }));
     try {
-      await fetchLinksForScope(module, module === "resource_matrix" ? resourceSubModule : undefined);
+      await fetchLinksForScope(moduleKey, moduleKey === "resource_matrix" ? resourceSubModule : undefined);
       setFocusedLinkId(item.link_id);
     } catch {
       setError("跳转到内容管理失败");
@@ -948,6 +964,44 @@ export default function AdminPage() {
     }
   };
 
+  const runDeployCheck = async () => {
+    if (deployAction !== "idle") return;
+    setDeployAction("checking");
+    setDeployLoading(true);
+    setError("");
+    try {
+      const status = await checkUpdates();
+      setDeployStatus(status);
+      markSectionLoaded("deploy");
+    } catch (err) {
+      const status = (err as Error & { status?: DeployStatus }).status;
+      if (status) setDeployStatus(status);
+      setError(String((err as Error).message || "检查更新失败"));
+    } finally {
+      setDeployAction("idle");
+      setDeployLoading(false);
+    }
+  };
+
+  const runDeployTrigger = async () => {
+    if (deployAction !== "idle" || deployStatus?.phase === "deploying" || !deployStatus?.has_update) return;
+    setDeployAction("triggering");
+    setDeployLoading(true);
+    setError("");
+    try {
+      const status = await triggerDeploy();
+      setDeployStatus(status);
+      markSectionLoaded("deploy");
+    } catch (err) {
+      const status = (err as Error & { status?: DeployStatus }).status;
+      if (status) setDeployStatus(status);
+      setError(String((err as Error).message || "触发部署失败"));
+    } finally {
+      setDeployAction("idle");
+      setDeployLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     const storedEnabled = window.localStorage.getItem(AUTO_DETECT_ENABLED_KEY);
@@ -995,6 +1049,16 @@ export default function AdminPage() {
     return () => window.clearInterval(intervalId);
   }, [activeSection, loadSystem]);
 
+  useEffect(() => {
+    if (activeSection !== "deploy" || user?.role !== "super") return;
+    const intervalId = window.setInterval(() => {
+      if (deployStatus?.phase === "deploying" || deployStatus?.phase === "checking") {
+        loadDeployStatus().catch(() => {});
+      }
+    }, 2000);
+    return () => window.clearInterval(intervalId);
+  }, [activeSection, deployStatus?.phase, loadDeployStatus, user?.role]);
+
   const openAutoDetectDialog = () => {
     setAutoDetectDraftMinutes(String(autoDetectIntervalMinutes));
     setAutoDetectDialogOpen(true);
@@ -1028,6 +1092,9 @@ export default function AdminPage() {
     return <div style={{ padding: 24 }}>Loading...</div>;
   }
   if (!user) return null;
+  const deployPhase = deployStatus?.phase || "idle";
+  const deployPhaseMeta = DEPLOY_PHASE_LABEL[deployPhase] || DEPLOY_PHASE_LABEL.idle;
+  const deployLogs = deployStatus?.logs || [];
 
   return (
     <div className="admin-shell" style={{ display: "grid", gap: 12, position: "relative", zIndex: 1 }}>
@@ -1758,10 +1825,10 @@ export default function AdminPage() {
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }}>
                     {(() => {
-                      const module = (h.module || "friend_links") as NavModule;
+                      const moduleKey = (h.module || "friend_links") as NavModule;
                       const sub = (h.resource_sub_module || "think_tank") as ResourceSubModule;
-                      const moduleLabel = NAV_MODULE_META[module]?.label || "未知";
-                      if (module !== "resource_matrix") return moduleLabel;
+                      const moduleLabel = NAV_MODULE_META[moduleKey]?.label || "未知";
+                      if (moduleKey !== "resource_matrix") return moduleLabel;
                       return `${moduleLabel} / ${RESOURCE_SUB_MODULE_META[sub]?.label || "智库"}`;
                     })()}
                   </td>
@@ -1839,6 +1906,101 @@ export default function AdminPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+      </div>
+      ) : null}
+
+      {user.role === "super" && activeSection === "deploy" ? (
+      <div className="admin-section-transition">
+      <div className="admin-card admin-console-pagehead" style={{ padding: 18, border: "1px solid #E6ECF5", background: "linear-gradient(180deg,#FFFFFF 0%,#F9FBFF 100%)" }}>
+        <div className="admin-console-title-row">
+          <span className="admin-console-icon-badge" style={{ background: "linear-gradient(135deg, rgba(37,99,235,0.14), rgba(14,165,233,0.2))", color: "#1D4ED8" }}>
+            <GitBranch size={16} />
+          </span>
+          <div className="admin-console-pagehead-title">版本更新</div>
+        </div>
+        <div className="admin-console-pagehead-desc">基于远程 Git Tag 检查可发布版本，并在服务器内执行构建、重启和健康检查。</div>
+      </div>
+      <div id="deploy" className="admin-card" style={{ padding: 18, display: "grid", gap: 16, background: "#F5F7FA", border: "1px solid #E6ECF5", borderRadius: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+          {[
+            { label: "当前版本", value: deployStatus?.current_tag || deployStatus?.current_commit || "--", icon: GitBranch },
+            { label: "远程最新 Tag", value: deployStatus?.latest_tag || "--", icon: RefreshCw },
+            { label: "更新状态", value: deployStatus?.has_update ? "有可用更新" : "暂无更新", icon: ShieldCheck },
+            { label: "部署任务", value: deployStatus?.job_id || "--", icon: Rocket },
+          ].map((item) => (
+            <div key={item.label} style={{ background: "#FFFFFF", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, display: "grid", gap: 8 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontSize: 12, color: "#64748B", fontWeight: 700 }}>{item.label}</span>
+                <span className="admin-console-icon-badge" style={{ width: 28, height: 28, background: "#EFF6FF", color: "#2563EB" }}>
+                  <item.icon size={14} />
+                </span>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", wordBreak: "break-all" }}>{item.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ background: "#FFFFFF", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, display: "grid", gap: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "grid", gap: 4 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>部署控制</span>
+                <span style={{ borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700, color: deployPhaseMeta.color, background: deployPhaseMeta.bg }}>
+                  {deployPhaseMeta.label}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
+                只有远程 tag 发生变化时才会提示更新；触发后会异步执行脚本并轮询部署状态。
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="admin-btn-ghost"
+                onClick={() => { void runDeployCheck(); }}
+                disabled={deployLoading || deployPhase === "deploying"}
+                style={{ height: 34, padding: "0 14px", borderRadius: 8 }}
+              >
+                {deployAction === "checking" ? "检查中..." : "检查更新"}
+              </button>
+              <button
+                type="button"
+                className="admin-btn"
+                onClick={() => { void runDeployTrigger(); }}
+                disabled={deployLoading || deployPhase === "deploying" || !deployStatus?.has_update}
+                style={{ height: 34, padding: "0 14px", borderRadius: 8 }}
+              >
+                {deployAction === "triggering" ? "启动中..." : "立即更新"}
+              </button>
+            </div>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10 }}>
+            <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
+              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 4 }}>部署目录</div>
+              <code style={{ fontSize: 12, color: "#334155", wordBreak: "break-all" }}>{deployStatus?.repo_path || "--"}</code>
+            </div>
+            <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
+              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 4 }}>更新脚本</div>
+              <code style={{ fontSize: 12, color: "#334155", wordBreak: "break-all" }}>{deployStatus?.update_script || "--"}</code>
+            </div>
+            <div style={{ border: "1px solid #E2E8F0", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
+              <div style={{ fontSize: 12, color: "#64748B", marginBottom: 4 }}>最近执行时间</div>
+              <div style={{ fontSize: 12, color: "#334155" }}>
+                {deployStatus?.started_at ? String(deployStatus.started_at).replace("T", " ").slice(0, 19) : "--"}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: "#0F172A", border: "1px solid #1E293B", borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ padding: "10px 12px", borderBottom: "1px solid #1E293B", color: "#CBD5E1", fontSize: 12, fontWeight: 700 }}>
+            部署日志
+          </div>
+          <pre style={{ margin: 0, padding: 12, minHeight: 220, maxHeight: 420, overflow: "auto", color: "#E2E8F0", fontSize: 12, lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+            {deployLogs.length ? deployLogs.join("\n") : "暂无部署日志"}
+          </pre>
         </div>
       </div>
       </div>
@@ -1984,7 +2146,3 @@ function formatLogObjectAndDetail(log: LinkLog): string {
   if (detail === "-") return target;
   return `${target} | ${detail}`;
 }
-
-
-
-

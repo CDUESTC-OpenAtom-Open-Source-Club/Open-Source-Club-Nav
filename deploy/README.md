@@ -3,48 +3,73 @@
 ## 架构概览
 
 ```
-GitHub Actions (push to main)
-  ├─ detect: 识别变更文件
-  ├─ test_frontend: lint + build (前端变更时)
-  ├─ test_backend: go test (后端变更时)
-  └─ deploy: SSH 到服务器执行 deploy.sh
-       ├─ git fetch + checkout
-       ├─ 构建后端二进制 / 前端 standalone
-       ├─ PM2 重启对应服务
-       └─ 健康检查 + 回滚
+GitHub Actions (Git Tag / workflow_dispatch)
+  ├─ 在 GitHub runner 上测试、构建后端 Linux 二进制
+  ├─ 在 GitHub runner 上构建前端 standalone bundle
+  ├─ 打包 backend/bin + frontend/apps/web/dist
+  └─ SSH 上传 artifact 到服务器并执行 deploy/update.sh --tag <tag>
+       ├─ git fetch --tags --force origin
+       ├─ checkout 指定 tag
+       ├─ 复用 GitHub Actions 上传的预构建产物
+       ├─ PM2 重启 openatom-backend / openatom-web
+       └─ 健康检查 + 失败回滚
 ```
 
 部署模式：**PM2 + 裸二进制**（不再使用 Docker）。
 
-## GitHub Secrets 配置
+当前测试部署触发以 **Git Tag** 为准，普通 push 到 main 不部署。测试服自动部署 tag 格式为 `v*-test`，例如 `v0.2.0-test`。
 
-在仓库 Settings → Secrets and variables → Actions 中添加：
+低内存服务器不现场构建。GitHub Actions 上传预构建产物后，用 `SKIP_BACKEND_BUILD=1` 和 `SKIP_FRONTEND_BUILD=1` 让脚本只 checkout tag、重启服务和做健康检查。
+
+## GitHub Actions Secrets
+
+测试服需要在仓库 Actions secrets 中配置：
 
 | Secret | 说明 | 示例 |
 |---|---|---|
-| `DEPLOY_HOST` | 服务器 IP 或域名 | `123.45.67.89` |
-| `DEPLOY_PORT` | SSH 端口 | `22` |
-| `DEPLOY_USER` | 部署专用用户名 | `deploy` |
-| `DEPLOY_SSH_KEY` | SSH 私钥 (ed25519 推荐) | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
-| `DEPLOY_PATH` | 服务器上项目目录 | `/opt/openatom-club` |
-| `SSH_KNOWN_HOSTS` | 服务器 host key | `123.45.67.89 ssh-ed25519 AAAA...` |
+| `TEST_DEPLOY_HOST` | 测试服务器 IP | `47.108.249.115` |
+| `TEST_DEPLOY_PORT` | SSH 端口 | `22` |
+| `TEST_DEPLOY_USER` | SSH 用户 | `root` |
+| `TEST_DEPLOY_PATH` | 项目目录 | `/opt/openatom-club` |
+| `TEST_DEPLOY_SSH_KEY` | GitHub Actions 使用的 SSH 私钥 | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
+| `TEST_SSH_KNOWN_HOSTS` | 测试服务器 host key | `ssh-keyscan -p 22 47.108.249.115` |
 
-获取 `SSH_KNOWN_HOSTS`：
+运行时敏感配置不放 GitHub secrets，放服务器本地 `${DEPLOY_PATH}/.deploy-env`：
+
 ```bash
-ssh-keyscan -p <port> <host> 2>/dev/null
+SERVER_ADDR=:18080
+BACKEND_API_URL=http://127.0.0.1:18080
+NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:18080
+MYSQL_PASSWORD=...
+JWT_SECRET=...
+HEALTH_RETRIES=24
+HEALTH_INTERVAL=3
 ```
+
+## 远程仓库访问
+
+服务器上的 `/opt/openatom-club` 必须能读取 GitHub `origin`：
+
+```bash
+cd /opt/openatom-club
+git ls-remote --tags --refs origin
+git fetch --tags --force origin
+```
+
+公开仓库可使用 HTTPS origin。私有仓库建议给服务器配置只读 deploy key，并将 `origin` 设置为 SSH 地址。
 
 ## 服务器目录结构
 
 ```
 /opt/openatom-club/
 ├── deploy/
-│   ├── deploy.sh                  # 部署脚本
+│   ├── update.sh                  # Tag 更新脚本
+│   ├── deploy.sh                  # 旧版 CI 部署脚本（保留兼容）
 │   ├── ecosystem.config.js        # PM2 进程配置
 │   └── env/
 │       └── web.env                # 前端环境变量
 ├── backend/
-│   ├── config.prod.yaml           # 生产配置（MySQL/Redis 直连 127.0.0.1）
+│   ├── config.yaml                # 配置文件（敏感信息通过环境变量覆盖）
 │   ├── bin/
 │   │   └── openatom-backend-linux-amd64
 │   └── ...
@@ -86,12 +111,23 @@ sudo useradd -m -s /bin/bash deploy
 
 ```bash
 sudo -u deploy git clone <repo-url> /opt/openatom-club
-sudo -u deploy git -C /opt/openatom-club remote set-url origin git@github.com:Dirinkbottle/Open-Source-Club-Nav.git
+sudo -u deploy git -C /opt/openatom-club remote set-url origin git@github.com:CDUESTC-OpenAtom-Open-Source-Club/Open-Source-Club-Nav.git
 ```
 
 ### 4. 配置后端
 
-编辑 `/opt/openatom-club/backend/config.prod.yaml`：
+**方式一：环境变量覆盖（推荐）**
+
+通过环境变量覆盖敏感字段，无需修改配置文件：
+```bash
+export MYSQL_PASSWORD="your-mysql-root-password"
+export JWT_SECRET="your-jwt-secret"  # openssl rand -hex 32
+export CORS_ALLOWED_ORIGINS="https://your-domain.com"
+```
+
+**方式二：修改配置文件**
+
+编辑 `/opt/openatom-club/backend/config.yaml`：
 ```yaml
 mysql:
   host: 127.0.0.1
@@ -108,12 +144,20 @@ redis:
   addr: "127.0.0.1:6379"
   password: ""
   db: 0
+server:
+  addr: ":8080"
+deploy:
+  repo_path: "/opt/openatom-club"
+  update_script: "deploy/update.sh"
+  allowed_tags:
+    - "v*"
 ```
 
-或通过环境变量覆盖敏感字段：
+测试服如需避开已有 `8080` 服务，可通过环境变量覆盖监听地址：
 ```bash
-export JWT_SECRET="your-jwt-secret"
-export MYSQL_PASSWORD="your-mysql-root-password"
+export SERVER_ADDR=":18080"
+export BACKEND_API_URL="http://127.0.0.1:18080"
+export NEXT_PUBLIC_BACKEND_API_URL="http://127.0.0.1:18080"
 ```
 
 ### 5. 配置前端环境变量
@@ -122,6 +166,7 @@ export MYSQL_PASSWORD="your-mysql-root-password"
 ```bash
 NODE_ENV=production
 USE_MOCK_DATA=false
+BACKEND_API_URL=http://127.0.0.1:8080
 NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:8080
 ```
 
@@ -134,51 +179,64 @@ pm2 start deploy/ecosystem.config.js
 pm2 save
 ```
 
-### 7. 设置 SSH 密钥
+### 7. 设置仓库读取密钥
 
-将 GitHub Actions 使用的公钥添加到 `~/.ssh/authorized_keys`：
+私有仓库需要在服务器上配置 GitHub deploy key：
 ```bash
-echo "ssh-ed25519 AAAA..." >> /home/deploy/.ssh/authorized_keys
+sudo -u deploy ssh -T git@github.com
+sudo -u deploy git -C /opt/openatom-club ls-remote --tags --refs origin
 ```
 
-## 部署行为
+## Git Tag 更新流程
 
-### 变更检测
+### 发布 tag
 
-| 变更范围 | 构建 | 部署 |
-|---|---|---|
-| `frontend/**` | 构建 standalone | PM2 重启 openatom-web |
-| `backend/**` | 构建二进制 | PM2 重启 openatom-backend |
-| 两者都改 | 都构建 | 都重启 |
-| `backend/db/migrate/**` | 构建二进制 | 部署前备份 MySQL（保留最近 30 个） |
-| 仅 `docs/**`、`README.md` | 不构建 | 不部署 |
+```bash
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+管理后台只检测远程 tag：
+
+- 当前版本：服务器本地 `HEAD` 对应的 tag
+- 最新版本：`git ls-remote --tags --refs origin` 中匹配 `deploy.allowed_tags` 的最新 tag
+- 有更新：最新远程 tag 与当前本地 tag 不一致
+
+### 管理后台操作
+
+1. 使用超级管理员登录 `/admin`
+2. 打开“版本更新”
+3. 点击“检查更新”
+4. 有新 tag 时点击“立即更新”
+5. 页面轮询 `/api/admin/deploy/status` 查看状态和日志
 
 ### 健康检查与回滚
 
 部署后自动执行健康检查（12 次，每次间隔 5 秒）：
-- 后端：`curl http://127.0.0.1:8080/healthz`
-- 前端：`curl http://127.0.0.1:4000/api/healthz`
+- 后端：默认 `curl http://127.0.0.1:8080/healthz`，如设置 `SERVER_ADDR=:18080` 则检查 `18080`
+- 前端：默认 `curl http://127.0.0.1:4000/api/healthz`
 
 如果健康检查失败：
 
 1. git checkout 回上一个版本
 2. 重新构建并 PM2 restart
-3. 脚本退出非零，GitHub Actions 标红
+3. 脚本退出非零，管理后台显示失败
 
 ### 并发控制
 
-使用 `flock` 文件锁 + GitHub Actions `concurrency` 确保：
+使用后端运行态检查 + `flock` 文件锁确保：
 
-- 连续 push 到 main 串行执行，不互相覆盖
 - 服务器上同时只能运行一个部署进程
+- 管理后台重复点击不会并发执行部署
 
 ## 安全注意事项
 
-- SSH 连接必须验证 host key（通过 `SSH_KNOWN_HOSTS`），禁用 `StrictHostKeyChecking=no`
-- JWT secret 等敏感信息通过环境变量或 `config.prod.yaml` 配置
-- MySQL root 密码建议通过 `MYSQL_PASSWORD` 环境变量传入，不要明文写入配置文件
-- GitHub Actions 权限最小化：`contents: read`
+- 私有仓库使用只读 deploy key，不要把个人 SSH 私钥放到服务器
+- **推荐使用环境变量配置敏感信息**，避免将密码写入配置文件
+- 支持的环境变量：`MYSQL_PASSWORD`、`JWT_SECRET`、`MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_DATABASE`、`REDIS_ADDR`、`REDIS_PASSWORD`、`REDIS_DB`、`CORS_ALLOWED_ORIGINS`、`SERVER_ADDR`
 - PM2 进程以 deploy 用户运行，不给 root 权限
+- 部署 API 仅超级管理员可访问
+- 部署脚本只 checkout 后端检测到的允许 tag
 
 ## 手动操作
 
@@ -194,7 +252,18 @@ pm2 logs openatom-web
 pm2 restart openatom-backend
 pm2 restart openatom-web
 
-# 手动部署（指定 SHA）
+# 手动部署（指定 tag）
 cd /opt/openatom-club
-./deploy/deploy.sh --sha <commit-sha> --frontend-changed true --backend-changed true
+./deploy/update.sh --tag v1.2.3
+
+# 测试服避开 8080 的手动部署
+SERVER_ADDR=:18080 \
+BACKEND_API_URL=http://127.0.0.1:18080 \
+NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:18080 \
+./deploy/update.sh --tag v1.2.3
+
+# 使用预构建产物部署（适合低内存服务器）
+SKIP_BACKEND_BUILD=1 \
+SKIP_FRONTEND_BUILD=1 \
+./deploy/update.sh --tag v1.2.3
 ```

@@ -13,3 +13,10 @@ redis:
   addr: "127.0.0.1:6379"
   password: ""
   db: 0
+server:
+  addr: ":8080"
+deploy:
+  repo_path: "/opt/openatom-club"
+  update_script: "deploy/update.sh"
+  allowed_tags:
+    - "v*"

@@ -2,18 +2,21 @@ mysql:
   host: 127.0.0.1
   port: 3306
   user: root
-  password: "openatom_dev_password"
+  password: "change-me"
   database: test_db
 jwt:
   secret: "change-me"
   expire: 3600
-# 新增CORS配置
 cors:
-  allowed_origins: "*"
+  allowed_origins: "http://localhost:4000"
 redis:
-  addr: "localhost:6379"       # 你的Redis地址
-  password: ""                 # 没有密码则留空
-  db: 0                        # 默认数据库编号
-
-# 启动时会自动执行 backend/db/migrate/migrations 下的 sql 迁移。
-# 首次部署只需先创建数据库，再启动服务即可完成建表和基础种子导入。
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+server:
+  addr: ":8080"
+deploy:
+  repo_path: "/opt/openatom-club"
+  update_script: "deploy/update.sh"
+  allowed_tags:
+    - "v*"

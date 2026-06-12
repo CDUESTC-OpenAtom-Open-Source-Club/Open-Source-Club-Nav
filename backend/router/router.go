@@ -141,6 +141,9 @@ func registerSuperAdminRoutes(g *gin.RouterGroup) {
 		superG.POST("/users", handler.CreateAdminUser)
 		superG.PUT("/users", handler.UpdateAdminUser)
 		superG.DELETE("/users/:id", handler.DeleteAdminUser)
+		superG.GET("/deploy/check-updates", handler.AdminCheckDeployUpdates)
+		superG.POST("/deploy/trigger", handler.AdminTriggerDeploy)
+		superG.GET("/deploy/status", handler.AdminDeployStatus)
 	}
 }
 
