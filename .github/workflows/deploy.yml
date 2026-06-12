@@ -1,190 +1,157 @@
 # .github/workflows/deploy.yml
-# main 分支 push 时：检测变更 → 测试 → 部署到生产服务器（PM2 + 裸二进制）
-name: Deploy
+# Build release artifacts in GitHub Actions, then deploy prebuilt files to the server.
+name: Deploy Release Artifact
 
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*-test"
 
 permissions:
   contents: read
 
 jobs:
-  # ── 变更检测 ──────────────────────────────────────────────────────────────────
-  detect:
+  build:
+    name: Build Linux artifact
     runs-on: ubuntu-latest
     outputs:
-      frontend_changed: ${{ steps.diff.outputs.frontend_changed }}
-      backend_changed: ${{ steps.diff.outputs.backend_changed }}
-      db_changed: ${{ steps.diff.outputs.db_changed }}
-      should_deploy: ${{ steps.diff.outputs.should_deploy }}
+      release_tag: ${{ steps.release.outputs.release_tag }}
+      artifact_name: ${{ steps.package.outputs.artifact_name }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Detect changes
-        id: diff
+      - name: Resolve release tag
+        id: release
         run: |
-          BEFORE="${{ github.event.before }}"
-          SHA="${{ github.sha }}"
-
-          # 首次 push 或 force push 时 before 可能全零，此时视为全部变更
-          if [[ "${BEFORE}" == "0000000000000000000000000000000000000000" ]]; then
-            echo "frontend_changed=true" >> "$GITHUB_OUTPUT"
-            echo "backend_changed=true" >> "$GITHUB_OUTPUT"
-            echo "db_changed=true" >> "$GITHUB_OUTPUT"
-            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
-            echo "Initial or force push detected, building everything."
-            exit 0
-          fi
-
-          CHANGED=$(git diff --name-only "${BEFORE}" "${SHA}" || true)
-          echo "Changed files:"
-          echo "${CHANGED}"
-
-          FRONTEND="false"
-          BACKEND="false"
-          DB="false"
-
-          # 纯文档文件列表（忽略这些以外的所有变更才跳过部署）
-          DOCS_ONLY="true"
-
-          while IFS= read -r file; do
-            [[ -z "${file}" ]] && continue
-
-            # 判断是否为纯文档文件
-            case "${file}" in
-              docs/*|*.md|LICENSE|.gitignore|.gitmodules)
-                ;; # 仍可能是 docs-only，继续检查其他文件
-              *)
-                DOCS_ONLY="false"
-                ;;
-            esac
-
-            # 前端变更
-            case "${file}" in
-              frontend/apps/web/*|frontend/shared/*)
-                FRONTEND="true"
-                ;;
-            esac
-
-            # 后端变更
-            case "${file}" in
-              backend/*)
-                BACKEND="true"
-                ;;
-            esac
-
-            # 数据库迁移变更
-            case "${file}" in
-              backend/db/migrate/*)
-                DB="true"
-                ;;
-            esac
-          done <<< "${CHANGED}"
-
-          # 纯文档变更不部署
-          if [[ "${DOCS_ONLY}" == "true" ]]; then
-            echo "Docs-only change, skipping deploy."
-            echo "frontend_changed=false" >> "$GITHUB_OUTPUT"
-            echo "backend_changed=false" >> "$GITHUB_OUTPUT"
-            echo "db_changed=false" >> "$GITHUB_OUTPUT"
-            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          SHOULD_DEPLOY="false"
-          if [[ "${FRONTEND}" == "true" || "${BACKEND}" == "true" ]]; then
-            SHOULD_DEPLOY="true"
-          fi
-
-          echo "frontend_changed=${FRONTEND}" >> "$GITHUB_OUTPUT"
-          echo "backend_changed=${BACKEND}" >> "$GITHUB_OUTPUT"
-          echo "db_changed=${DB}" >> "$GITHUB_OUTPUT"
-          echo "should_deploy=${SHOULD_DEPLOY}" >> "$GITHUB_OUTPUT"
-
-  # ── 前端测试 ─────────────────────────────────────────────────────────────────
-  test_frontend:
-    needs: detect
-    if: needs.detect.outputs.frontend_changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/apps/web/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend/apps/web
-        run: npm ci
-
-      - name: Lint
-        working-directory: frontend/apps/web
-        run: npm run lint
-        continue-on-error: true
-
-      - name: Build
-        working-directory: frontend/apps/web
-        run: npm run build
-
-  # ── 后端测试 ─────────────────────────────────────────────────────────────────
-  test_backend:
-    needs: detect
-    if: needs.detect.outputs.backend_changed == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+          RELEASE_TAG="${GITHUB_REF_NAME}"
+          git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${RELEASE_TAG}"
 
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      - name: Run tests
+      - name: Test backend
         working-directory: backend
+        env:
+          GOTOOLCHAIN: auto
+          GOPROXY: https://goproxy.cn,direct
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
         run: go test ./...
 
-  # ── 部署到生产服务器 ────────────────────────────────────────────────────────
-  deploy:
-    needs: [detect, test_frontend, test_backend]
-    if: |
-      always() &&
-      needs.detect.result == 'success' &&
-      needs.detect.outputs.should_deploy == 'true' &&
-      (needs.test_frontend.result == 'success' || needs.test_frontend.result == 'skipped') &&
-      (needs.test_backend.result == 'success' || needs.test_backend.result == 'skipped')
+      - name: Build backend binary
+        working-directory: backend
+        env:
+          GOTOOLCHAIN: auto
+          GOPROXY: https://goproxy.cn,direct
+          GOFLAGS: -p=1
+          GOMAXPROCS: "1"
+        run: bash scripts/build-linux.sh
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/apps/web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend/apps/web
+        run: npm ci
+
+      - name: Build frontend standalone bundle
+        working-directory: frontend/apps/web
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: bash scripts/pack-standalone.sh dist
+
+      - name: Package artifact
+        id: package
+        run: |
+          RELEASE_TAG="${{ steps.release.outputs.release_tag }}"
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          ARTIFACT_NAME="openatom-${RELEASE_TAG}-${SHORT_SHA}"
+
+          test -x backend/bin/openatom-backend-linux-amd64
+          test -f frontend/apps/web/dist/server.js
+
+          tar -czf "${ARTIFACT_NAME}.tar.gz" \
+            backend/bin/openatom-backend-linux-amd64 \
+            frontend/apps/web/dist
+
+          echo "artifact_name=${ARTIFACT_NAME}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.artifact_name }}
+          path: ${{ steps.package.outputs.artifact_name }}.tar.gz
+          if-no-files-found: error
+          retention-days: 14
+
+  deploy_test:
+    name: Deploy to test server
+    needs: build
     runs-on: ubuntu-latest
     concurrency:
-      group: production-main
+      group: deploy-test
       cancel-in-progress: false
-    environment: production
+    environment: test
     steps:
-      - name: Set up SSH
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+
+      - name: Configure SSH
+        env:
+          TEST_DEPLOY_SSH_KEY: ${{ secrets.TEST_DEPLOY_SSH_KEY }}
+          TEST_SSH_KNOWN_HOSTS: ${{ secrets.TEST_SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
-          eval "$(ssh-agent -s)"
-          echo "${{ secrets.DEPLOY_SSH_KEY }}" | ssh-add -
-          echo "SSH_AUTH_SOCK=${SSH_AUTH_SOCK}" >> "$GITHUB_ENV"
+          chmod 700 ~/.ssh
+          printf '%s\n' "${TEST_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          printf '%s\n' "${TEST_DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
 
-      - name: Deploy via SSH
+      - name: Upload artifact
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
-          SHA: ${{ github.sha }}
-          FRONTEND_CHANGED: ${{ needs.detect.outputs.frontend_changed }}
-          BACKEND_CHANGED: ${{ needs.detect.outputs.backend_changed }}
-          DB_CHANGED: ${{ needs.detect.outputs.db_changed }}
+          TEST_DEPLOY_HOST: ${{ secrets.TEST_DEPLOY_HOST }}
+          TEST_DEPLOY_PORT: ${{ secrets.TEST_DEPLOY_PORT }}
+          TEST_DEPLOY_USER: ${{ secrets.TEST_DEPLOY_USER }}
+          ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
         run: |
-          ssh -p "${DEPLOY_PORT}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
-            "${DEPLOY_PATH}/deploy.sh" \
-              --sha "${SHA}" \
-              --frontend-changed "${FRONTEND_CHANGED}" \
-              --backend-changed "${BACKEND_CHANGED}" \
-              --db-changed "${DB_CHANGED}"
+          scp -i ~/.ssh/deploy_key -P "${TEST_DEPLOY_PORT}" \
+            "${ARTIFACT_NAME}.tar.gz" \
+            "${TEST_DEPLOY_USER}@${TEST_DEPLOY_HOST}:/tmp/${ARTIFACT_NAME}.tar.gz"
+
+      - name: Apply artifact on test server
+        env:
+          TEST_DEPLOY_HOST: ${{ secrets.TEST_DEPLOY_HOST }}
+          TEST_DEPLOY_PORT: ${{ secrets.TEST_DEPLOY_PORT }}
+          TEST_DEPLOY_USER: ${{ secrets.TEST_DEPLOY_USER }}
+          TEST_DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
+          ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${TEST_DEPLOY_PORT}" \
+            "${TEST_DEPLOY_USER}@${TEST_DEPLOY_HOST}" \
+            "DEPLOY_PATH='${TEST_DEPLOY_PATH}' RELEASE_TAG='${RELEASE_TAG}' ARTIFACT_NAME='${ARTIFACT_NAME}' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          cd "${DEPLOY_PATH}"
+          git fetch --tags --force origin
+          git rev-parse -q --verify "refs/tags/${RELEASE_TAG}" >/dev/null
+          git checkout --quiet "refs/tags/${RELEASE_TAG}"
+
+          tar -xzf "/tmp/${ARTIFACT_NAME}.tar.gz" -C "${DEPLOY_PATH}"
+          chmod +x backend/bin/openatom-backend-linux-amd64 deploy/update.sh
+
+          SKIP_BACKEND_BUILD=1 \
+          SKIP_FRONTEND_BUILD=1 \
+          ./deploy/update.sh --tag "${RELEASE_TAG}"
+
+          rm -f "/tmp/${ARTIFACT_NAME}.tar.gz"
+          REMOTE
