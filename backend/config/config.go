@@ -89,6 +89,32 @@ func LoadConfig() *Config {
 	if mysqlPwd := os.Getenv("MYSQL_PASSWORD"); mysqlPwd != "" {
 		cfg.MySQL.Password = mysqlPwd
 	}
+	// Docker 环境变量支持
+	if mysqlHost := os.Getenv("MYSQL_HOST"); mysqlHost != "" {
+		cfg.MySQL.Host = mysqlHost
+	}
+	if mysqlPort := os.Getenv("MYSQL_PORT"); mysqlPort != "" {
+		var port int
+		fmt.Sscanf(mysqlPort, "%d", &port)
+		if port > 0 {
+			cfg.MySQL.Port = port
+		}
+	}
+	if mysqlUser := os.Getenv("MYSQL_USER"); mysqlUser != "" {
+		cfg.MySQL.User = mysqlUser
+	}
+	if mysqlDB := os.Getenv("MYSQL_DATABASE"); mysqlDB != "" {
+		cfg.MySQL.Database = mysqlDB
+	}
+	if redisAddr := os.Getenv("REDIS_ADDR"); redisAddr != "" {
+		cfg.Redis.Addr = redisAddr
+	}
+	if redisPwd := os.Getenv("REDIS_PASSWORD"); redisPwd != "" {
+		cfg.Redis.Password = redisPwd
+	}
+	if corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); corsOrigins != "" {
+		cfg.CORS.AllowedOrigins = corsOrigins
+	}
 	// 新增：配置校验（这行是要加的）
 	if err := (&cfg).Validate(); err != nil {
 		panic("配置校验失败: " + err.Error())
