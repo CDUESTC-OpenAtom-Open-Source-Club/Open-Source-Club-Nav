@@ -14,6 +14,8 @@ redis:
   addr: "localhost:6379"       # 你的Redis地址
   password: ""                 # 没有密码则留空
   db: 0                        # 默认数据库编号
+server:
+  addr: ":8080"
 
 # 启动时会自动执行 backend/db/migrate/migrations 下的 sql 迁移。
 # 首次部署只需先创建数据库，再启动服务即可完成建表和基础种子导入。

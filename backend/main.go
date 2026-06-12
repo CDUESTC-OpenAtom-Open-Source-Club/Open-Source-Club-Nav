@@ -36,8 +36,9 @@ func main() {
 	logger.Info("Redis 连接成功")
 
 	r := router.InitRouter(db, cfg)
-	logger.Info("服务启动成功，监听端口: 8080")
-	if err := r.Run(":8080"); err != nil {
+	serverAddr := cfg.ServerAddr()
+	logger.Info("服务启动成功", zap.String("addr", serverAddr))
+	if err := r.Run(serverAddr); err != nil {
 		logger.Fatal("服务启动失败", zap.Error(err))
 	}
 }

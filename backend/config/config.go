@@ -30,12 +30,17 @@ type CORSConfig struct {
 	AllowedOrigins string `yaml:"allowed_origins"` // 允许的跨域域名（逗号分隔）
 }
 
+type ServerConfig struct {
+	Addr string `yaml:"addr"`
+}
+
 // 总配置结构体（嵌套子结构体）
 type Config struct {
-	MySQL MySQLConfig `yaml:"mysql"` // 数据库配置
-	JWT   JWTConfig   `yaml:"jwt"`   // JWT配置
-	Redis RedisConfig `yaml:"redis"`
-	CORS  CORSConfig  `yaml:"cors"` // CORS配置
+	MySQL  MySQLConfig  `yaml:"mysql"` // 数据库配置
+	JWT    JWTConfig    `yaml:"jwt"`   // JWT配置
+	Redis  RedisConfig  `yaml:"redis"`
+	CORS   CORSConfig   `yaml:"cors"` // CORS配置
+	Server ServerConfig `yaml:"server"`
 }
 
 // 新增：Redis配置子结构体
@@ -115,6 +120,9 @@ func LoadConfig() *Config {
 	if corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); corsOrigins != "" {
 		cfg.CORS.AllowedOrigins = corsOrigins
 	}
+	if serverAddr := os.Getenv("SERVER_ADDR"); serverAddr != "" {
+		cfg.Server.Addr = serverAddr
+	}
 	// 新增：配置校验（这行是要加的）
 	if err := (&cfg).Validate(); err != nil {
 		panic("配置校验失败: " + err.Error())
@@ -122,6 +130,13 @@ func LoadConfig() *Config {
 
 	// 返回指针
 	return &cfg
+}
+
+func (c *Config) ServerAddr() string {
+	if c.Server.Addr == "" {
+		return ":8080"
+	}
+	return c.Server.Addr
 }
 
 // BuildDSN 动态构建MySQL的DSN字符串
