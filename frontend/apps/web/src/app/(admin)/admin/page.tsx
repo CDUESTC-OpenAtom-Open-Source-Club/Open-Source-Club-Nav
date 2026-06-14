@@ -1299,9 +1299,6 @@ export default function AdminPage() {
       ? "实时通道降级探活"
       : "实时连接中";
   const sampledAt = system?.sampledAt || system?.network?.sampledAt;
-  const statsSourceText = statsSource?.type === "database"
-    ? `真实接口 /api/admin/stats · 今日来自 ${statsSource.today || "metrics"}`
-    : "真实接口 /api/admin/stats";
   const statsSampledAt = statsSource?.sampledAt ? formatDateTime(statsSource.sampledAt) : formatDateTime(sampledAt);
   const kpiItems = [
     { label: "访问量 PV", value: today.page_views, detail: `小时事件 ${hourlyOverview.totals.page_views}`, icon: Eye, tint: "rgba(14,165,233,0.14)", color: "#0EA5E9" },
@@ -1425,38 +1422,50 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 14, background: "#FFFFFF", borderColor: "#E2E8F0", boxShadow: "0 10px 24px rgba(15,23,42,0.06)", display: "grid", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-              <div className="admin-console-title-row">
-                <span className="admin-console-icon-badge" style={{ background: "rgba(14,165,233,0.14)", color: "#0EA5E9" }}>
-                  <BarChart3 size={15} />
-                </span>
-                <div style={{ fontWeight: 800, color: "#0F172A" }}>今日流量</div>
-              </div>
-              <div style={{ fontSize: 12, color: "#64748B" }}>{statsSampledAt}</div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 0, borderTop: "1px solid #EEF2F7", borderBottom: "1px solid #EEF2F7" }}>
-              {kpiItems.map((item) => (
-                <div key={item.label} style={{ padding: "12px 14px", display: "grid", gap: 8, minHeight: 92 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                    <div style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>{item.label}</div>
-                    <span className="admin-console-icon-badge" style={{ background: item.tint, color: item.color }}>
-                      <item.icon size={14} />
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 28, color: item.color, fontWeight: 850, lineHeight: 1 }}>
-                    {item.value}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>{item.detail}</div>
+          <div className="admin-overview-quick-grid" style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }}>
+            <div className="admin-card admin-overview-panel" style={{ flex: "0 1 360px", width: "min(100%, 360px)", minWidth: "min(100%, 280px)", padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0", boxShadow: "0 10px 24px rgba(15,23,42,0.06)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                <div className="admin-console-title-row">
+                  <span className="admin-console-icon-badge" style={{ background: "rgba(14,165,233,0.14)", color: "#0EA5E9" }}>
+                    <BarChart3 size={15} />
+                  </span>
+                  <div style={{ fontWeight: 800, color: "#0F172A" }}>今日流量</div>
                 </div>
-              ))}
+                <div style={{ fontSize: 12, color: "#64748B" }}>{statsSampledAt}</div>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {kpiItems.map((item) => (
+                  <div
+                    key={item.label}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "minmax(0, 1fr) auto",
+                      alignItems: "center",
+                      gap: 10,
+                      border: "1px solid #EEF2F7",
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      background: "#F8FAFC",
+                      minHeight: 64,
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>{item.label}</div>
+                      <div style={{ fontSize: 11, color: "#64748B", marginTop: 3 }}>{item.detail}</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span className="admin-console-icon-badge" style={{ background: item.tint, color: item.color }}>
+                        <item.icon size={14} />
+                      </span>
+                      <span style={{ fontSize: 24, color: item.color, fontWeight: 850, lineHeight: 1 }}>
+                        {item.value}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: "#64748B", borderTop: "1px solid #EEF2F7", paddingTop: 10 }}>
-              {statsSourceText}
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
-            <div className="admin-card admin-overview-panel" style={{ padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
+            <div className="admin-card admin-overview-panel" style={{ flex: "1 1 280px", minWidth: "min(100%, 280px)", padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                 <div className="admin-console-title-row">
                   <span className="admin-console-icon-badge" style={{ background: "rgba(37,99,235,0.12)", color: "#2563EB" }}>
@@ -1489,7 +1498,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            <div className="admin-card admin-overview-panel" style={{ padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
+            <div className="admin-card admin-overview-panel" style={{ flex: "1 1 280px", minWidth: "min(100%, 280px)", padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                 <div className="admin-console-title-row">
                   <span className="admin-console-icon-badge" style={{ background: "rgba(15,118,110,0.12)", color: "#0F766E" }}>
