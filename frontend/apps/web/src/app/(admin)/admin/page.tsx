@@ -64,12 +64,23 @@ type StatMetricKey = "link_clicks" | "page_views" | "unique_visitors";
 type SystemInfo = {
   uptimeSec: number;
   cpuCores: number;
-  mem: { usageRate: number };
+  mem: {
+    usageRate: number | null;
+    processAllocBytes?: number | null;
+    processSysBytes?: number | null;
+    usedBytes?: number | null;
+    totalBytes?: number | null;
+    availableBytes?: number | null;
+    source?: string;
+    systemAvailable?: boolean;
+  };
   network?: {
     rxBytes: number | null;
     txBytes: number | null;
     totalBytes: number | null;
     sampledAt: string;
+    available?: boolean;
+    source?: string;
   };
 };
 
@@ -272,6 +283,7 @@ function getActionTag(action: string): { text: string; fg: string; bg: string } 
 
 function formatDurationFromSec(totalSec: number): string {
   const safe = Math.max(0, Math.floor(Number(totalSec || 0)));
+  if (safe <= 0) return "<1秒";
   const days = Math.floor(safe / 86400);
   const hours = Math.floor((safe % 86400) / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
@@ -304,9 +316,17 @@ function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
   const source = input || ({} as SystemInfo);
   const uptimeSec = Number(source.uptimeSec || 0);
   const cpuCores = Number(source.cpuCores || 0);
-  const memUsage = Number(source.mem?.usageRate || 0);
+  const rawMemUsage = source.mem?.usageRate;
+  const memUsage = rawMemUsage === null || rawMemUsage === undefined ? null : Number(rawMemUsage);
   const mem = {
-    usageRate: Number.isFinite(memUsage) ? memUsage : 0,
+    usageRate: memUsage !== null && Number.isFinite(memUsage) ? memUsage : null,
+    processAllocBytes: source.mem?.processAllocBytes ?? null,
+    processSysBytes: source.mem?.processSysBytes ?? null,
+    usedBytes: source.mem?.usedBytes ?? null,
+    totalBytes: source.mem?.totalBytes ?? null,
+    availableBytes: source.mem?.availableBytes ?? null,
+    source: source.mem?.source || "unavailable",
+    systemAvailable: Boolean(source.mem?.systemAvailable),
   };
   const totalBytesRaw = source.network?.totalBytes;
   const hasRealNetwork = totalBytesRaw !== null && totalBytesRaw !== undefined && Number.isFinite(Number(totalBytesRaw));
@@ -316,12 +336,16 @@ function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
         txBytes: source.network?.txBytes === undefined ? null : source.network.txBytes,
         totalBytes: Number(totalBytesRaw),
         sampledAt: source.network?.sampledAt || new Date().toISOString(),
+        available: true,
+        source: source.network?.source || "system",
       }
     : {
         rxBytes: null,
         txBytes: null,
-        totalBytes: 0,
-        sampledAt: new Date().toISOString(),
+        totalBytes: null,
+        sampledAt: source.network?.sampledAt || new Date().toISOString(),
+        available: false,
+        source: source.network?.source || "unavailable",
       };
   return { uptimeSec, cpuCores, mem, network };
 }
@@ -1141,6 +1165,23 @@ export default function AdminPage() {
   }
   if (!user) return null;
 
+  const memUsageRate = system?.mem?.usageRate;
+  const hasSystemMem = typeof memUsageRate === "number" && Number.isFinite(memUsageRate);
+  const processMemBytes = system?.mem?.processAllocBytes ?? system?.mem?.processSysBytes ?? null;
+  const memCardLabel = hasSystemMem ? "系统内存" : "进程内存";
+  const memCardValue = hasSystemMem
+    ? `${memUsageRate}%`
+    : processMemBytes !== null ? formatBytes(processMemBytes) : "暂无采样";
+  const memCardMeta = hasSystemMem
+    ? system?.mem?.usedBytes && system?.mem?.totalBytes
+      ? `${formatBytes(system.mem.usedBytes)} / ${formatBytes(system.mem.totalBytes)}`
+      : "系统采样"
+    : processMemBytes !== null ? "Go 运行时采样" : "暂无采样";
+  const networkBytes = system?.network?.totalBytes;
+  const hasNetworkBytes = typeof networkBytes === "number" && Number.isFinite(networkBytes);
+  const networkCardValue = hasNetworkBytes ? formatBytes(networkBytes) : "暂无采样";
+  const networkCardMeta = hasNetworkBytes ? "系统网卡累计" : "本机未开放网卡统计";
+
   return (
     <div className="admin-shell" style={{ display: "grid", gap: 12, position: "relative", zIndex: 1 }}>
       <div className="admin-console-layout">
@@ -1237,8 +1278,8 @@ export default function AdminPage() {
               {[
                 { label: "服务状态", value: system ? "在线" : "等待采样", meta: "5 秒自动刷新", icon: ShieldCheck, color: system ? "#059669" : "#64748B", bg: "rgba(5,150,105,0.12)" },
                 { label: "运行时长", value: formatDurationFromSec(system?.uptimeSec ?? 0), meta: "后端进程", icon: Clock3, color: "#2563EB", bg: "rgba(37,99,235,0.12)" },
-                { label: "内存占用", value: `${system?.mem?.usageRate ?? 0}%`, meta: system ? "当前采样" : "暂无采样", icon: Gauge, color: "#0EA5E9", bg: "rgba(14,165,233,0.12)" },
-                { label: "网络流量", value: formatBytes(system?.network?.totalBytes), meta: "收发合计", icon: Activity, color: "#7C3AED", bg: "rgba(124,58,237,0.12)" },
+                { label: memCardLabel, value: memCardValue, meta: memCardMeta, icon: Gauge, color: "#0EA5E9", bg: "rgba(14,165,233,0.12)" },
+                { label: "网络流量", value: networkCardValue, meta: networkCardMeta, icon: Activity, color: hasNetworkBytes ? "#7C3AED" : "#64748B", bg: hasNetworkBytes ? "rgba(124,58,237,0.12)" : "rgba(100,116,139,0.12)" },
               ].map((item) => (
                 <div key={item.label} style={{ border: "1px solid #E2E8F0", borderRadius: 10, background: "#FFFFFF", padding: 12, display: "grid", gap: 8, minHeight: 92 }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>

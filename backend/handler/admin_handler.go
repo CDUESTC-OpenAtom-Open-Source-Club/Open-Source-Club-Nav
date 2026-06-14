@@ -92,35 +92,57 @@ func GetAdminLogs(c *gin.Context) {
 }
 
 // GetAdminSystem 获取系统运行状态（GET /api/admin/system）
-// 从 Linux /proc 文件系统读取真实系统指标
+// 优先返回跨平台可用的后端进程指标；Linux 上补充 /proc 系统指标。
 func GetAdminSystem(c *gin.Context) {
 	hostname, _ := os.Hostname()
 	now := time.Now()
-	uptimeSec := int(now.Unix() - bootTimeUnix())
+	uptimeSec := int(time.Since(processStartedAt).Seconds())
 
 	cpuCores := runtime.NumCPU()
 
-	memTotal, memAvail := readMemInfo()
-	var memUsageRate float64
-	if memTotal > 0 {
-		memUsageRate = float64(memTotal-memAvail) / float64(memTotal) * 100
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	mem := gin.H{
+		"processAllocBytes": memStats.Alloc,
+		"processSysBytes":   memStats.Sys,
+		"source":            "go_runtime",
+		"systemAvailable":   false,
+		"usageRate":         nil,
 	}
 
-	rxBytes, txBytes := readNetDev()
-	totalBytes := rxBytes + txBytes
+	memTotal, memAvail := readMemInfo()
+	if memTotal > 0 {
+		memUsed := memTotal - memAvail
+		mem["usageRate"] = round2(float64(memUsed) / float64(memTotal) * 100)
+		mem["usedBytes"] = memUsed * 1024
+		mem["totalBytes"] = memTotal * 1024
+		mem["availableBytes"] = memAvail * 1024
+		mem["source"] = "proc_meminfo"
+		mem["systemAvailable"] = true
+	}
+
+	rxBytes, txBytes, netOK := readNetDev()
+	network := gin.H{
+		"available": netOK,
+		"sampledAt": now.Format(time.RFC3339),
+	}
+	if netOK {
+		network["rxBytes"] = rxBytes
+		network["txBytes"] = txBytes
+		network["totalBytes"] = rxBytes + txBytes
+		network["source"] = "proc_net_dev"
+	} else {
+		network["rxBytes"] = nil
+		network["txBytes"] = nil
+		network["totalBytes"] = nil
+		network["source"] = "unavailable"
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"uptimeSec": uptimeSec,
 		"cpuCores":  cpuCores,
-		"mem": gin.H{
-			"usageRate": round2(memUsageRate),
-		},
-		"network": gin.H{
-			"rxBytes":    rxBytes,
-			"txBytes":    txBytes,
-			"totalBytes": totalBytes,
-			"sampledAt":  now.Format(time.RFC3339),
-		},
+		"mem":       mem,
+		"network":   network,
 		"hostname":  hostname,
 		"goVersion": runtime.Version(),
 		"status":    "ok",
@@ -184,11 +206,11 @@ func parseMemInfoValue(line string) int64 {
 	return 0
 }
 
-// readNetDev 从 /proc/net/dev 读取所有非 lo 接口的 rx/tx 字节数
-func readNetDev() (rxBytes int64, txBytes int64) {
+// readNetDev 从 /proc/net/dev 读取所有非 lo 接口的 rx/tx 字节数。
+func readNetDev() (rxBytes int64, txBytes int64, ok bool) {
 	f, err := os.Open("/proc/net/dev")
 	if err != nil {
-		return 0, 0
+		return 0, 0, false
 	}
 	defer f.Close()
 
@@ -212,9 +234,11 @@ func readNetDev() (rxBytes int64, txBytes int64) {
 		if len(rest) >= 10 {
 			if v, err := strconv.ParseInt(rest[0], 10, 64); err == nil {
 				rxBytes += v
+				ok = true
 			}
 			if v, err := strconv.ParseInt(rest[8], 10, 64); err == nil {
 				txBytes += v
+				ok = true
 			}
 		}
 	}
