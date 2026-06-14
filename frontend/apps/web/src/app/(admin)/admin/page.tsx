@@ -130,6 +130,8 @@ const baseSections = [
   { id: "logs", label: "操作日志" },
 ] as const;
 
+const ERROR_AUTO_DISMISS_MS = 4000;
+
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
   const text = await res.text();
   if (!text) return null;
@@ -768,6 +770,14 @@ export default function AdminPage() {
 
     void init();
   }, [loadLinks, loadLogs, loadOverview, router]);
+
+  useEffect(() => {
+    if (!error) return undefined;
+    const timer = window.setTimeout(() => {
+      setError("");
+    }, ERROR_AUTO_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [error]);
 
   // 懒加载对应分区数据，并滚动到目标分区
   const scrollToSection = (sectionId: string) => {
