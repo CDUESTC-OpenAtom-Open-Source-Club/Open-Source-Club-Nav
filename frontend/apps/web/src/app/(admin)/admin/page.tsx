@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, BarChart3, Clock3, Eye, LayoutDashboard, MousePointerClick, ServerCog, Users } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Clock3, Eye, Gauge, LayoutDashboard, ListChecks, MousePointerClick, ServerCog, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import PortalTooltip from "@/components/shared/PortalTooltip";
 type AdminUser = {
   id: number;
   username: string;
@@ -51,6 +52,14 @@ type HourStat = {
   unique_visitors: number;
   link_clicks: number;
 };
+type TopClick = {
+  link_id?: number | null;
+  title: string;
+  url?: string | null;
+  module?: NavModule | string;
+  resource_sub_module?: ResourceSubModule | null;
+  clicks: number;
+};
 type StatMetricKey = "link_clicks" | "page_views" | "unique_visitors";
 type SystemInfo = {
   uptimeSec: number;
@@ -76,6 +85,16 @@ type LinkHealth = {
   module?: NavModule;
   resource_sub_module?: ResourceSubModule | null;
 };
+
+type HealthProgress = {
+  checked: number;
+  total: number;
+  failed: number;
+  skipped?: number;
+  current_title?: string;
+  current_url?: string;
+} | null;
+
 type LinkLog = {
   id: number;
   link_id: number | null;
@@ -276,6 +295,11 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(fixed)} ${units[unitIndex]}`;
 }
 
+function formatDateTime(value?: string | null): string {
+  if (!value) return "-";
+  return String(value).replace("T", " ").slice(0, 19);
+}
+
 function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
   const source = input || ({} as SystemInfo);
   const uptimeSec = Number(source.uptimeSec || 0);
@@ -313,11 +337,13 @@ export default function AdminPage() {
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [health, setHealth] = useState<LinkHealth[]>([]);
   const [logs, setLogs] = useState<LinkLog[]>([]);
-  const [trend7, setTrend7] = useState<Array<{ stat_date: string; link_clicks: number }>>([]);
   const [hourly24, setHourly24] = useState<HourStat[]>([]);
+  const [todayStat, setTodayStat] = useState<StatDay | null>(null);
+  const [topClicks, setTopClicks] = useState<TopClick[]>([]);
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
   const [healthChecking, setHealthChecking] = useState(false);
+  const [healthProgress, setHealthProgress] = useState<HealthProgress>(null);
   const [checkingLinkId, setCheckingLinkId] = useState<number | null>(null);
   const [autoDetectDialogOpen, setAutoDetectDialogOpen] = useState(false);
   const [autoDetectEnabled, setAutoDetectEnabled] = useState(false);
@@ -359,14 +385,16 @@ export default function AdminPage() {
 
   // 今日 KPI（无数据时使用零值占位）
   const today = useMemo(
-    () =>
-      stats[stats.length - 1] || {
+    () => {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      return todayStat || stats.find((item) => String(item.stat_date).slice(0, 10) === todayKey) || stats[stats.length - 1] || {
         stat_date: new Date().toISOString().slice(0, 10),
         page_views: 0,
         unique_visitors: 0,
         link_clicks: 0,
-      },
-    [stats],
+      };
+    },
+    [stats, todayStat],
   );
 
   const hourlyStats = useMemo(() => {
@@ -394,6 +422,16 @@ export default function AdminPage() {
     const hovered = hoveredHourlyIndex === null ? null : hourlyStats[hoveredHourlyIndex] || null;
     return { totals, hovered };
   }, [hourlyStats, hoveredHourlyIndex]);
+
+  const hasHourlyDetail = useMemo(
+    () => hourlyOverview.totals.page_views > 0 || hourlyOverview.totals.unique_visitors > 0 || hourlyOverview.totals.link_clicks > 0,
+    [hourlyOverview],
+  );
+  const hasDailyActivity = today.page_views > 0 || today.unique_visitors > 0 || today.link_clicks > 0;
+  const hourlyDataNote = hasDailyActivity && !hasHourlyDetail
+    ? "日统计已更新，小时明细暂无事件采样"
+    : "日统计与小时明细来自同一统计接口";
+  const recentLogs = useMemo(() => logs.slice(0, 5), [logs]);
 
   const hourlyLineChart = useMemo(() => {
     const metricKeys: StatMetricKey[] = ["page_views", "unique_visitors", "link_clicks"];
@@ -558,64 +596,6 @@ export default function AdminPage() {
     };
   }, [activeStatMetric, filteredMonthlyStats, hoveredMonthlyIndex]);
 
-  const lineChart = useMemo(() => {
-    const source = trend7.length
-      ? trend7
-      : Array.from({ length: 7 }).map((_, i) => ({
-          stat_date: `D${i + 1}`,
-          link_clicks: 0,
-        }));
-
-    const width = 760;
-    const height = 220;
-    const padding = { top: 18, right: 18, bottom: 32, left: 26 };
-    const innerWidth = width - padding.left - padding.right;
-    const innerHeight = height - padding.top - padding.bottom;
-    const maxValue = Math.max(3, ...source.map((item) => item.link_clicks || 0));
-
-    const points = source.map((item, index) => {
-      const x =
-        padding.left +
-        (source.length === 1 ? innerWidth / 2 : (innerWidth / Math.max(1, source.length - 1)) * index);
-      const y =
-        padding.top +
-        innerHeight -
-        ((item.link_clicks || 0) / maxValue) * innerHeight;
-      return {
-        ...item,
-        x,
-        y,
-      };
-    });
-
-    const buildSmoothPath = (list: typeof points) => {
-      if (!list.length) return "";
-      if (list.length === 1) return `M ${list[0].x} ${list[0].y}`;
-      let path = `M ${list[0].x} ${list[0].y}`;
-      for (let i = 0; i < list.length - 1; i += 1) {
-        const current = list[i];
-        const next = list[i + 1];
-        const midX = (current.x + next.x) / 2;
-        path += ` C ${midX} ${current.y}, ${midX} ${next.y}, ${next.x} ${next.y}`;
-      }
-      return path;
-    };
-
-    const linePath = buildSmoothPath(points);
-
-    const areaPath = points.length
-      ? `${linePath} L ${points[points.length - 1].x} ${padding.top + innerHeight} L ${points[0].x} ${padding.top + innerHeight} Z`
-      : "";
-
-    const yTicks = Array.from({ length: 4 }).map((_, index) => {
-      const value = Math.round((maxValue / 3) * (3 - index));
-      const y = padding.top + (innerHeight / 3) * index;
-      return { value, y };
-    });
-
-    return { width, height, padding, innerWidth, innerHeight, points, linePath, areaPath, yTicks };
-  }, [trend7]);
-
   const markSectionLoaded = useCallback((sectionId: string) => {
     setLoadedSections((prev) => (prev[sectionId] ? prev : { ...prev, [sectionId]: true }));
   }, []);
@@ -625,15 +605,18 @@ export default function AdminPage() {
     const statsData = await readJsonSafe<{
       days?: StatDay[];
       stats?: StatDay[];
-      trend7?: Array<{ stat_date: string; link_clicks: number }>;
+      today?: StatDay;
       hourly24?: HourStat[];
       hourly?: HourStat[];
+      topClicks?: TopClick[];
+      top_clicks?: TopClick[];
     }>(statsRes);
 
     setStats(statsData?.days || statsData?.stats || []);
-    setTrend7(statsData?.trend7 || []);
+    setTodayStat(statsData?.today || null);
     setHourly24(statsData?.hourly24 || statsData?.hourly || []);
-  }, [markSectionLoaded]);
+    setTopClicks(statsData?.topClicks || statsData?.top_clicks || []);
+  }, []);
 
   const loadSystem = useCallback(async () => {
     const sysRes = await fetch("/api/admin/system", { cache: "no-store" });
@@ -750,8 +733,8 @@ export default function AdminPage() {
         }
 
         setUser(me.user);
-        await Promise.all([loadOverview(), loadLinks()]);
-        setLoadedSections({ overview: true, links: true });
+        await Promise.all([loadOverview(), loadLinks(), loadLogs().catch(() => {})]);
+        setLoadedSections({ overview: true, links: true, logs: true });
       } catch {
         setError("加载后台数据失败");
       } finally {
@@ -760,7 +743,7 @@ export default function AdminPage() {
     };
 
     void init();
-  }, [loadLinks, loadOverview, router]);
+  }, [loadLinks, loadLogs, loadOverview, router]);
 
   // 懒加载对应分区数据，并滚动到目标分区
   const scrollToSection = (sectionId: string) => {
@@ -998,13 +981,49 @@ export default function AdminPage() {
     }
   };
 
-  const runHealthCheck = async () => {
+  const runHealthCheck = useCallback(async () => {
     if (healthChecking) return;
     setHealthChecking(true);
+    setHealthProgress({ checked: 0, total: 0, failed: 0 });
+
     try {
-      const res = await fetch("/api/admin/link-health", { method: "POST" });
-      const data = await readJsonSafe<{ error?: string }>(res);
-      if (!res.ok) throw new Error(data?.error || "检测失败");
+      const res = await fetch("/api/admin/link-health?stream=1", { method: "POST" });
+      if (!res.ok) {
+        const data = await readJsonSafe<{ error?: string }>(res);
+        throw new Error(data?.error || "检测失败");
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error("无法获取响应流");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6);
+            try {
+              const data = JSON.parse(jsonStr) as HealthProgress;
+              if (data) {
+                setHealthProgress(data);
+              }
+            } catch {
+              // ignore parse errors
+            }
+          }
+        }
+      }
+
       await loadHealth();
       const nowIso = new Date().toISOString();
       setLastAutoDetectAt(nowIso);
@@ -1015,8 +1034,10 @@ export default function AdminPage() {
       setError(String((err as Error).message || "检测失败"));
     } finally {
       setHealthChecking(false);
+      // 检测完成后短暂延迟再隐藏进度条（让用户看到100%状态）
+      setTimeout(() => setHealthProgress(null), 500);
     }
-  };
+  }, [healthChecking, loadHealth]);
 
   const checkSingleLink = async (linkId: number) => {
     if (checkingLinkId !== null) return;
@@ -1068,7 +1089,7 @@ export default function AdminPage() {
       void runHealthCheck();
     }, autoDetectIntervalMinutes * 60 * 1000);
     return () => window.clearInterval(intervalId);
-  }, [autoDetectEnabled, autoDetectIntervalMinutes, healthChecking]);
+  }, [autoDetectEnabled, autoDetectIntervalMinutes, runHealthCheck]);
 
   useEffect(() => {
     if (activeSection !== "health" && activeSection !== "links") return;
@@ -1183,8 +1204,11 @@ export default function AdminPage() {
       </div>
 
       {error ? (
-        <div style={{ color: "#DC2626", fontSize: 12 }}>{error}</div>
+        <div className="admin-console-error" style={{ color: "#B91C1C", fontSize: 13 }}>
+          {error}
+        </div>
       ) : null}
+
       {/* 按当前激活分区显示对应内容 */}
       {activeSection === "overview" ? (
         <div className="admin-section-transition">
@@ -1195,69 +1219,38 @@ export default function AdminPage() {
               </span>
               <div className="admin-console-pagehead-title">首页总览</div>
             </div>
-            <div className="admin-console-pagehead-desc">查看系统运行状态、今日访问数据和后台全局摘要。</div>
+            <div className="admin-console-pagehead-desc">优先看今日访问、点击排行和最近后台操作；内容治理与健康明细保留在对应模块。</div>
           </div>
-          <div className="admin-card admin-overview-panel" style={{ padding: 16, background: "linear-gradient(135deg,#FFFFFF 0%,#F3F8FF 55%,#EEF6FF 100%)", border: "1px solid #DCE8F8", boxShadow: "0 14px 28px rgba(37,99,235,0.08)" }}>
-            <div className="admin-console-title-row" style={{ marginBottom: 10 }}>
-              <span className="admin-console-icon-badge" style={{ background: "linear-gradient(135deg, rgba(37,99,235,0.18), rgba(14,165,233,0.22))", color: "#1D4ED8" }}>
-                <ServerCog size={16} />
-              </span>
-              <div style={{ fontWeight: 700, color: "#0F172A" }}>服务器运行情况</div>
+          <div className="admin-card admin-overview-panel" style={{ padding: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#F7FBFF 100%)", border: "1px solid #DCE8F8", boxShadow: "0 10px 24px rgba(15,23,42,0.06)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+              <div className="admin-console-title-row">
+                <span className="admin-console-icon-badge" style={{ background: "rgba(37,99,235,0.12)", color: "#1D4ED8" }}>
+                  <ServerCog size={16} />
+                </span>
+                <div style={{ fontWeight: 800, color: "#0F172A" }}>运行状态</div>
+              </div>
+              <div style={{ fontSize: 12, color: "#64748B" }}>
+                采样：{formatDateTime(system?.network?.sampledAt)}
+              </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 14, alignItems: "center" }}>
-              <div style={{ display: "grid", placeItems: "center" }}>
-                <div
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: "50%",
-                    background: "conic-gradient(#3B82F6 100%, #E2E8F0 0)",
-                    display: "grid",
-                    placeItems: "center",
-                    boxShadow: "0 10px 24px rgba(59,130,246,0.25)",
-                  }}
-                >
-                  <div style={{ width: 90, height: 90, borderRadius: "50%", background: "#fff", border: "1px solid #DBEAFE", display: "grid", placeItems: "center", textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#64748B" }}>流量消耗量</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#1D4ED8", lineHeight: 1.25 }}>
-                      {formatBytes(system?.network?.totalBytes)}
-                    </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+              {[
+                { label: "服务状态", value: system ? "在线" : "等待采样", meta: "5 秒自动刷新", icon: ShieldCheck, color: system ? "#059669" : "#64748B", bg: "rgba(5,150,105,0.12)" },
+                { label: "运行时长", value: formatDurationFromSec(system?.uptimeSec ?? 0), meta: "后端进程", icon: Clock3, color: "#2563EB", bg: "rgba(37,99,235,0.12)" },
+                { label: "内存占用", value: `${system?.mem?.usageRate ?? 0}%`, meta: system ? "当前采样" : "暂无采样", icon: Gauge, color: "#0EA5E9", bg: "rgba(14,165,233,0.12)" },
+                { label: "网络流量", value: formatBytes(system?.network?.totalBytes), meta: "收发合计", icon: Activity, color: "#7C3AED", bg: "rgba(124,58,237,0.12)" },
+              ].map((item) => (
+                <div key={item.label} style={{ border: "1px solid #E2E8F0", borderRadius: 10, background: "#FFFFFF", padding: 12, display: "grid", gap: 8, minHeight: 92 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>{item.label}</span>
+                    <span className="admin-console-icon-badge" style={{ width: 30, height: 30, background: item.bg, color: item.color }}>
+                      <item.icon size={14} />
+                    </span>
                   </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", whiteSpace: "nowrap" }}>{item.value}</div>
+                  <div style={{ fontSize: 11, color: "#94A3B8" }}>{item.meta}</div>
                 </div>
-              </div>
-              <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
-                    <span>运行时长</span>
-                    <span>{formatDurationFromSec(system?.uptimeSec ?? 0)}</span>
-                  </div>
-                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, Math.max(8, ((system?.uptimeSec ?? 0) / 86400) * 100))}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#93C5FD,#2563EB)" }} />
-                  </div>
-                </div>
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
-                    <span>CPU 核心数</span>
-                    <span>{system?.cpuCores ?? 0} cores</span>
-                  </div>
-                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, ((system?.cpuCores ?? 0) / 32) * 100)}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#60A5FA,#2563EB)" }} />
-                  </div>
-                </div>
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
-                    <span>内存占用</span>
-                    <span>{system?.mem?.usageRate ?? 0}%</span>
-                  </div>
-                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, system?.mem?.usageRate ?? 0)}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#22D3EE,#0EA5E9)" }} />
-                  </div>
-                </div>
-                <div style={{ marginTop: 2, fontSize: 12, color: "#64748B", display: "flex", justifyContent: "space-between" }}>
-                  <span>服务状态实时更新</span>
-                  <span>{system?.network?.sampledAt ? `采样: ${String(system.network.sampledAt).replace("T", " ").slice(0, 19)}` : "采样: -"}</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -1265,27 +1258,99 @@ export default function AdminPage() {
             className="admin-console-kpi-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: 10,
             }}
           >
-            {[ 
-              { label: "今日访问量 (PV)", value: today.page_views, icon: Eye, tint: "linear-gradient(135deg, rgba(14,165,233,0.16), rgba(14,165,233,0.26))", color: "#0EA5E9" },
-              { label: "今日访客数 (UV)", value: today.unique_visitors, icon: Users, tint: "linear-gradient(135deg, rgba(5,150,105,0.16), rgba(16,185,129,0.24))", color: "#059669" },
-              { label: "今日点击量", value: today.link_clicks, icon: MousePointerClick, tint: "linear-gradient(135deg, rgba(37,99,235,0.16), rgba(59,130,246,0.26))", color: "#1D4ED8" },
+            {[
+              { label: "今日访问量 (PV)", value: today.page_views, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.page_views}` : "日统计口径", icon: Eye, tint: "rgba(14,165,233,0.14)", color: "#0EA5E9" },
+              { label: "今日访客数 (UV)", value: today.unique_visitors, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.unique_visitors}` : "日统计口径", icon: Users, tint: "rgba(5,150,105,0.14)", color: "#059669" },
+              { label: "今日点击量", value: today.link_clicks, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.link_clicks}` : "日统计口径", icon: MousePointerClick, tint: "rgba(37,99,235,0.14)", color: "#1D4ED8" },
             ].map((item) => (
-              <div key={item.label} className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 12, background: "rgba(214,231,250,0.95)", borderColor: "#93C5FD", boxShadow: "0 10px 26px rgba(37,99,235,0.16)" }}>
+              <div key={item.label} className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 14, background: "#FFFFFF", borderColor: "#E2E8F0", boxShadow: "0 10px 24px rgba(15,23,42,0.06)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>{item.label}</div>
                   <span className="admin-console-icon-badge" style={{ background: item.tint, color: item.color }}>
                     <item.icon size={14} />
                   </span>
                 </div>
-                <div style={{ fontSize: 26, color: "#1D4ED8", fontWeight: 800 }}>
+                <div style={{ fontSize: 28, color: item.color, fontWeight: 850, lineHeight: 1 }}>
                   {item.value}
                 </div>
+                <div style={{ fontSize: 12, color: "#64748B" }}>{item.detail}</div>
               </div>
             ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+            <div className="admin-card admin-overview-panel" style={{ padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div className="admin-console-title-row">
+                  <span className="admin-console-icon-badge" style={{ background: "rgba(37,99,235,0.12)", color: "#2563EB" }}>
+                    <TrendingUp size={15} />
+                  </span>
+                  <div style={{ fontWeight: 800, color: "#0F172A" }}>今日点击排行</div>
+                </div>
+                <span style={{ fontSize: 12, color: "#64748B" }}>{topClicks.length ? "Top 5" : "暂无点击"}</span>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {topClicks.length ? topClicks.map((item, index) => (
+                  <div key={`${item.link_id || item.url || item.title}-${index}`} style={{ display: "grid", gridTemplateColumns: "28px minmax(0, 1fr) auto", gap: 10, alignItems: "center", border: "1px solid #F1F5F9", borderRadius: 10, padding: "9px 10px", background: index === 0 ? "#F8FAFF" : "#FFFFFF" }}>
+                    <div style={{ width: 24, height: 24, borderRadius: 999, display: "grid", placeItems: "center", background: index === 0 ? "#DBEAFE" : "#F1F5F9", color: index === 0 ? "#1D4ED8" : "#64748B", fontSize: 12, fontWeight: 800 }}>
+                      {index + 1}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || "未命名链接"}</div>
+                      <div style={{ fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {moduleLabel(item.module, item.resource_sub_module)}
+                        {item.url ? ` · ${item.url}` : ""}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#2563EB" }}>{Number(item.clicks || 0)}</div>
+                  </div>
+                )) : (
+                  <div style={{ border: "1px dashed #CBD5E1", borderRadius: 10, padding: 14, color: "#64748B", fontSize: 13, background: "#F8FAFC" }}>
+                    今日还没有可排序的点击事件。
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="admin-card admin-overview-panel" style={{ padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div className="admin-console-title-row">
+                  <span className="admin-console-icon-badge" style={{ background: "rgba(15,118,110,0.12)", color: "#0F766E" }}>
+                    <ListChecks size={15} />
+                  </span>
+                  <div style={{ fontWeight: 800, color: "#0F172A" }}>最近操作</div>
+                </div>
+                <button type="button" onClick={() => scrollToSection("logs")} className="admin-btn-ghost" style={{ height: 30, padding: "0 10px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  查看全部 <ArrowRight size={13} />
+                </button>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {recentLogs.length ? recentLogs.map((log) => {
+                  const tag = getActionTag(log.action);
+                  return (
+                    <div key={log.id} style={{ border: "1px solid #F1F5F9", borderRadius: 10, padding: "9px 10px", display: "grid", gap: 5, background: "#FFFFFF" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "2px 8px", fontSize: 11, fontWeight: 700, color: tag.fg, background: tag.bg }}>
+                          {tag.text}
+                        </span>
+                        <span style={{ fontSize: 11, color: "#94A3B8", whiteSpace: "nowrap" }}>{formatDateTime(log.created_at)}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {formatLogObjectAndDetail(log)}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748B" }}>{log.actor_username || "-"} · {log.actor_role || "-"}</div>
+                    </div>
+                  );
+                }) : (
+                  <div style={{ border: "1px dashed #CBD5E1", borderRadius: 10, padding: 14, color: "#64748B", fontSize: 13, background: "#F8FAFC" }}>
+                    暂无后台操作日志。
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           <div className="admin-card admin-console-chart-card admin-console-anchor-card admin-overview-panel" style={{ padding: 12 }}>
             <div style={{ display: "grid", gap: 10 }}>
@@ -1298,7 +1363,7 @@ export default function AdminPage() {
                     <div style={{ fontWeight: 800, color: "#0F172A" }}>今日概况（24 小时）</div>
                   </div>
                   <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
-                    按小时展示访问量、访客数与点击量的变化趋势。
+                    按小时展示访问量、访客数与点击量的变化趋势。{hourlyDataNote}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1339,14 +1404,21 @@ export default function AdminPage() {
                 }}
               >
                 <div style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>
-                  {hourlyOverview.hovered ? `${String(hourlyOverview.hovered.hour).padStart(2, "0")}:00 - ${String(hourlyOverview.hovered.hour).padStart(2, "0")}:59` : "今日累计"}
+                  {hourlyOverview.hovered
+                    ? `${String(hourlyOverview.hovered.hour).padStart(2, "0")}:00 - ${String(hourlyOverview.hovered.hour).padStart(2, "0")}:59`
+                    : hasHourlyDetail ? "今日累计（小时明细）" : "今日累计（日统计）"}
                 </div>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  {(Object.keys(STAT_METRIC_META) as StatMetricKey[]).map((metricKey) => (
-                    <span key={`hourly-overview-${metricKey}`} style={{ fontSize: 12, color: STAT_METRIC_META[metricKey].color, fontWeight: 700 }}>
-                      {STAT_METRIC_META[metricKey].label}：{hourlyOverview.hovered ? Number(hourlyOverview.hovered[metricKey] || 0) : Number(hourlyOverview.totals[metricKey] || 0)}
-                    </span>
-                  ))}
+                  {(Object.keys(STAT_METRIC_META) as StatMetricKey[]).map((metricKey) => {
+                    const value = hourlyOverview.hovered
+                      ? Number(hourlyOverview.hovered[metricKey] || 0)
+                      : hasHourlyDetail ? Number(hourlyOverview.totals[metricKey] || 0) : Number(today[metricKey] || 0);
+                    return (
+                      <span key={`hourly-overview-${metricKey}`} style={{ fontSize: 12, color: STAT_METRIC_META[metricKey].color, fontWeight: 700 }}>
+                        {STAT_METRIC_META[metricKey].label}：{value}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1745,25 +1817,12 @@ export default function AdminPage() {
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    <span className="admin-link-url-preview">
-                      <span
-                        className="admin-link-url-preview-trigger"
-                        tabIndex={item.description ? 0 : undefined}
-                        title={item.description || item.url}
-                        aria-describedby={item.description ? `admin-link-url-tooltip-${item.id}` : undefined}
-                      >
-                        {item.url}
-                      </span>
-                      {item.description ? (
-                        <span
-                          id={`admin-link-url-tooltip-${item.id}`}
-                          role="tooltip"
-                          className="admin-link-url-tooltip"
-                        >
-                          {item.description}
-                        </span>
-                      ) : null}
-                    </span>
+                    <PortalTooltip
+                      trigger={item.url}
+                      content={item.description || undefined}
+                      id={`admin-link-url-tooltip-${item.id}`}
+                      title={item.description || item.url}
+                    />
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" }}>
