@@ -12,6 +12,7 @@ import (
 // GetAdminStats 获取后台统计数据（GET /api/admin/stats）
 func GetAdminStats(c *gin.Context) {
 	db := c.MustGet("db").(*gorm.DB)
+	now := time.Now()
 
 	// 1. 最近30天每日统计
 	type DailyRow struct {
@@ -24,12 +25,14 @@ func GetAdminStats(c *gin.Context) {
 	db.Raw(`SELECT stat_date, page_views, unique_visitors, link_clicks
 		FROM daily_stats ORDER BY stat_date DESC LIMIT 30`).Scan(&dailyRows)
 
-	today := DailyRow{}
-	if len(dailyRows) > 0 {
-		today = dailyRows[0]
-	} else {
-		today.StatDate = time.Now().Format("2006-01-02")
-	}
+	today := DailyRow{StatDate: now.Format("2006-01-02")}
+	db.Raw(`SELECT
+		DATE_FORMAT(CURDATE(), '%Y-%m-%d') AS stat_date,
+		COALESCE(SUM(CASE WHEN event_type = 'visit' THEN 1 ELSE 0 END), 0) AS page_views,
+		COUNT(DISTINCT CASE WHEN event_type = 'visit' THEN visitor_id ELSE NULL END) AS unique_visitors,
+		COALESCE(SUM(CASE WHEN event_type = 'click' THEN 1 ELSE 0 END), 0) AS link_clicks
+		FROM metrics
+		WHERE created_at >= CURDATE() AND created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)`).Scan(&today)
 
 	// 反转为正序
 	days := make([]DailyRow, len(dailyRows))
@@ -105,5 +108,13 @@ func GetAdminStats(c *gin.Context) {
 		"trend7":    trend7,
 		"hourly24":  hourly24,
 		"topClicks": topClicks,
+		"source": gin.H{
+			"type":      "database",
+			"today":     "metrics",
+			"hourly24":  "metrics",
+			"topClicks": "metrics + nav_items",
+			"days":      "daily_stats",
+			"sampledAt": now.Format(time.RFC3339),
+		},
 	})
 }

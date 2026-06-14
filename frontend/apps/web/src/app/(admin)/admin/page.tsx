@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, ArrowRight, BarChart3, Clock3, Eye, Gauge, LayoutDashboard, ListChecks, MousePointerClick, ServerCog, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Clock3, Database, Eye, Gauge, LayoutDashboard, ListChecks, MousePointerClick, Radio, ServerCog, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import PortalTooltip from "@/components/shared/PortalTooltip";
 type AdminUser = {
   id: number;
@@ -61,9 +61,19 @@ type TopClick = {
   clicks: number;
 };
 type StatMetricKey = "link_clicks" | "page_views" | "unique_visitors";
+type StatsSource = {
+  type?: string;
+  today?: string;
+  hourly24?: string;
+  topClicks?: string;
+  days?: string;
+  sampledAt?: string;
+};
 type SystemInfo = {
   uptimeSec: number;
   cpuCores: number;
+  status?: string;
+  sampledAt?: string;
   mem: {
     usageRate: number | null;
     processAllocBytes?: number | null;
@@ -82,6 +92,19 @@ type SystemInfo = {
     available?: boolean;
     source?: string;
   };
+  services?: {
+    backend?: ServiceProbe;
+    database?: ServiceProbe;
+    redis?: ServiceProbe;
+  };
+};
+
+type ServiceProbe = {
+  ok?: boolean;
+  status?: string;
+  message?: string;
+  latencyMs?: number | null;
+  checkedAt?: string;
 };
 
 type LinkHealth = {
@@ -314,6 +337,26 @@ function formatDateTime(value?: string | null): string {
   return String(value).replace("T", " ").slice(0, 19);
 }
 
+function isServiceOnline(service?: ServiceProbe | null): boolean {
+  return Boolean(service?.ok) || service?.status === "ok";
+}
+
+function serviceValue(service?: ServiceProbe | null): string {
+  if (!service) return "等待采样";
+  return isServiceOnline(service) ? "在线" : "异常";
+}
+
+function serviceMeta(service?: ServiceProbe | null): string {
+  if (!service) return "等待实时采样";
+  if (isServiceOnline(service)) {
+    const latency = typeof service.latencyMs === "number" && Number.isFinite(service.latencyMs)
+      ? `${service.latencyMs} ms`
+      : "";
+    return latency ? `探活 ${latency}` : "探活通过";
+  }
+  return service.message || service.status || "探活失败";
+}
+
 function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
   const source = input || ({} as SystemInfo);
   const uptimeSec = Number(source.uptimeSec || 0);
@@ -349,7 +392,15 @@ function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
         available: false,
         source: source.network?.source || "unavailable",
       };
-  return { uptimeSec, cpuCores, mem, network };
+  return {
+    uptimeSec,
+    cpuCores,
+    status: source.status || "unknown",
+    sampledAt: source.sampledAt || network.sampledAt,
+    mem,
+    network,
+    services: source.services || {},
+  };
 }
 
 export default function AdminPage() {
@@ -361,11 +412,13 @@ export default function AdminPage() {
   const [stats, setStats] = useState<StatDay[]>([]);
   const [error, setError] = useState("");
   const [system, setSystem] = useState<SystemInfo | null>(null);
+  const [systemStreamState, setSystemStreamState] = useState<"connecting" | "live" | "fallback">("connecting");
   const [health, setHealth] = useState<LinkHealth[]>([]);
   const [logs, setLogs] = useState<LinkLog[]>([]);
   const [hourly24, setHourly24] = useState<HourStat[]>([]);
   const [todayStat, setTodayStat] = useState<StatDay | null>(null);
   const [topClicks, setTopClicks] = useState<TopClick[]>([]);
+  const [statsSource, setStatsSource] = useState<StatsSource | null>(null);
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
   const [healthChecking, setHealthChecking] = useState(false);
@@ -636,12 +689,14 @@ export default function AdminPage() {
       hourly?: HourStat[];
       topClicks?: TopClick[];
       top_clicks?: TopClick[];
+      source?: StatsSource;
     }>(statsRes);
 
     setStats(statsData?.days || statsData?.stats || []);
     setTodayStat(statsData?.today || null);
     setHourly24(statsData?.hourly24 || statsData?.hourly || []);
     setTopClicks(statsData?.topClicks || statsData?.top_clicks || []);
+    setStatsSource(statsData?.source || null);
   }, []);
 
   const loadSystem = useCallback(async () => {
@@ -1135,10 +1190,54 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeSection !== "overview") return;
-    const intervalId = window.setInterval(() => {
+    let closed = false;
+    let fallbackTimer: number | null = null;
+    let stream: EventSource | null = null;
+
+    const startFallback = () => {
+      if (fallbackTimer !== null) return;
+      setSystemStreamState("fallback");
       loadSystem().catch(() => {});
-    }, 5000);
-    return () => window.clearInterval(intervalId);
+      fallbackTimer = window.setInterval(() => {
+        loadSystem().catch(() => {});
+      }, 15000);
+    };
+
+    if (typeof window === "undefined" || typeof window.EventSource === "undefined") {
+      startFallback();
+      return () => {
+        if (fallbackTimer !== null) window.clearInterval(fallbackTimer);
+      };
+    }
+
+    setSystemStreamState("connecting");
+    stream = new EventSource("/api/admin/system/stream", { withCredentials: true });
+
+    stream.onopen = () => {
+      if (!closed) setSystemStreamState("live");
+    };
+
+    stream.addEventListener("system", (event) => {
+      if (closed) return;
+      try {
+        setSystem(withSystemFallback(JSON.parse(event.data) as SystemInfo));
+        setSystemStreamState("live");
+      } catch {
+        // Ignore a malformed stream frame; the next server event will replace it.
+      }
+    });
+
+    stream.onerror = () => {
+      stream?.close();
+      stream = null;
+      if (!closed) startFallback();
+    };
+
+    return () => {
+      closed = true;
+      stream?.close();
+      if (fallbackTimer !== null) window.clearInterval(fallbackTimer);
+    };
   }, [activeSection, loadSystem]);
 
   const openAutoDetectDialog = () => {
@@ -1191,6 +1290,24 @@ export default function AdminPage() {
   const hasNetworkBytes = typeof networkBytes === "number" && Number.isFinite(networkBytes);
   const networkCardValue = hasNetworkBytes ? formatBytes(networkBytes) : "暂无采样";
   const networkCardMeta = hasNetworkBytes ? "系统网卡累计" : "本机未开放网卡统计";
+  const backendService = system?.services?.backend;
+  const databaseService = system?.services?.database;
+  const redisService = system?.services?.redis;
+  const realtimeMeta = systemStreamState === "live"
+    ? "实时推送中"
+    : systemStreamState === "fallback"
+      ? "实时通道降级探活"
+      : "实时连接中";
+  const sampledAt = system?.sampledAt || system?.network?.sampledAt;
+  const statsSourceText = statsSource?.type === "database"
+    ? `真实接口 /api/admin/stats · 今日来自 ${statsSource.today || "metrics"}`
+    : "真实接口 /api/admin/stats";
+  const statsSampledAt = statsSource?.sampledAt ? formatDateTime(statsSource.sampledAt) : formatDateTime(sampledAt);
+  const kpiItems = [
+    { label: "访问量 PV", value: today.page_views, detail: `小时事件 ${hourlyOverview.totals.page_views}`, icon: Eye, tint: "rgba(14,165,233,0.14)", color: "#0EA5E9" },
+    { label: "访客数 UV", value: today.unique_visitors, detail: `去重访客 ${hourlyOverview.totals.unique_visitors}`, icon: Users, tint: "rgba(5,150,105,0.14)", color: "#059669" },
+    { label: "点击量", value: today.link_clicks, detail: `点击事件 ${hourlyOverview.totals.link_clicks}`, icon: MousePointerClick, tint: "rgba(37,99,235,0.14)", color: "#1D4ED8" },
+  ];
 
   return (
     <div className="admin-shell" style={{ display: "grid", gap: 12, position: "relative", zIndex: 1 }}>
@@ -1281,12 +1398,15 @@ export default function AdminPage() {
                 <div style={{ fontWeight: 800, color: "#0F172A" }}>运行状态</div>
               </div>
               <div style={{ fontSize: 12, color: "#64748B" }}>
-                采样：{formatDateTime(system?.network?.sampledAt)}
+                采样：{formatDateTime(sampledAt)} · {realtimeMeta}
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
               {[
-                { label: "服务状态", value: system ? "在线" : "等待采样", meta: "5 秒自动刷新", icon: ShieldCheck, color: system ? "#059669" : "#64748B", bg: "rgba(5,150,105,0.12)" },
+                { label: "前端网关", value: system ? "在线" : "等待采样", meta: realtimeMeta, icon: Radio, color: system ? "#059669" : "#64748B", bg: "rgba(5,150,105,0.12)" },
+                { label: "后端 API", value: serviceValue(backendService), meta: serviceMeta(backendService), icon: ShieldCheck, color: isServiceOnline(backendService) ? "#059669" : "#DC2626", bg: isServiceOnline(backendService) ? "rgba(5,150,105,0.12)" : "rgba(220,38,38,0.12)" },
+                { label: "数据库", value: serviceValue(databaseService), meta: serviceMeta(databaseService), icon: Database, color: isServiceOnline(databaseService) ? "#059669" : "#DC2626", bg: isServiceOnline(databaseService) ? "rgba(5,150,105,0.12)" : "rgba(220,38,38,0.12)" },
+                { label: "Redis", value: serviceValue(redisService), meta: serviceMeta(redisService), icon: ServerCog, color: isServiceOnline(redisService) ? "#059669" : "#DC2626", bg: isServiceOnline(redisService) ? "rgba(5,150,105,0.12)" : "rgba(220,38,38,0.12)" },
                 { label: "运行时长", value: formatDurationFromSec(system?.uptimeSec ?? 0), meta: "后端进程", icon: Clock3, color: "#2563EB", bg: "rgba(37,99,235,0.12)" },
                 { label: memCardLabel, value: memCardValue, meta: memCardMeta, icon: Gauge, color: "#0EA5E9", bg: "rgba(14,165,233,0.12)" },
                 { label: "网络流量", value: networkCardValue, meta: networkCardMeta, icon: Activity, color: hasNetworkBytes ? "#7C3AED" : "#64748B", bg: hasNetworkBytes ? "rgba(124,58,237,0.12)" : "rgba(100,116,139,0.12)" },
@@ -1305,32 +1425,35 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div
-            className="admin-console-kpi-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: 10,
-            }}
-          >
-            {[
-              { label: "今日访问量 (PV)", value: today.page_views, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.page_views}` : "日统计口径", icon: Eye, tint: "rgba(14,165,233,0.14)", color: "#0EA5E9" },
-              { label: "今日访客数 (UV)", value: today.unique_visitors, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.unique_visitors}` : "日统计口径", icon: Users, tint: "rgba(5,150,105,0.14)", color: "#059669" },
-              { label: "今日点击量", value: today.link_clicks, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.link_clicks}` : "日统计口径", icon: MousePointerClick, tint: "rgba(37,99,235,0.14)", color: "#1D4ED8" },
-            ].map((item) => (
-              <div key={item.label} className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 14, background: "#FFFFFF", borderColor: "#E2E8F0", boxShadow: "0 10px 24px rgba(15,23,42,0.06)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>{item.label}</div>
-                  <span className="admin-console-icon-badge" style={{ background: item.tint, color: item.color }}>
-                    <item.icon size={14} />
-                  </span>
-                </div>
-                <div style={{ fontSize: 28, color: item.color, fontWeight: 850, lineHeight: 1 }}>
-                  {item.value}
-                </div>
-                <div style={{ fontSize: 12, color: "#64748B" }}>{item.detail}</div>
+          <div className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 14, background: "#FFFFFF", borderColor: "#E2E8F0", boxShadow: "0 10px 24px rgba(15,23,42,0.06)", display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+              <div className="admin-console-title-row">
+                <span className="admin-console-icon-badge" style={{ background: "rgba(14,165,233,0.14)", color: "#0EA5E9" }}>
+                  <BarChart3 size={15} />
+                </span>
+                <div style={{ fontWeight: 800, color: "#0F172A" }}>今日流量</div>
               </div>
-            ))}
+              <div style={{ fontSize: 12, color: "#64748B" }}>{statsSampledAt}</div>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 0, borderTop: "1px solid #EEF2F7", borderBottom: "1px solid #EEF2F7" }}>
+              {kpiItems.map((item) => (
+                <div key={item.label} style={{ padding: "12px 14px", display: "grid", gap: 8, minHeight: 92 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>{item.label}</div>
+                    <span className="admin-console-icon-badge" style={{ background: item.tint, color: item.color }}>
+                      <item.icon size={14} />
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 28, color: item.color, fontWeight: 850, lineHeight: 1 }}>
+                    {item.value}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748B" }}>{item.detail}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: "#64748B", borderTop: "1px solid #EEF2F7", paddingTop: 10 }}>
+              {statsSourceText}
+            </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
             <div className="admin-card admin-overview-panel" style={{ padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
