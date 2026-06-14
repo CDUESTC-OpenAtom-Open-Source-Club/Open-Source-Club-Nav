@@ -5,7 +5,7 @@ name: Deploy Release Artifact
 on:
   push:
     tags:
-      - "v*-test"
+      - "v*"
 
 permissions:
   contents: read
@@ -99,6 +99,7 @@ jobs:
   deploy_test:
     name: Deploy to test server
     needs: build
+    if: ${{ endsWith(github.ref_name, '-test') }}
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-test
@@ -153,6 +154,89 @@ jobs:
           SKIP_FRONTEND_BUILD=1 \
           SKIP_GIT_CHECKOUT=1 \
           ./deploy/update.sh --tag "${RELEASE_TAG}"
+
+          rm -f "/tmp/${ARTIFACT_NAME}.tar.gz"
+          REMOTE
+
+  deploy_production:
+    name: Deploy to production server
+    needs: build
+    if: ${{ !endsWith(github.ref_name, '-test') }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+
+      - name: Configure SSH
+        env:
+          PROD_DEPLOY_SSH_KEY: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${PROD_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          printf '%s\n' "${PROD_DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Upload artifact
+        env:
+          PROD_DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          PROD_DEPLOY_PORT: ${{ secrets.PROD_DEPLOY_PORT }}
+          PROD_DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
+        run: |
+          scp -i ~/.ssh/deploy_key -P "${PROD_DEPLOY_PORT}" \
+            "${ARTIFACT_NAME}.tar.gz" \
+            "${PROD_DEPLOY_USER}@${PROD_DEPLOY_HOST}:/tmp/${ARTIFACT_NAME}.tar.gz"
+
+      - name: Apply artifact on production server
+        env:
+          PROD_DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          PROD_DEPLOY_PORT: ${{ secrets.PROD_DEPLOY_PORT }}
+          PROD_DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          PROD_DEPLOY_PATH: ${{ secrets.PROD_DEPLOY_PATH }}
+          PROD_LEGACY_SYSTEMD_SERVICES: ${{ secrets.PROD_LEGACY_SYSTEMD_SERVICES }}
+          ARTIFACT_NAME: ${{ needs.build.outputs.artifact_name }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${PROD_DEPLOY_PORT}" \
+            "${PROD_DEPLOY_USER}@${PROD_DEPLOY_HOST}" \
+            "DEPLOY_PATH='${PROD_DEPLOY_PATH}' RELEASE_TAG='${RELEASE_TAG}' ARTIFACT_NAME='${ARTIFACT_NAME}' LEGACY_SYSTEMD_SERVICES='${PROD_LEGACY_SYSTEMD_SERVICES}' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          cd "${DEPLOY_PATH}"
+          tar -xzf "/tmp/${ARTIFACT_NAME}.tar.gz" -C "${DEPLOY_PATH}"
+          chmod +x backend/bin/openatom-backend-linux-amd64 deploy/update.sh
+
+          active_legacy_services=""
+          if [[ -n "${LEGACY_SYSTEMD_SERVICES:-}" ]]; then
+            for service in ${LEGACY_SYSTEMD_SERVICES}; do
+              if systemctl is-active --quiet "${service}"; then
+                active_legacy_services="${active_legacy_services} ${service}"
+              fi
+            done
+            systemctl stop ${LEGACY_SYSTEMD_SERVICES} 2>/dev/null || true
+          fi
+
+          if SKIP_BACKEND_BUILD=1 \
+            SKIP_FRONTEND_BUILD=1 \
+            SKIP_GIT_CHECKOUT=1 \
+            ./deploy/update.sh --tag "${RELEASE_TAG}"; then
+            if [[ -n "${LEGACY_SYSTEMD_SERVICES:-}" ]]; then
+              systemctl disable ${LEGACY_SYSTEMD_SERVICES} 2>/dev/null || true
+            fi
+          else
+            rc=$?
+            if [[ -n "${active_legacy_services}" ]]; then
+              systemctl start ${active_legacy_services} 2>/dev/null || true
+            fi
+            exit "${rc}"
+          fi
 
           rm -f "/tmp/${ARTIFACT_NAME}.tar.gz"
           REMOTE
