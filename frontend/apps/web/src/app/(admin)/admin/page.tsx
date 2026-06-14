@@ -65,11 +65,13 @@ type SystemInfo = {
 };
 
 type LinkHealth = {
+  id?: number;
   link_id: number;
   title: string;
+  url?: string;
   status_code: number | null;
-  is_ok: number;
-  message: string;
+  is_ok: boolean | number;
+  message?: string | null;
   checked_at: string;
   module?: NavModule;
   resource_sub_module?: ResourceSubModule | null;
@@ -139,6 +141,21 @@ function moduleLabel(moduleValue: unknown, subModuleValue?: unknown): string {
   if (moduleKey === "mini_games") return "小游戏";
   if (moduleKey === "friend_links") return "友情链接";
   return "未分类";
+}
+
+function isHealthOk(item: LinkHealth): boolean {
+  return item.is_ok === true || item.is_ok === 1;
+}
+
+function formatHealthCheckedAt(value?: string | null): string {
+  if (!value) return "-";
+  return String(value).replace("T", " ").slice(0, 19);
+}
+
+function healthStatusText(item: LinkHealth): string {
+  if (isHealthOk(item)) return "运行正常";
+  if (item.status_code) return `HTTP ${item.status_code}`;
+  return "连接失败";
 }
 
 function toHumanDetail(log: LinkLog): string {
@@ -301,6 +318,7 @@ export default function AdminPage() {
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
   const [healthChecking, setHealthChecking] = useState(false);
+  const [checkingLinkId, setCheckingLinkId] = useState<number | null>(null);
   const [autoDetectDialogOpen, setAutoDetectDialogOpen] = useState(false);
   const [autoDetectEnabled, setAutoDetectEnabled] = useState(false);
   const [autoDetectIntervalMinutes, setAutoDetectIntervalMinutes] = useState(15);
@@ -321,6 +339,13 @@ export default function AdminPage() {
     sort: 0,
     module: "resource_matrix" as NavModule,
     resource_sub_module: "think_tank" as ResourceSubModule,
+  });
+  const [editLinkId, setEditLinkId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    url: "",
+    description: "",
+    sort: 0,
   });
   const [userForm, setUserForm] = useState({
     username: "",
@@ -447,8 +472,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (user?.role !== "super" && activeSection === "users") {
-      setActiveSection("overview");
+      const timer = window.setTimeout(() => setActiveSection("overview"), 0);
+      return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [activeSection, user]);
 
   const healthMapByLinkId = useMemo(() => {
@@ -459,6 +486,15 @@ export default function AdminPage() {
       }
     }
     return map;
+  }, [health]);
+
+  const failedHealth = useMemo(() => health.filter((item) => !isHealthOk(item)), [health]);
+  const latestHealthCheckedAt = useMemo(() => {
+    const timestamps = health
+      .map((item) => Date.parse(String(item.checked_at || "")))
+      .filter((value) => Number.isFinite(value));
+    if (!timestamps.length) return "-";
+    return formatHealthCheckedAt(new Date(Math.max(...timestamps)).toISOString());
   }, [health]);
 
   const monthlyStats = useMemo(() => {
@@ -762,22 +798,22 @@ export default function AdminPage() {
   };
 
   const jumpToLinkFromHealth = useCallback(async (item: LinkHealth) => {
-    const module = (item.module || "friend_links") as NavModule;
+    const navModule = (item.module || "friend_links") as NavModule;
     const resourceSubModule = (item.resource_sub_module || "think_tank") as ResourceSubModule;
     setError("");
     setActiveSection("links");
     setLinksNavExpanded(true);
-    setActiveLinkModule(module);
-    if (module === "resource_matrix") {
+    setActiveLinkModule(navModule);
+    if (navModule === "resource_matrix") {
       setActiveResourceSubModule(resourceSubModule);
     }
     setLinkForm((prev) => ({
       ...prev,
-      module,
-      resource_sub_module: module === "resource_matrix" ? resourceSubModule : prev.resource_sub_module,
+      module: navModule,
+      resource_sub_module: navModule === "resource_matrix" ? resourceSubModule : prev.resource_sub_module,
     }));
     try {
-      await fetchLinksForScope(module, module === "resource_matrix" ? resourceSubModule : undefined);
+      await fetchLinksForScope(navModule, navModule === "resource_matrix" ? resourceSubModule : undefined);
       setFocusedLinkId(item.link_id);
     } catch {
       setError("跳转到内容管理失败");
@@ -866,6 +902,40 @@ export default function AdminPage() {
     }
   };
 
+  // 打开编辑弹窗
+  const openEditLink = (item: LinkItem) => {
+    setEditLinkId(item.id);
+    setEditForm({
+      title: item.title,
+      url: item.url,
+      description: item.description || "",
+      sort: item.sort ?? 0,
+    });
+  };
+
+  // 提交编辑
+  const submitEditLink = async (e: FormEvent) => {
+    e.preventDefault();
+    if (editLinkId === null) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/links`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editLinkId, ...editForm }),
+      });
+      const data = await readJsonSafe<{ error?: string }>(res);
+      if (!res.ok) throw new Error(data?.error || "编辑链接失败");
+      setEditLinkId(null);
+      await Promise.all([
+        loadLinks(),
+        loadLogs().catch(() => {}),
+      ]);
+    } catch (err) {
+      setError(String((err as Error).message || "编辑链接失败"));
+    }
+  };
+
   const submitUser = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -945,6 +1015,27 @@ export default function AdminPage() {
       setError(String((err as Error).message || "检测失败"));
     } finally {
       setHealthChecking(false);
+    }
+  };
+
+  const checkSingleLink = async (linkId: number) => {
+    if (checkingLinkId !== null) return;
+    setError("");
+    setCheckingLinkId(linkId);
+    try {
+      const res = await fetch(`/api/admin/link-health/${linkId}`, { method: "POST" });
+      const data = await readJsonSafe<{ error?: string; health?: LinkHealth }>(res);
+      if (!res.ok) throw new Error(data?.error || "检测失败");
+      if (data?.health) {
+        setHealth((prev) => [data.health as LinkHealth, ...prev.filter((item) => item.link_id !== linkId)]);
+      } else {
+        await loadHealth();
+      }
+      void loadLogs().catch(() => {});
+    } catch (err) {
+      setError(String((err as Error).message || "检测失败"));
+    } finally {
+      setCheckingLinkId(null);
     }
   };
 
@@ -1653,7 +1744,27 @@ export default function AdminPage() {
                 >
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    <span className="admin-link-url-preview">
+                      <span
+                        className="admin-link-url-preview-trigger"
+                        tabIndex={item.description ? 0 : undefined}
+                        title={item.description || item.url}
+                        aria-describedby={item.description ? `admin-link-url-tooltip-${item.id}` : undefined}
+                      >
+                        {item.url}
+                      </span>
+                      {item.description ? (
+                        <span
+                          id={`admin-link-url-tooltip-${item.id}`}
+                          role="tooltip"
+                          className="admin-link-url-tooltip"
+                        >
+                          {item.description}
+                        </span>
+                      ) : null}
+                    </span>
+                  </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" }}>
                     {item.created_at ? String(item.created_at).replace("T", " ").slice(0, 19) : "-"}
@@ -1661,12 +1772,53 @@ export default function AdminPage() {
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontWeight: 600 }}>
                     {(() => {
                       const h = healthMapByLinkId.get(item.id);
-                      if (!h) return <span style={{ color: "#64748B" }}>未检测</span>;
-                      if (h.is_ok) return <span style={{ color: "#059669" }}>有效</span>;
-                      return <span style={{ color: "#DC2626" }}>异常</span>;
+                      const isChecking = checkingLinkId === item.id;
+                      if (isChecking) {
+                        return (
+                          <button
+                            type="button"
+                            disabled
+                            className="admin-link-health-trigger admin-link-health-trigger--checking"
+                          >
+                            检测中...
+                          </button>
+                        );
+                      }
+                      if (!h) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => checkSingleLink(item.id)}
+                            className="admin-link-health-trigger admin-link-health-trigger--unknown"
+                          >
+                            未检测
+                          </button>
+                        );
+                      }
+                      if (isHealthOk(h)) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => checkSingleLink(item.id)}
+                            className="admin-link-health-trigger admin-link-health-trigger--ok"
+                          >
+                            有效
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => checkSingleLink(item.id)}
+                          className="admin-link-health-trigger admin-link-health-trigger--bad"
+                        >
+                          异常
+                        </button>
+                      );
                     })()}
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => openEditLink(item)} className="admin-btn-ghost" style={{ color: "#1D4ED8", borderColor: "#93C5FD" }}>编辑</button>
                     <button type="button" onClick={() => removeLink(item.id)} className="admin-btn-ghost" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}>删除</button>
                   </td>
                 </tr>
@@ -1681,31 +1833,64 @@ export default function AdminPage() {
       </div>
       ) : null}
 
+      {/* 编辑链接弹窗 */}
+      {editLinkId !== null && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.35)", backdropFilter: "blur(4px)" }} onClick={() => setEditLinkId(null)}>
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={submitEditLink}
+            style={{ background: "#fff", borderRadius: 14, padding: 28, width: 520, maxWidth: "90vw", boxShadow: "0 24px 64px rgba(15,23,42,0.18)", display: "grid", gap: 16 }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#0F172A" }}>编辑链接</div>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>标题</span>
+              <input className="admin-input" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>URL</span>
+              <input className="admin-input" value={editForm.url} onChange={(e) => setEditForm({ ...editForm, url: e.target.value })} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>描述</span>
+              <input className="admin-input" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>排序</span>
+              <input className="admin-input" type="number" value={editForm.sort} onChange={(e) => setEditForm({ ...editForm, sort: Number(e.target.value || 0) })} />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+              <button type="button" onClick={() => setEditLinkId(null)} className="admin-btn-ghost" style={{ color: "#334155" }}>取消</button>
+              <button type="submit" className="admin-btn" style={{ background: "#1890FF", color: "#fff" }}>保存</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {activeSection === "health" ? (
       <div className="admin-section-transition">
       <div className="admin-card admin-console-pagehead" style={{ padding: 18, border: "1px solid #E6ECF5", background: "linear-gradient(180deg,#FFFFFF 0%,#F8FBFF 100%)" }}>
         <div className="admin-console-pagehead-title">链接健康检测</div>
-        <div className="admin-console-pagehead-desc">监控链接可用性、异常比例与最近探测结果。</div>
+        <div className="admin-console-pagehead-desc">逐个探测所有启用链接；下方仅展示异常对象，正常状态在内容管理中查看。</div>
       </div>
       <div id="health" className="admin-card" style={{ padding: 20, background: "#F3F6FA", border: "1px solid #E6ECF5", borderRadius: 12, display: "grid", gap: 16, boxShadow: "0 8px 24px rgba(15,23,42,0.04)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", gap: 12 }}>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, boxShadow: "inset 0 0 0 1px rgba(24,144,255,0.06)" }}>
             <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评估</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: "#1890FF" }}>
-              {health.length ? `${Math.round((health.filter((h) => h.is_ok).length / health.length) * 100)}%` : "100%"}
+              {health.length ? `${Math.round(((health.length - failedHealth.length) / health.length) * 100)}%` : "-"}
             </div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>总监控项</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>已检测项</div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{health.length}</div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>正常</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#059669" }}>{health.filter((h) => h.is_ok).length}</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>异常</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#DC2626" }}>{failedHealth.length}</div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>异常</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#DC2626" }}>{health.filter((h) => !h.is_ok).length}</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>最近探测</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap" }}>{latestHealthCheckedAt}</div>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: "10px 12px" }}>
@@ -1742,42 +1927,39 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {(health.length ? health : [{ link_id: 0, title: "暂无数据", status_code: null, is_ok: 1, message: "", checked_at: "-" }]).map((h) => (
-                <tr key={h.link_id} style={{ background: h.is_ok ? "#fff" : "#FFF1F0" }}>
+              {failedHealth.map((h) => (
+                <tr key={h.link_id} style={{ background: "#FFF1F0" }}>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>
-                    {h.link_id ? (
-                      <button
-                        type="button"
-                        onClick={() => { void jumpToLinkFromHealth(h); }}
-                        className="admin-btn-ghost"
-                        style={{ padding: "2px 8px", height: "auto", borderRadius: 6 }}
-                      >
-                        {h.title || `#${h.link_id}`}
-                      </button>
-                    ) : (h.title || `#${h.link_id}`)}
+                    <button
+                      type="button"
+                      onClick={() => { void jumpToLinkFromHealth(h); }}
+                      className="admin-btn-ghost"
+                      style={{ padding: "2px 8px", height: "auto", borderRadius: 6 }}
+                    >
+                      {h.title || `#${h.link_id}`}
+                    </button>
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }}>
-                    {(() => {
-                      const module = (h.module || "friend_links") as NavModule;
-                      const sub = (h.resource_sub_module || "think_tank") as ResourceSubModule;
-                      const moduleLabel = NAV_MODULE_META[module]?.label || "未知";
-                      if (module !== "resource_matrix") return moduleLabel;
-                      return `${moduleLabel} / ${RESOURCE_SUB_MODULE_META[sub]?.label || "智库"}`;
-                    })()}
+                    {moduleLabel(h.module, h.resource_sub_module)}
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    <span style={{ color: h.is_ok ? "#059669" : "#DC2626", fontWeight: 700 }}>
-                      {h.is_ok ? "运行正常" : "服务不可用"}
+                    <span style={{ color: "#DC2626", fontWeight: 700 }}>
+                      {healthStatusText(h)}
                     </span>
-                    {!h.is_ok && h.status_code ? <span style={{ marginLeft: 8, fontSize: 12, background: "#F3F4F6", padding: "2px 8px", borderRadius: 999, color: "#475569" }}>HTTP {h.status_code}</span> : null}
+                    {h.message ? <span style={{ marginLeft: 8, fontSize: 12, color: "#64748B" }}>{h.message}</span> : null}
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }} title={String(h.checked_at || "")}>
-                    {String(h.checked_at || "").replace("T", " ").slice(0, 19)}
+                    {formatHealthCheckedAt(h.checked_at)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {!failedHealth.length ? (
+            <div style={{ padding: "14px", color: "#64748B", fontSize: 13, borderTop: "1px solid #F1F5F9" }}>
+              当前没有异常链接
+            </div>
+          ) : null}
         </div>
       </div>
       </div>
@@ -1984,7 +2166,3 @@ function formatLogObjectAndDetail(log: LinkLog): string {
   if (detail === "-") return target;
   return `${target} | ${detail}`;
 }
-
-
-
-
