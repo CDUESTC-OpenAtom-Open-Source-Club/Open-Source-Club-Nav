@@ -3,8 +3,10 @@ package handler
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"open-source-club-nav/backend/model"
 	"open-source-club-nav/backend/utils"
@@ -94,6 +96,32 @@ func GetAdminLogs(c *gin.Context) {
 // GetAdminSystem 获取系统运行状态（GET /api/admin/system）
 // 优先返回跨平台可用的后端进程指标；Linux 上补充 /proc 系统指标。
 func GetAdminSystem(c *gin.Context) {
+	c.JSON(http.StatusOK, buildAdminSystemPayload(c))
+}
+
+// StreamAdminSystem 以 SSE 推送系统运行状态（GET /api/admin/system/stream）。
+func StreamAdminSystem(c *gin.Context) {
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache, no-store, must-revalidate")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	c.Stream(func(w io.Writer) bool {
+		c.SSEvent("system", buildAdminSystemPayload(c))
+
+		select {
+		case <-c.Request.Context().Done():
+			return false
+		case <-ticker.C:
+			return true
+		}
+	})
+}
+
+func buildAdminSystemPayload(c *gin.Context) gin.H {
 	hostname, _ := os.Hostname()
 	now := time.Now()
 	uptimeSec := int(time.Since(processStartedAt).Seconds())
@@ -138,15 +166,80 @@ func GetAdminSystem(c *gin.Context) {
 		network["source"] = "unavailable"
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	db := c.MustGet("db").(*gorm.DB)
+
+	return gin.H{
 		"uptimeSec": uptimeSec,
 		"cpuCores":  cpuCores,
 		"mem":       mem,
 		"network":   network,
+		"sampledAt": now.Format(time.RFC3339),
+		"services": gin.H{
+			"backend": gin.H{
+				"ok":        true,
+				"status":    "ok",
+				"message":   "Go API online",
+				"checkedAt": now.Format(time.RFC3339),
+			},
+			"database": databaseProbe(db, now),
+			"redis":    redisProbe(now),
+		},
 		"hostname":  hostname,
 		"goVersion": runtime.Version(),
 		"status":    "ok",
+	}
+}
+
+func databaseProbe(db *gorm.DB, checkedAt time.Time) gin.H {
+	start := time.Now()
+	sqlDB, err := db.DB()
+	if err != nil {
+		return serviceProbe(false, "error", "database handle unavailable", checkedAt, start, nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return serviceProbe(false, "down", err.Error(), checkedAt, start, nil)
+	}
+
+	stats := sqlDB.Stats()
+	return serviceProbe(true, "ok", "database reachable", checkedAt, start, gin.H{
+		"openConnections": stats.OpenConnections,
+		"inUse":           stats.InUse,
+		"idle":            stats.Idle,
 	})
+}
+
+func redisProbe(checkedAt time.Time) gin.H {
+	start := time.Now()
+	if utils.RedisClient == nil {
+		return serviceProbe(false, "unavailable", "redis client not initialized", checkedAt, start, nil)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 800*time.Millisecond)
+	defer cancel()
+
+	if err := utils.RedisClient.Ping(ctx).Err(); err != nil {
+		return serviceProbe(false, "down", err.Error(), checkedAt, start, nil)
+	}
+
+	return serviceProbe(true, "ok", "redis reachable", checkedAt, start, nil)
+}
+
+func serviceProbe(ok bool, status string, message string, checkedAt time.Time, startedAt time.Time, detail gin.H) gin.H {
+	payload := gin.H{
+		"ok":        ok,
+		"status":    status,
+		"message":   message,
+		"checkedAt": checkedAt.Format(time.RFC3339),
+		"latencyMs": round2(float64(time.Since(startedAt).Microseconds()) / 1000),
+	}
+	if detail != nil {
+		payload["detail"] = detail
+	}
+	return payload
 }
 
 // bootTimeUnix 从 /proc/uptime 读取系统启动至今的秒数，反算启动时间戳

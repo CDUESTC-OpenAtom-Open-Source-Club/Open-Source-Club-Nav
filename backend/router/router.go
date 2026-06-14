@@ -108,6 +108,7 @@ func registerAdminRoutes(g *gin.RouterGroup) {
 		authG.GET("/stats", handler.GetAdminStats)
 		authG.GET("/logs", handler.GetAdminLogs)
 		authG.GET("/system", handler.GetAdminSystem)
+		authG.GET("/system/stream", handler.StreamAdminSystem)
 		authG.GET("/link-health", handler.GetLinkHealth)
 		authG.POST("/link-health", handler.CheckLinkHealth)
 		authG.POST("/link-health/:id", handler.CheckSingleLinkHealth)
