@@ -508,10 +508,21 @@ LIMIT ?
 	c.JSON(http.StatusOK, gin.H{"health": healthChecks})
 }
 
-// CheckLinkHealth 触发链接健康检查（POST /api/admin/link-health）
-func CheckLinkHealth(c *gin.Context) {
-	db := c.MustGet("db").(*gorm.DB)
+// linkHealthInternalResult 内部检测结果结构
+type linkHealthInternalResult struct {
+	linkID         uint
+	title          string
+	url            string
+	isOK           bool
+	statusCode     *int
+	message        string
+	responseTimeMs int
+}
 
+// RunLinkHealthCheckInternal 执行链接健康检测核心逻辑（可被定时任务和HTTP handler调用）
+// useStream=true 时返回 SSE stream 数据（由 handler 调用）
+// useStream=false 时静默执行（由定时任务调用），返回统计数据
+func RunLinkHealthCheckInternal(db *gorm.DB, useStream bool, streamWriter ...func(string)) (checked, failed, skipped, total int) {
 	// 获取所有活跃的 nav_items
 	type NavItemBasic struct {
 		ID    uint
@@ -529,12 +540,12 @@ WHERE active = 1
 ORDER BY id ASC
 `).Scan(&items)
 
-	checked := 0
-	failed := 0
-	skipped := 0
-	client := &http.Client{Timeout: 5 * time.Second}
+	total = len(items)
+	if total == 0 {
+		return 0, 0, 0, 0
+	}
+
 	linkColumn := healthLinkColumn(db)
-	forceCheck := strings.EqualFold(c.Query("force"), "1") || strings.EqualFold(c.Query("force"), "true")
 	healthCacheTTL := envDuration("LINK_HEALTH_CACHE_TTL", 24*time.Hour)
 	cleanupStaleLinkHealth(db, linkColumn)
 	healthColumns := map[string]bool{
@@ -543,39 +554,127 @@ ORDER BY id ASC
 		"response_time_ms": healthTableHasColumn(db, "response_time_ms"),
 	}
 
+	// 并发控制：semaphore 限制并发上限为5
+	sem := make(chan struct{}, 5)
+	results := make(chan linkHealthInternalResult, total)
+
+	// 统计计数器
+	checkedCount := 0
+	failedCount := 0
+	skippedCount := 0
+
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	// 并发检测
 	for _, item := range items {
 		if item.URL == "" {
 			continue
 		}
-		if !forceCheck && healthCacheTTL > 0 && hasRecentLinkHealth(db, linkColumn, item.ID, healthCacheTTL) {
-			skipped++
+		if healthCacheTTL > 0 && hasRecentLinkHealth(db, linkColumn, item.ID, healthCacheTTL) {
+			skippedCount++
 			continue
 		}
 
-		start := time.Now()
-		isOK, statusCode, message := probeLink(client, item.URL)
-		responseTimeMs := int(time.Since(start).Milliseconds())
-		if !isOK {
-			failed++
-		}
+		sem <- struct{}{} // 获取并发槽位
+		go func(item NavItemBasic) {
+			defer func() { <-sem }() // 释放槽位
 
-		now := time.Now()
-		if err := upsertLinkHealth(db, linkColumn, healthColumns, item.ID, item.Title, item.URL, statusCode, isOK, message, responseTimeMs, now); err != nil {
-			utils.Logger.Warn("写入链接健康状态失败", zap.Uint("link_id", item.ID), zap.Error(err))
-		}
-		checked++
+			start := time.Now()
+			isOK, statusCode, message := probeLinkWithRetry(client, item.URL, 2)
+			responseTimeMs := int(time.Since(start).Milliseconds())
+
+			now := time.Now()
+			if err := upsertLinkHealth(db, linkColumn, healthColumns, item.ID, item.Title, item.URL, statusCode, isOK, message, responseTimeMs, now); err != nil {
+				utils.Logger.Warn("写入链接健康状态失败", zap.Uint("link_id", item.ID), zap.Error(err))
+			}
+
+			results <- linkHealthInternalResult{
+				linkID:         item.ID,
+				title:          item.Title,
+				url:            item.URL,
+				isOK:           isOK,
+				statusCode:     statusCode,
+				message:        message,
+				responseTimeMs: responseTimeMs,
+			}
+		}(item)
 	}
 
-	detailBytes, _ := json.Marshal(gin.H{
-		"checked": checked,
-		"failed":  failed,
-		"skipped": skipped,
-		"total":   len(items),
-		"reason":  "manual_probe",
-	})
-	logAction(db, c, "check_health", nil, string(detailBytes))
+	// 收集结果并推送进度（如果使用 SSE）
+	for i := 0; i < total; i++ {
+		r := <-results
+		checkedCount++
+		if !r.isOK {
+			failedCount++
+		}
 
-	c.JSON(http.StatusOK, gin.H{"checked": checked, "failed": failed, "skipped": skipped, "total": len(items)})
+		if useStream && len(streamWriter) > 0 {
+			progressData := fmt.Sprintf(`{"checked":%d,"total":%d,"failed":%d,"current_title":"%s","current_url":"%s"}`,
+				checkedCount, total, failedCount, r.title, r.url)
+			streamWriter[0](progressData)
+		}
+	}
+
+	checked = checkedCount
+	failed = failedCount
+	skipped = skippedCount
+	return checked, failed, skipped, total
+}
+
+// CheckLinkHealth 触发链接健康检查（POST /api/admin/link-health）
+// 支持 ?stream=1 参数返回 SSE stream
+func CheckLinkHealth(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+
+	// 判断是否使用 SSE stream
+	useStream := c.Query("stream") == "1"
+
+	if useStream {
+		// SSE 模式：返回实时进度
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+		c.Header("Access-Control-Allow-Origin", "*")
+
+		// SSE 写入函数
+		streamWriter := func(data string) {
+			c.Writer.WriteString(fmt.Sprintf("event: progress\ndata: %s\n\n", data))
+			c.Writer.Flush()
+		}
+
+		// 执行检测
+		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, true, streamWriter)
+
+		// 发送完成事件
+		completeData := fmt.Sprintf(`{"checked":%d,"total":%d,"failed":%d,"skipped":%d}`,
+			checked, total, failed, skipped)
+		c.Writer.WriteString(fmt.Sprintf("event: complete\ndata: %s\n\n", completeData))
+		c.Writer.Flush()
+
+		// 记录日志
+		detailBytes, _ := json.Marshal(gin.H{
+			"checked": checked,
+			"failed":  failed,
+			"skipped": skipped,
+			"total":   total,
+			"reason":  "manual_probe_stream",
+		})
+		logAction(db, c, "check_health", nil, string(detailBytes))
+	} else {
+		// 传统 JSON 模式
+		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, false)
+
+		detailBytes, _ := json.Marshal(gin.H{
+			"checked": checked,
+			"failed":  failed,
+			"skipped": skipped,
+			"total":   total,
+			"reason":  "manual_probe",
+		})
+		logAction(db, c, "check_health", nil, string(detailBytes))
+
+		c.JSON(http.StatusOK, gin.H{"checked": checked, "failed": failed, "skipped": skipped, "total": total})
+	}
 }
 
 // CheckSingleLinkHealth 检查单个链接的健康状态（POST /api/admin/link-health/:id）
@@ -720,6 +819,23 @@ func probeLink(client *http.Client, targetURL string) (bool, *int, string) {
 		return false, statusCode, truncateHealthMessage(statusText)
 	}
 	return true, statusCode, "OK"
+}
+
+// probeLinkWithRetry 带重试的链接探测，maxRetries=2 表示最多重试2次（共3次尝试）
+func probeLinkWithRetry(client *http.Client, targetURL string, maxRetries int) (bool, *int, string) {
+	var lastStatusCode *int
+	var lastMessage string
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		isOK, statusCode, message := probeLink(client, targetURL)
+		if isOK {
+			return true, statusCode, "OK"
+		}
+		lastStatusCode = statusCode
+		lastMessage = message
+	}
+
+	return false, lastStatusCode, lastMessage
 }
 
 func requestLink(client *http.Client, method string, targetURL string) (*int, string, error) {
