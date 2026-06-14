@@ -147,6 +147,7 @@ jobs:
           set -Eeuo pipefail
 
           cd "${DEPLOY_PATH}"
+          rm -rf "${DEPLOY_PATH}/frontend/apps/web/dist"
           tar -xzf "/tmp/${ARTIFACT_NAME}.tar.gz" -C "${DEPLOY_PATH}"
           chmod +x backend/bin/openatom-backend-linux-amd64 deploy/update.sh
 
@@ -210,6 +211,7 @@ jobs:
           set -Eeuo pipefail
 
           cd "${DEPLOY_PATH}"
+          rm -rf "${DEPLOY_PATH}/frontend/apps/web/dist"
           tar -xzf "/tmp/${ARTIFACT_NAME}.tar.gz" -C "${DEPLOY_PATH}"
           chmod +x backend/bin/openatom-backend-linux-amd64 deploy/update.sh
 

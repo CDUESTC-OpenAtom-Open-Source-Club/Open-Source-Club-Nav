@@ -1,16 +1,22 @@
 import "./globals.css";
 import type { Metadata } from "next";
-
-const SITE_URL = "https://nav.kcos.club";
+import {
+  SITE_DESCRIPTION,
+  SITE_IMAGE_PATH,
+  SITE_NAME,
+  SITE_SHORT_DESCRIPTION,
+  SITE_TITLE,
+  SITE_URL,
+  absoluteSiteUrl,
+} from "@/lib/site";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "KCOS 开放原子开源社团 - 开源导航平台",
-    template: "%s | KCOS 开放原子开源社团",
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "科成开放原子开源社团导航平台，汇集开源工具、学习资源、校园服务、开发利器，助力高校开源社区建设与发展。",
+  description: SITE_DESCRIPTION,
   keywords: [
     "开放原子开源社团",
     "KCOS",
@@ -29,9 +35,9 @@ export const metadata: Metadata = {
     "GitHub",
   ],
   applicationName: "OpenAtom Club Nav",
-  authors: [{ name: "KCOS 开放原子开源社团", url: SITE_URL }],
-  creator: "KCOS 开放原子开源社团",
-  publisher: "KCOS 开放原子开源社团",
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   formatDetection: {
     email: false,
     address: false,
@@ -41,25 +47,23 @@ export const metadata: Metadata = {
     type: "website",
     locale: "zh_CN",
     url: SITE_URL,
-    siteName: "KCOS 开放原子开源社团",
-    title: "KCOS 开放原子开源社团 - 开源导航平台",
-    description:
-      "科成开放原子开源社团导航平台，汇集开源工具、学习资源、校园服务、开发利器，助力高校开源社区建设与发展。",
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
     images: [
       {
-        url: `${SITE_URL}/images/brand/club-logo-user.jpg`,
+        url: absoluteSiteUrl(SITE_IMAGE_PATH),
         width: 714,
         height: 672,
-        alt: "KCOS 开放原子开源社团",
+        alt: SITE_NAME,
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "KCOS 开放原子开源社团 - 开源导航平台",
-    description:
-      "科成开放原子开源社团导航平台，汇集开源工具、学习资源、校园服务、开发利器。",
-    images: [`${SITE_URL}/images/brand/club-logo-user.jpg`],
+    title: SITE_TITLE,
+    description: SITE_SHORT_DESCRIPTION,
+    images: [absoluteSiteUrl(SITE_IMAGE_PATH)],
   },
   robots: {
     index: true,
@@ -92,18 +96,17 @@ export default function RootLayout({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "KCOS 开放原子开源社团",
+    name: SITE_NAME,
     alternateName: ["OpenAtom Club Nav", "KCOS 导航"],
     url: SITE_URL,
-    description:
-      "科成开放原子开源社团导航平台，汇集开源工具、学习资源、校园服务、开发利器。",
+    description: SITE_SHORT_DESCRIPTION,
     publisher: {
       "@type": "Organization",
-      name: "KCOS 开放原子开源社团",
+      name: SITE_NAME,
       url: SITE_URL,
       logo: {
         "@type": "ImageObject",
-        url: `${SITE_URL}/images/brand/club-logo-user.jpg`,
+        url: absoluteSiteUrl(SITE_IMAGE_PATH),
       },
     },
     potentialAction: {
