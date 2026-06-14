@@ -1,11 +1,14 @@
-﻿import { fetchBackend } from "@/lib/backend-proxy";
+﻿import { fetchPublicBackend } from "@/lib/backend-proxy";
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  return fetchBackend(request, `/api/works/${id}`);
+  return fetchPublicBackend(request, `/api/works/${id}`, {
+    browserMaxAgeSeconds: 60,
+    sharedMaxAgeSeconds: 300,
+  });
 }

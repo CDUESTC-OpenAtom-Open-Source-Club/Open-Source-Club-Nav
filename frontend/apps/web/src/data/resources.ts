@@ -46,6 +46,54 @@ const DEFAULT_RESOURCE_CATEGORIES = [
         url: "https://ocw.mit.edu",
         tag: "Course",
       },
+      {
+        title: "牛客网",
+        desc: "面试刷题 · 笔试真题",
+        url: "https://www.nowcoder.com",
+        tag: "Practice",
+      },
+      {
+        title: "洛谷",
+        desc: "算法竞赛训练平台",
+        url: "https://www.luogu.com.cn",
+        tag: "Algorithm",
+      },
+      {
+        title: "中国大学MOOC",
+        desc: "国内高校优质课程",
+        url: "https://www.icourse163.org",
+        tag: "Course",
+      },
+      {
+        title: "edX",
+        desc: "哈佛MIT等名校课程",
+        url: "https://www.edx.org",
+        tag: "Course",
+      },
+      {
+        title: "Kaggle",
+        desc: "数据科学竞赛平台",
+        url: "https://www.kaggle.com",
+        tag: "Data",
+      },
+      {
+        title: "W3Schools",
+        desc: "Web开发入门教程",
+        url: "https://www.w3schools.com",
+        tag: "Web",
+      },
+      {
+        title: "GeeksforGeeks",
+        desc: "计算机科学知识库",
+        url: "https://www.geeksforgeeks.org",
+        tag: "CS",
+      },
+      {
+        title: "菜鸟教程",
+        desc: "编程语言入门指南",
+        url: "https://www.runoob.com",
+        tag: "Tutorial",
+      },
     ],
   },
   {
@@ -91,6 +139,42 @@ const DEFAULT_RESOURCE_CATEGORIES = [
         desc: "校园外卖集中取餐坐标",
         url: "#",
         tag: "Life",
+      },
+      {
+        title: "就业信息网",
+        desc: "招聘信息 · 就业指导",
+        url: "#",
+        tag: "Employment",
+      },
+      {
+        title: "创新创业中心",
+        desc: "创业指导 · 项目孵化",
+        url: "#",
+        tag: "Innovation",
+      },
+      {
+        title: "学术讲座公告",
+        desc: "学术活动 · 讲座信息",
+        url: "#",
+        tag: "Academic",
+      },
+      {
+        title: "校园地图",
+        desc: "校园导航 · 建筑分布",
+        url: "#",
+        tag: "Navigation",
+      },
+      {
+        title: "校历查询",
+        desc: "学期安排 · 假期时间",
+        url: "#",
+        tag: "Calendar",
+      },
+      {
+        title: "实验室预约",
+        desc: "实验室使用预约系统",
+        url: "#",
+        tag: "Lab",
       },
     ],
   },
@@ -138,6 +222,54 @@ const DEFAULT_RESOURCE_CATEGORIES = [
         url: "https://devdocs.io",
         tag: "Docs",
       },
+      {
+        title: "Git",
+        desc: "分布式版本控制系统",
+        url: "https://git-scm.com",
+        tag: "VCS",
+      },
+      {
+        title: "Postman",
+        desc: "API测试与协作平台",
+        url: "https://www.postman.com",
+        tag: "API",
+      },
+      {
+        title: "Figma",
+        desc: "UI/UX设计协作工具",
+        url: "https://www.figma.com",
+        tag: "Design",
+      },
+      {
+        title: "Notion",
+        desc: "知识管理与协作平台",
+        url: "https://www.notion.so",
+        tag: "Productivity",
+      },
+      {
+        title: "Obsidian",
+        desc: "本地知识管理工具",
+        url: "https://obsidian.md",
+        tag: "Notes",
+      },
+      {
+        title: "Typora",
+        desc: "极简Markdown编辑器",
+        url: "https://typora.io",
+        tag: "Editor",
+      },
+      {
+        title: "Vercel",
+        desc: "前端部署与托管平台",
+        url: "https://vercel.com",
+        tag: "Deploy",
+      },
+      {
+        title: "Google Fonts",
+        desc: "免费开源字体资源库",
+        url: "https://fonts.google.com",
+        tag: "Fonts",
+      },
     ],
   },
 ];
@@ -145,8 +277,8 @@ const DEFAULT_RESOURCE_CATEGORIES = [
 // 从后端获取资源分类数据
 export async function fetchResourceCategories() {
   try {
-    // 获取5个子分类的数据
-    const subTypes = ["learning_material", "open_source", "tech_articles", "activity_review", "tools"] as const;
+    // 获取资源矩阵三个子分类的数据
+    const subTypes = ["think_tank", "campus", "tools"] as const;
     const responses = await Promise.all(
       subTypes.map((subType) =>
         getContentByType("resource", subType).then((items) => ({
@@ -159,8 +291,8 @@ export async function fetchResourceCategories() {
     // 转换为前端格式
     const categories = DEFAULT_RESOURCE_CATEGORIES.map((category) => {
       const mapping: Record<string, string> = {
-        intelligence: "learning_material",
-        surface: "open_source",
+        intelligence: "think_tank",
+        surface: "campus",
         armory: "tools",
       };
 

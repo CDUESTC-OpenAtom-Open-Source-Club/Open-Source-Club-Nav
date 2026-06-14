@@ -48,6 +48,57 @@ const EVENT_ICONS = {
 const PANEL_WIDTH = "clamp(238px, 18vw, 296px)";
 const DEFAULT_ACTIVITY_LIMIT = 20;
 const EXPANDED_ACTIVITY_LIMIT = 100;
+const ACTIVITY_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const THEME_TRANSITION_DURATION = "var(--theme-transition-duration, 360ms)";
+const THEME_TRANSITION_EASE = "var(--theme-transition-ease, cubic-bezier(0.22, 1, 0.36, 1))";
+const THEME_SURFACE_TRANSITION = [
+  `background ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `background-color ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `border-color ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `color ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `box-shadow ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `filter ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+].join(", ");
+const QUICK_ACTIVITY_TRANSITION = `transform 0.18s ease, ${THEME_SURFACE_TRANSITION}`;
+
+type ActivitySnapshot = {
+  items: ActivityItem[];
+  source: "github" | "error";
+  notice: string;
+  updatedAt: Date;
+  nowTs: number;
+};
+
+const getActivityKey = (item: ActivityItem, index: number) => {
+  const id = String(item.id || "").trim();
+  if (id) return id;
+  return `${item.type}-${item.repo}-${item.branch || "default"}-${item.time}-${index}`;
+};
+
+const getAvatarFallbackText = (login = "") => {
+  const normalized = String(login || "").trim();
+  return (normalized.slice(0, 2) || "?").toUpperCase();
+};
+
+function ActivityActorAvatar({ item }: { item: ActivityItem }) {
+  const [loadFailed, setLoadFailed] = useState(!item.actor.avatarUrl);
+
+  if (!item.actor.avatarUrl || loadFailed) {
+    return <>{item.actor.avatar || getAvatarFallbackText(item.actor.login)}</>;
+  }
+
+  return (
+    <img
+      src={item.actor.avatarUrl}
+      alt={`${item.actor.login} GitHub avatar`}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setLoadFailed(true)}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
+  );
+}
 
 function ActivityCard({
   item,
@@ -65,6 +116,8 @@ function ActivityCard({
   return (
     <div
       data-ui-touch="true"
+      data-activity-card="true"
+      data-theme-variant={isDarkMode ? "dark" : "light"}
       style={{
         padding: "10px 14px",
         borderRadius: 10,
@@ -74,21 +127,19 @@ function ActivityCard({
         gap: 10,
         alignItems: "flex-start",
         animation: `slideIn 0.3s ease ${index * 0.05}s both`,
-        transition:
-          "border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, background 0.18s ease",
+        transition: QUICK_ACTIVITY_TRANSITION,
         cursor: "default",
       }}
       onMouseEnter={(e) => {
-        const cs = getComputedStyle(e.currentTarget);
-        e.currentTarget.style.borderColor = cs.getPropertyValue("--hover-border-2").trim();
-        e.currentTarget.style.background = cs.getPropertyValue("--hover-bg").trim();
+        if (e.currentTarget.closest('[data-theme-switching="true"]')) return;
+        e.currentTarget.style.borderColor = "var(--hover-border-2)";
+        e.currentTarget.style.background = "var(--hover-bg)";
         e.currentTarget.style.transform = "translateY(-1px)";
-        e.currentTarget.style.boxShadow = "0 6px 12px rgba(15,23,42,0.16)";
+        e.currentTarget.style.boxShadow = "var(--shadow-hover)";
       }}
       onMouseLeave={(e) => {
-        const cs = getComputedStyle(e.currentTarget);
-        e.currentTarget.style.borderColor = cs.getPropertyValue("--border-soft").trim();
-        e.currentTarget.style.background = cs.getPropertyValue("--card-bg-deep").trim();
+        e.currentTarget.style.borderColor = "var(--border-soft)";
+        e.currentTarget.style.background = "var(--card-bg-deep)";
         e.currentTarget.style.transform = "translateY(0)";
         e.currentTarget.style.boxShadow = "none";
       }}
@@ -215,15 +266,7 @@ function ActivityCard({
               overflow: "hidden",
             }}
           >
-            {item.actor.avatarUrl ? (
-              <img
-                src={item.actor.avatarUrl}
-                alt={item.actor.login}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            ) : (
-              item.actor.avatar
-            )}
+            <ActivityActorAvatar item={item} />
           </div>
           <span style={{ fontSize: 10, color: "#94A3B8" }}>{item.actor.login}</span>
           <span style={{ fontSize: 10, color: "var(--text-dim)" }}>•</span>
@@ -289,9 +332,11 @@ const getDiffLabel = (updatedAt: Date, nowTs: number) => {
 export default function RightPanel({
   isDarkMode = false,
   embedded = false,
+  isThemeSwitching = false,
 }: {
   isDarkMode?: boolean;
   embedded?: boolean;
+  isThemeSwitching?: boolean;
 }) {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -301,6 +346,33 @@ export default function RightPanel({
   const [nowTs, setNowTs] = useState(() => Date.now());
   const [activityLimit, setActivityLimit] = useState(DEFAULT_ACTIVITY_LIMIT);
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const isThemeSwitchingRef = useRef(isThemeSwitching);
+  const pendingActivitySnapshotRef = useRef<ActivitySnapshot | null>(null);
+
+  const applyActivitySnapshot = useCallback((snapshot: ActivitySnapshot) => {
+    setActivity(snapshot.items);
+    setSource(snapshot.source);
+    setNotice(snapshot.notice);
+    setLastUpdated(snapshot.updatedAt);
+    setNowTs(snapshot.nowTs);
+  }, []);
+
+  useEffect(() => {
+    isThemeSwitchingRef.current = isThemeSwitching;
+    if (isThemeSwitching || !pendingActivitySnapshotRef.current) return;
+
+    applyActivitySnapshot(pendingActivitySnapshotRef.current);
+    pendingActivitySnapshotRef.current = null;
+  }, [applyActivitySnapshot, isThemeSwitching]);
+
+  const queueOrApplyActivitySnapshot = useCallback((snapshot: ActivitySnapshot) => {
+    if (isThemeSwitchingRef.current) {
+      pendingActivitySnapshotRef.current = snapshot;
+      return;
+    }
+
+    applyActivitySnapshot(snapshot);
+  }, [applyActivitySnapshot]);
 
   const refresh = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
@@ -324,31 +396,37 @@ export default function RightPanel({
       if (controller.signal.aborted) return;
 
       if (items.length > 0) {
-        setActivity(items as ActivityItem[]);
-        setSource(payload?.source === "github" ? "github" : "error");
-        setNotice(
-          payload?.source === "github"
-            ? `已连接 ${GITHUB_ORG} 的实时动态`
-            : "",
-        );
+        queueOrApplyActivitySnapshot({
+          items,
+          source: payload?.source === "github" ? "github" : "error",
+          notice: payload?.source === "github" ? `已连接 ${GITHUB_ORG} 的实时动态` : "",
+          updatedAt: new Date(),
+          nowTs: Date.now(),
+        });
       } else {
-        setActivity([]);
-        setSource("error");
-        setNotice("GitHub 暂无可用活动数据。");
+        queueOrApplyActivitySnapshot({
+          items: [],
+          source: "error",
+          notice: "GitHub 暂无可用活动数据。",
+          updatedAt: new Date(),
+          nowTs: Date.now(),
+        });
       }
     } catch {
       if (controller.signal.aborted) return;
-      setActivity([]);
-      setSource("error");
-      setNotice("GitHub API 请求失败，请检查网络后重试。");
+      queueOrApplyActivitySnapshot({
+        items: [],
+        source: "error",
+        notice: "GitHub API 请求失败，请检查网络后重试。",
+        updatedAt: new Date(),
+        nowTs: Date.now(),
+      });
     } finally {
       if (!controller.signal.aborted) {
-        setLastUpdated(new Date());
-        setNowTs(Date.now());
         setLoading(false);
       }
     }
-  }, [activityLimit]);
+  }, [activityLimit, queueOrApplyActivitySnapshot]);
 
   useEffect(() => {
     const initialRefreshId = setTimeout(() => {
@@ -356,7 +434,7 @@ export default function RightPanel({
     }, 0);
     const refreshId = setInterval(() => {
       refresh({ silent: true });
-    }, 60000);
+    }, ACTIVITY_REFRESH_INTERVAL_MS);
     const tickId = setInterval(() => {
       setNowTs(Date.now());
     }, 10000);
@@ -523,7 +601,7 @@ export default function RightPanel({
         }}
       >
         {activity.map((item, i) => (
-          <ActivityCard key={`${item.id}-${i}`} item={item} index={i} isDarkMode={isDarkMode} />
+          <ActivityCard key={getActivityKey(item, i)} item={item} index={i} isDarkMode={isDarkMode} />
         ))}
       </div>
 

@@ -7,7 +7,7 @@ type WorkResponse = { work?: Work; ok?: boolean };
 /** Client-facing works service via local BFF routes. */
 export async function getWorks(): Promise<{ works: Work[]; source: string }> {
   try {
-    const data = await apiClient.get<WorksResponse>("/api/works", { cache: "no-store" });
+    const data = await apiClient.get<WorksResponse>("/api/works");
     return { works: data.works || [], source: data.source || "bff" };
   } catch {
     return { works: [], source: "fallback" };

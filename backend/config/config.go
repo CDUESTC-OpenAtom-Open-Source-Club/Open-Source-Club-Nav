@@ -117,6 +117,13 @@ func LoadConfig() *Config {
 	if redisPwd := os.Getenv("REDIS_PASSWORD"); redisPwd != "" {
 		cfg.Redis.Password = redisPwd
 	}
+	if redisDB := os.Getenv("REDIS_DB"); redisDB != "" {
+		var db int
+		fmt.Sscanf(redisDB, "%d", &db)
+		if db >= 0 {
+			cfg.Redis.DB = db
+		}
+	}
 	if corsOrigins := os.Getenv("CORS_ALLOWED_ORIGINS"); corsOrigins != "" {
 		cfg.CORS.AllowedOrigins = corsOrigins
 	}

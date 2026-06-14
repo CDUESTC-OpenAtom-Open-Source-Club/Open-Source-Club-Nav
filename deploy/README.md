@@ -41,6 +41,14 @@ BACKEND_API_URL=http://127.0.0.1:18080
 NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:18080
 MYSQL_PASSWORD=...
 JWT_SECRET=...
+GITHUB_TOKEN=...
+GITHUB_ORG=CDUESTC-OpenAtom-Open-Source-Club
+NEXT_PUBLIC_GITHUB_ORG=CDUESTC-OpenAtom-Open-Source-Club
+GITHUB_EVENTS_CACHE_TTL=5m
+GITHUB_USERS_CACHE_TTL=1h
+GITHUB_REPOS_CACHE_TTL=30m
+GITHUB_CONTRIBUTORS_CACHE_TTL=6h
+LINK_HEALTH_CACHE_TTL=24h
 HEALTH_RETRIES=24
 HEALTH_INTERVAL=3
 ```
@@ -159,6 +167,7 @@ NODE_ENV=production
 USE_MOCK_DATA=false
 BACKEND_API_URL=http://127.0.0.1:8080
 NEXT_PUBLIC_BACKEND_API_URL=http://127.0.0.1:8080
+NEXT_PUBLIC_GITHUB_ORG=CDUESTC-OpenAtom-Open-Source-Club
 ```
 
 ### 6. 配置 PM2 开机自启
@@ -214,10 +223,20 @@ Actions artifact 部署会设置 `SKIP_GIT_CHECKOUT=1`，因此服务器上的 G
 
 - 私有仓库使用只读 deploy key，不要把个人 SSH 私钥放到服务器
 - **推荐使用环境变量配置敏感信息**，避免将密码写入配置文件
-- 支持的环境变量：`MYSQL_PASSWORD`、`JWT_SECRET`、`MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_DATABASE`、`REDIS_ADDR`、`REDIS_PASSWORD`、`REDIS_DB`、`CORS_ALLOWED_ORIGINS`、`SERVER_ADDR`
+- 支持的环境变量：`MYSQL_PASSWORD`、`JWT_SECRET`、`MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_USER`、`MYSQL_DATABASE`、`REDIS_ADDR`、`REDIS_PASSWORD`、`REDIS_DB`、`CORS_ALLOWED_ORIGINS`、`SERVER_ADDR`、`GITHUB_TOKEN`、`GITHUB_ORG`、`NEXT_PUBLIC_GITHUB_ORG`、`LINK_HEALTH_CACHE_TTL`
 - PM2 进程以 deploy 用户运行，不给 root 权限
 - GitHub Actions 只在 tag push 时部署，部署私钥只保存在 Actions secrets
 - 部署脚本只 checkout GitHub Actions 传入的 tag
+
+## 低流量运行建议
+
+本项目是导航站，默认按低频更新处理公开数据：
+
+- 公开 BFF GET 接口会返回 `Cache-Control: public`，建议 Cloudflare 对 `/api/links`、`/api/works`、`/api/activities`、`/api/org-stats`、`/api/github-*` 启用边缘缓存。
+- GitHub API 响应会写入 Redis。默认活动缓存 5 分钟、用户 1 小时、仓库列表 30 分钟、贡献者 6 小时，可通过 `GITHUB_*_CACHE_TTL` 环境变量调整。
+- 外链健康检查默认跳过 24 小时内已检测的链接；需要强制重查时请求 `/api/admin/link-health?force=1`。
+- 前端公开数据轮询为 5 分钟级，不建议改回秒级轮询；后台管理接口仍然保持实时、不走公开缓存。
+- 免费层服务器上避免现场构建和频繁 `git fetch`，优先使用 GitHub Actions 产物部署。
 
 ## 手动操作
 

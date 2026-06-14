@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -p 4000",
     "lint": "eslint",
+    "check:resource-seeds": "node scripts/check-resource-matrix-seeds.mjs",
     "gen:types": "npx swagger2openapi --patch ../../../backend/docs/swagger.json -o src/types/generated/openapi.v3.json && npx openapi-typescript src/types/generated/openapi.v3.json -o src/types/generated/openapi.d.ts"
   },
   "dependencies": {

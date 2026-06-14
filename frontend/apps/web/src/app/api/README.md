@@ -35,5 +35,5 @@ High-risk write routes use Zod validation:
 
 ## Caching
 
-Public GET routes may define `export const revalidate = 60`.
+Public GET routes use `fetchPublicBackend` and explicit CDN/browser cache headers. Cache windows are intentionally minutes-to-hours because this is a navigation site.
 Admin routes and write operations default to no cache.

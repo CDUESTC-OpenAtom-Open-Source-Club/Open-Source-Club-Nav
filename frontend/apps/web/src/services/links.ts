@@ -15,7 +15,7 @@ export async function getLinks(
     const params = new URLSearchParams();
     if (navModule) params.set("module", navModule);
     if (resourceSubModule) params.set("resource_sub_module", resourceSubModule);
-    const data = await apiClient.get<LinkListResponse>(`/api/links?${params.toString()}`, { cache: "no-store" });
+    const data = await apiClient.get<LinkListResponse>(`/api/links?${params.toString()}`);
     return { links: data.links || data.data || [], source: "bff" };
   } catch {
     return { links: [], source: "fallback" };
@@ -29,7 +29,7 @@ export async function getAllLinks(navModule?: NavModule, resourceSubModule?: Res
 
 export async function getLinkById(id: number): Promise<FriendLink | null> {
   try {
-    const data = await apiClient.get<LinkListResponse>(`/api/links?keyword=&id=${id}`, { cache: "no-store" });
+    const data = await apiClient.get<LinkListResponse>(`/api/links?keyword=&id=${id}`);
     const links = data.links || data.data || [];
     return links[0] || null;
   } catch {

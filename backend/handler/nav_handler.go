@@ -1,5 +1,6 @@
 // handler/nav_handler.go
 package handler
+
 // 测试部署不要管这行注释后续可删掉
 import (
 	"net/http"
@@ -11,6 +12,58 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
+
+func normalizeNavModule(module string) string {
+	switch strings.TrimSpace(module) {
+	case "resource_matrix", "friend_links", "mini_games":
+		return strings.TrimSpace(module)
+	default:
+		return "friend_links"
+	}
+}
+
+func navItemToLinkDTO(item model.NavItem) gin.H {
+	module := item.ContentType
+	if module == "" {
+		module = item.Category
+	}
+	module = normalizeNavModule(module)
+
+	dto := gin.H{
+		"id":           item.ID,
+		"title":        item.Title,
+		"url":          item.LinkUrl,
+		"link_url":     item.LinkUrl,
+		"description":  item.Description,
+		"sort":         item.Sort,
+		"active":       item.Active,
+		"module":       module,
+		"content_type": item.ContentType,
+		"category":     item.Category,
+		"icon":         item.Icon,
+		"icon_url":     item.IconUrl,
+		"cover_url":    item.CoverUrl,
+		"game_type":    item.GameType,
+		"click_count":  0,
+		"created_at":   item.CreatedAt,
+		"updated_at":   item.UpdatedAt,
+	}
+
+	if item.SubType != "" {
+		dto["resource_sub_module"] = item.SubType
+		dto["sub_type"] = item.SubType
+	}
+
+	return dto
+}
+
+func navItemsToLinkDTOs(items []model.NavItem) []gin.H {
+	links := make([]gin.H, 0, len(items))
+	for _, item := range items {
+		links = append(links, navItemToLinkDTO(item))
+	}
+	return links
+}
 
 // GetNavWithBusiness 获取导航项+关联的业务数据
 // @Summary 获取导航项及关联的业务数据
@@ -77,6 +130,7 @@ func SearchNavItem(c *gin.Context) {
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	module := strings.TrimSpace(c.Query("module"))
 	resourceSubModule := strings.TrimSpace(c.Query("resource_sub_module"))
+	id := strings.TrimSpace(c.Query("id"))
 
 	limit := 20
 	if rawLimit := strings.TrimSpace(c.DefaultQuery("limit", "")); rawLimit != "" {
@@ -110,17 +164,28 @@ func SearchNavItem(c *gin.Context) {
 
 	query := gormDB.Model(&model.NavItem{})
 
-	// 支持 module（category）筛选
+	hasFilter := false
+	if id != "" {
+		query = query.Where("id = ?", id)
+		hasFilter = true
+	}
+
+	// 支持 module 筛选。nav_items 的真实模块字段是 content_type，category 作为兼容字段保留。
 	if module != "" {
-		query = query.Where("category = ?", module)
-		// 资源矩阵子模块：通过 content JSON 中的 resourceSubModule 筛选
+		query = query.Where("(content_type = ? OR category = ?)", module, module)
+		hasFilter = true
 		if module == "resource_matrix" && resourceSubModule != "" {
-			query = query.Where("content LIKE ?", "%"+resourceSubModule+"%")
+			query = query.Where("sub_type = ?", resourceSubModule)
 		}
-	} else if keyword != "" {
+	}
+
+	if keyword != "" {
 		likeKeyword := "%" + keyword + "%"
-		query = query.Where("title LIKE ? OR content LIKE ?", likeKeyword, likeKeyword)
-	} else {
+		query = query.Where("(title LIKE ? OR description LIKE ? OR content LIKE ? OR link_url LIKE ?)", likeKeyword, likeKeyword, likeKeyword, likeKeyword)
+		hasFilter = true
+	}
+
+	if !hasFilter {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "keyword or module is required"})
 		return
 	}
@@ -137,9 +202,9 @@ func SearchNavItem(c *gin.Context) {
 	}
 
 	// 4. 返回结果（admin 前端期望 { links: [...] } 格式）
-	if module != "" {
-		c.JSON(http.StatusOK, gin.H{"links": navItems})
+	if module != "" || id != "" {
+		c.JSON(http.StatusOK, gin.H{"links": navItemsToLinkDTOs(navItems)})
 	} else {
-		c.JSON(http.StatusOK, navItems)
+		c.JSON(http.StatusOK, navItemsToLinkDTOs(navItems))
 	}
 }

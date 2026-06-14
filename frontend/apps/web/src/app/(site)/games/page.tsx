@@ -25,6 +25,7 @@ type LinkItem = {
 const BASE_MINI_GAME_LINKS: LinkItem[] = [
   { title: "吃豆人小游戏", url: "/games", description: "站内经典小游戏入口" },
 ];
+const PUBLIC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 export default function GamesPage() {
   const [remoteMiniGameLinks, setRemoteMiniGameLinks] = useState<LinkItem[]>([]);
@@ -34,7 +35,7 @@ export default function GamesPage() {
 
     const syncMiniGameLinks = async () => {
       try {
-        const res = await fetch("/api/links?module=mini_games", { cache: "no-store" });
+        const res = await fetch("/api/links?module=mini_games");
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
         const list = Array.isArray(data?.links) ? data.links : [];
@@ -55,7 +56,7 @@ export default function GamesPage() {
     void syncMiniGameLinks();
     const timer = window.setInterval(() => {
       void syncMiniGameLinks();
-    }, 60000);
+    }, PUBLIC_REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

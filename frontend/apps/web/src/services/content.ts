@@ -2,7 +2,7 @@ import { apiClient } from "@/lib/api-client";
 
 /** Content type values supported by content APIs. */
 export type ContentType = "resource" | "official_news";
-export type ResourceSubType = "learning_material" | "open_source" | "tech_articles" | "activity_review" | "tools";
+export type ResourceSubType = "learning_material" | "open_source" | "tech_articles" | "activity_review" | "tools" | "think_tank" | "campus";
 
 export interface ContentItem {
   id: number;

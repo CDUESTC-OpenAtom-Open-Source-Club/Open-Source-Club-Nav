@@ -24,6 +24,19 @@ const PACMAN_EASY = {
   // Higher number means ghosts move less frequently.
   ghostMoveDivisorByLevel: [9, 8, 7],
 };
+const THEME_TRANSITION_DURATION = "var(--theme-transition-duration, 360ms)";
+const THEME_TRANSITION_EASE = "var(--theme-transition-ease, cubic-bezier(0.22, 1, 0.36, 1))";
+const THEME_SURFACE_TRANSITION = [
+  `background ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `background-color ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `border-color ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `color ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `box-shadow ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `filter ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `backdrop-filter ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+  `-webkit-backdrop-filter ${THEME_TRANSITION_DURATION} ${THEME_TRANSITION_EASE}`,
+].join(", ");
+const QUICK_SURFACE_TRANSITION = `transform 0.18s ease, opacity 0.18s ease, ${THEME_SURFACE_TRANSITION}`;
 const PACMAN_LEVEL_TEMPLATES = [
   [
     "###########",
@@ -243,6 +256,49 @@ function getContributorsForWork(work: any, repoContributors: Record<string, any[
   }
   // 无数据时返回空数组，不再使用硬编码 fallback
   return [];
+}
+
+const getAvatarFallbackText = (login = "") => {
+  const normalized = String(login || "").trim();
+  return (normalized.slice(0, 2) || "?").toUpperCase();
+};
+
+function ContributorAvatarImage({ contributor, tint }: { contributor: any; tint: string }) {
+  const [loadFailed, setLoadFailed] = useState(!contributor?.avatar);
+
+  if (loadFailed) {
+    return (
+      <span
+        aria-hidden="true"
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: tint,
+          fontSize: 7,
+          fontWeight: 800,
+          lineHeight: 1,
+          background: `${tint}14`,
+        }}
+      >
+        {getAvatarFallbackText(contributor?.login)}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={contributor.avatar}
+      alt={`${contributor.login} GitHub avatar`}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setLoadFailed(true)}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+    />
+  );
 }
 
 function CardBody({
@@ -504,6 +560,7 @@ function CardBody({
                 href={c.url}
                 target="_blank"
                 rel="noopener noreferrer"
+                aria-label={`打开 ${c.login} 的 GitHub 主页`}
                 onClick={(e) => e.stopPropagation()}
                 onMouseEnter={() => setHoveredRole({ login: c.login, contributions: c.contributions })}
                 onMouseLeave={() => setHoveredRole(null)}
@@ -520,7 +577,7 @@ function CardBody({
                   cursor: "pointer",
                   marginLeft: idx === 0 ? 0 : -4,
                   zIndex: arr.length - idx,
-                  transition: "all 0.22s ease",
+                  transition: QUICK_SURFACE_TRANSITION,
                   overflow: "hidden",
                   textDecoration: "none",
                 }}
@@ -531,11 +588,7 @@ function CardBody({
                   e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
-                <img
-                  src={c.avatar}
-                  alt={`${c.login} GitHub avatar`}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
+                <ContributorAvatarImage contributor={c} tint={work.color} />
               </a>
             ))}
 
@@ -614,7 +667,7 @@ function WorkCard({
         padding: "10px 10px",
         cursor: "pointer",
         transition:
-          "transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.35s ease, box-shadow 0.25s ease, border-color 0.2s ease",
+          `transform 0.45s cubic-bezier(0.25,0.46,0.45,0.94), opacity 0.35s ease, ${THEME_SURFACE_TRANSITION}`,
         boxShadow: isCenter
           ? (isDarkMode ? `0 0 16px ${work.color}24, 0 6px 14px rgba(0,0,0,0.4)` : `0 0 16px ${work.color}12, 0 6px 14px rgba(148,163,184,0.16)`)
           : "none",
@@ -670,6 +723,7 @@ function MobileWorkCard({
         display: "flex",
         flexDirection: "column",
         gap: 5,
+        transition: THEME_SURFACE_TRANSITION,
       }}
     >
       <CardBody
@@ -716,8 +770,7 @@ function ListRow({
         borderRadius: 9,
         border: `1px solid ${baseBorder}`,
         background: baseBg,
-        transition:
-          "border-color 0.18s, box-shadow 0.18s, transform 0.18s, background 0.18s",
+        transition: QUICK_SURFACE_TRANSITION,
         cursor: "pointer",
         textAlign: "left",
       }}
@@ -822,6 +875,7 @@ function InsightCard({ icon: Icon, label, value, tint, isDarkMode = false }: any
         alignItems: "center",
         gap: 10,
         boxShadow: isDarkMode ? "none" : "0 4px 6px rgba(148,163,184,0.05)",
+        transition: THEME_SURFACE_TRANSITION,
       }}
     >
       <div
@@ -1562,7 +1616,6 @@ export default function WorksCarousel({ isDarkMode = false }) {
         if (!repos.length) return;
         const res = await fetch(`/api/github-contributors?repos=${encodeURIComponent(repos.join(","))}`, {
           signal: abortController.signal,
-          cache: "no-store",
         });
         if (!res.ok) throw new Error("GitHub contributors API error");
         const payload = await res.json();
@@ -1631,7 +1684,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
     };
 
     fetchWorks();
-    const refreshId = setInterval(fetchWorks, 120000);
+    const refreshId = setInterval(fetchWorks, 5 * 60 * 1000);
     return () => {
       abortRef.abort();
       clearInterval(refreshId);
@@ -1846,7 +1899,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   justifyContent: "center",
                   cursor: viewMode === "carousel" ? "pointer" : "not-allowed",
                   opacity: viewMode === "carousel" ? 1 : 0.45,
-                  transition: "all 0.18s ease",
+                  transition: QUICK_SURFACE_TRANSITION,
                 }}
                 aria-label="上一项作品"
                 title="Previous"
@@ -1884,7 +1937,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   justifyContent: "center",
                   cursor: viewMode === "carousel" ? "pointer" : "not-allowed",
                   opacity: viewMode === "carousel" ? 1 : 0.45,
-                  transition: "all 0.18s ease",
+                  transition: QUICK_SURFACE_TRANSITION,
                 }}
                 aria-label={autoPlay ? "暂停自动播放" : "继续自动播放"}
                 aria-pressed={autoPlay}
@@ -1924,7 +1977,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                   justifyContent: "center",
                   cursor: viewMode === "carousel" ? "pointer" : "not-allowed",
                   opacity: viewMode === "carousel" ? 1 : 0.45,
-                  transition: "all 0.18s ease",
+                  transition: QUICK_SURFACE_TRANSITION,
                 }}
                 aria-label="下一项作品"
                 title="Next"
@@ -1976,7 +2029,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                transition: "all 0.18s ease",
+                transition: QUICK_SURFACE_TRANSITION,
               }}
               aria-label={mode === "carousel" ? "切换到轮播视图" : "切换到列表视图"}
               title={mode === "carousel" ? "Carousel" : "List"}
@@ -2128,7 +2181,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
           aria-label="成员作品轮播"
           aria-roledescription="carousel"
         >
-          <TechBackground />
+          <TechBackground isDarkMode={isDarkMode} />
 
           <div
             style={{
@@ -2213,7 +2266,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
               justifyContent: "center",
               cursor: "pointer",
               backdropFilter: "blur(8px)",
-              transition: "all 0.18s ease",
+              transition: QUICK_SURFACE_TRANSITION,
             }}
             aria-label="上一项"
             onMouseEnter={(e) => {
@@ -2249,7 +2302,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
               justifyContent: "center",
               cursor: "pointer",
               backdropFilter: "blur(8px)",
-              transition: "all 0.18s ease",
+              transition: QUICK_SURFACE_TRANSITION,
             }}
             aria-label="下一项"
             onMouseEnter={(e) => {
@@ -2387,7 +2440,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                transition: "all 0.18s ease",
+                transition: QUICK_SURFACE_TRANSITION,
               }}
               aria-label="上一项作品"
               onMouseEnter={(e) => {
@@ -2467,7 +2520,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                transition: "all 0.18s ease",
+                transition: QUICK_SURFACE_TRANSITION,
               }}
               aria-label="下一项作品"
               onMouseEnter={(e) => {

@@ -4,6 +4,7 @@ backend/config.local.yaml
 backend/config.yaml
 # 编译产物
 backend/bin/
+backend/backend
 backend/nav-gateway
 
 # === Frontend ===

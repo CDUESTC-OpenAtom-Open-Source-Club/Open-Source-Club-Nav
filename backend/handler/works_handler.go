@@ -4,7 +4,6 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"open-source-club-nav/backend/model"
 	"open-source-club-nav/backend/utils"
@@ -451,33 +450,7 @@ func fetchGitHubRepos(db *gorm.DB) ([]model.Work, error) {
 // fetchGitHubRepoList 调用 GitHub API 获取组织仓库列表
 func fetchGitHubRepoList() ([]map[string]interface{}, error) {
 	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&sort=updated", githubOrgFromEnv())
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	// 尝试从 config 或环境变量获取 token
-	// 暂时先不使用 token，后续可以通过 config 注入
-
-	client := &http.Client{Timeout: 15 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GitHub API 返回 %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var repos []map[string]interface{}
-	if err := json.Unmarshal(body, &repos); err != nil {
-		return nil, err
-	}
-	return repos, nil
+	return fetchGitHubArray(url, githubHeaders())
 }
 
 // enrichFromGitHub 从 GitHub API 补全作品信息
@@ -490,19 +463,8 @@ func enrichFromGitHub(work *model.Work, repoURL string) {
 	owner, repo := parts[0], parts[1]
 
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s", owner, repo)
-	req, _ := http.NewRequest("GET", url, nil)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		return
-	}
-	defer resp.Body.Close()
-
-	body, _ := io.ReadAll(resp.Body)
-	var data map[string]interface{}
-	if err := json.Unmarshal(body, &data); err != nil {
+	data, err := fetchGitHubObject(url, githubHeaders())
+	if err != nil {
 		return
 	}
 

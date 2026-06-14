@@ -30,8 +30,8 @@ SKIP_GIT_CHECKOUT="${SKIP_GIT_CHECKOUT:-0}"
 DEPLOY_STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 DEPLOY_FINALIZED=0
 export GOTOOLCHAIN="${GOTOOLCHAIN:-auto}"
-export GOPROXY="${GOPROXY:-https://goproxy.cn,direct}"
-export GOSUMDB="${GOSUMDB:-sum.golang.org https://goproxy.cn/sumdb/sum.golang.org}"
+export GOPROXY="${GOPROXY:-https://proxy.golang.org,direct}"
+export GOSUMDB="${GOSUMDB:-sum.golang.org}"
 export GOFLAGS="${GOFLAGS:--p=1}"
 export GOMAXPROCS="${GOMAXPROCS:-1}"
 

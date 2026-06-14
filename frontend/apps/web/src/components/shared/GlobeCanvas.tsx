@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import * as THREE from "three";
 
 /**
@@ -11,6 +12,7 @@ import * as THREE from "three";
  * `<GlobeCanvas size={260} pulse />`
  */
 export type GlobeCanvasProps = {
+  isDarkMode?: boolean;
   pulse?: boolean;
   size?: number;
 };
@@ -19,10 +21,33 @@ type SceneRuntime = {
   renderer?: { dispose: () => void } | null;
 };
 
-export default function GlobeCanvas({ pulse = false, size = 260 }: GlobeCanvasProps) {
+const getGlobeTheme = (isDarkMode: boolean) => ({
+  sphereColor: isDarkMode ? 0x0a84ff : 0x2563eb,
+  outerColor: isDarkMode ? 0x38bdf8 : 0x60a5fa,
+  ringColor: isDarkMode ? 0x06e5cc : 0x0891b2,
+  sphereOpacityBase: isDarkMode ? 0.32 : 0.18,
+  sphereOpacityPulse: isDarkMode ? 0.06 : 0.025,
+  outerOpacity: isDarkMode ? 0.1 : 0.045,
+  ringOpacityBase: isDarkMode ? 0.5 : 0.24,
+  ringOpacityPulse: isDarkMode ? 0.2 : 0.08,
+  ring2Opacity: isDarkMode ? 0.4 : 0.16,
+  particleOpacity: isDarkMode ? 0.6 : 0.28,
+  canvasOpacity: isDarkMode ? 1 : 0.72,
+  canvasFilter: isDarkMode
+    ? "drop-shadow(0 0 24px rgba(10,132,255,0.2))"
+    : "drop-shadow(0 0 14px rgba(37,99,235,0.12)) saturate(0.82) brightness(1.05)",
+  blendMode: isDarkMode ? "screen" : "multiply",
+});
+
+export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 260 }: GlobeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const sceneRef = useRef<SceneRuntime>({});
+  const themeRef = useRef(getGlobeTheme(isDarkMode));
+
+  useEffect(() => {
+    themeRef.current = getGlobeTheme(isDarkMode);
+  }, [isDarkMode]);
 
   useEffect(() => {
     let cleanup = false;
@@ -42,30 +67,32 @@ export default function GlobeCanvas({ pulse = false, size = 260 }: GlobeCanvasPr
     camera.position.z = 3.8;
 
     const sphereGeo = new THREE.SphereGeometry(1.4, 22, 16);
+    const initialTheme = themeRef.current;
     const sphereMat = new THREE.MeshBasicMaterial({
-      color: 0x0a84ff, wireframe: true, transparent: true, opacity: 0.35,
+      color: initialTheme.sphereColor, wireframe: true, transparent: true, opacity: initialTheme.sphereOpacityBase,
     });
     const sphere = new THREE.Mesh(sphereGeo, sphereMat);
     scene.add(sphere);
 
     const outerGeo = new THREE.SphereGeometry(1.52, 18, 12);
     const outerMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8, wireframe: true, transparent: true, opacity: 0.1,
+      color: initialTheme.outerColor, wireframe: true, transparent: true, opacity: initialTheme.outerOpacity,
     });
     const outer = new THREE.Mesh(outerGeo, outerMat);
     scene.add(outer);
 
     const ringGeo = new THREE.TorusGeometry(1.48, 0.006, 2, 80);
     const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x06e5cc, transparent: true, opacity: 0.7,
+      color: initialTheme.ringColor, transparent: true, opacity: initialTheme.ringOpacityBase,
     });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     scene.add(ring);
 
     const ring2 = new THREE.Mesh(
       new THREE.TorusGeometry(1.56, 0.004, 2, 80),
-      new THREE.MeshBasicMaterial({ color: 0x0a84ff, transparent: true, opacity: 0.4 }),
+      new THREE.MeshBasicMaterial({ color: initialTheme.sphereColor, transparent: true, opacity: initialTheme.ring2Opacity }),
     );
+    const ring2Mat = ring2.material as THREE.MeshBasicMaterial;
     ring2.rotation.x = Math.PI / 3;
     scene.add(ring2);
 
@@ -82,7 +109,7 @@ export default function GlobeCanvas({ pulse = false, size = 260 }: GlobeCanvasPr
     const particleGeo = new THREE.BufferGeometry();
     particleGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     const particleMat = new THREE.PointsMaterial({
-      color: 0x38bdf8, size: 0.03, transparent: true, opacity: 0.6,
+      color: initialTheme.outerColor, size: 0.03, transparent: true, opacity: initialTheme.particleOpacity,
     });
     const particles = new THREE.Points(particleGeo, particleMat);
     scene.add(particles);
@@ -101,10 +128,20 @@ export default function GlobeCanvas({ pulse = false, size = 260 }: GlobeCanvasPr
       particles.rotation.x += 0.0005;
       ring.rotation.z += 0.002;
 
+      const theme = themeRef.current;
+      sphereMat.color.setHex(theme.sphereColor);
+      outerMat.color.setHex(theme.outerColor);
+      ringMat.color.setHex(theme.ringColor);
+      ring2Mat.color.setHex(theme.sphereColor);
+      particleMat.color.setHex(theme.outerColor);
+      outerMat.opacity = theme.outerOpacity;
+      ring2Mat.opacity = theme.ring2Opacity;
+      particleMat.opacity = theme.particleOpacity;
+
       const pulseMult = pulse ? 1 + Math.sin(t * 4) * 0.08 : 1;
       sphere.scale.setScalar(pulseMult);
-      ring.material.opacity = 0.5 + Math.sin(t * 3) * 0.2;
-      sphereMat.opacity = 0.32 + Math.sin(t * 2) * 0.06;
+      ringMat.opacity = theme.ringOpacityBase + Math.sin(t * 3) * theme.ringOpacityPulse;
+      sphereMat.opacity = theme.sphereOpacityBase + Math.sin(t * 2) * theme.sphereOpacityPulse;
       renderer.render(scene, camera);
     };
     animate();
@@ -117,6 +154,8 @@ export default function GlobeCanvas({ pulse = false, size = 260 }: GlobeCanvasPr
     };
   }, [pulse, size]);
 
+  const renderedTheme = getGlobeTheme(isDarkMode);
+
   return (
     <canvas
       ref={canvasRef}
@@ -126,7 +165,9 @@ export default function GlobeCanvas({ pulse = false, size = 260 }: GlobeCanvasPr
         width: size,
         height: size,
         display: "block",
-        filter: "drop-shadow(0 0 24px rgba(10,132,255,0.2))",
+        filter: renderedTheme.canvasFilter,
+        mixBlendMode: renderedTheme.blendMode as CSSProperties["mixBlendMode"],
+        opacity: renderedTheme.canvasOpacity,
         flexShrink: 0,
       }}
     />

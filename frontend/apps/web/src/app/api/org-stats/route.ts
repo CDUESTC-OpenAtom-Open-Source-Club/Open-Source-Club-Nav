@@ -1,7 +1,10 @@
-import { fetchBackend } from "@/lib/backend-proxy";
+import { fetchPublicBackend } from "@/lib/backend-proxy";
 
-export const revalidate = 60;
+export const revalidate = 3600;
 
 export async function GET(request: Request) {
-  return fetchBackend(request, "/api/org-stats");
+  return fetchPublicBackend(request, "/api/org-stats", {
+    browserMaxAgeSeconds: 300,
+    sharedMaxAgeSeconds: 3600,
+  });
 }

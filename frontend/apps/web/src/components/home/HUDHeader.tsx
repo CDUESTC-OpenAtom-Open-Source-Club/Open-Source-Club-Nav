@@ -15,6 +15,7 @@ const HEADER_HEIGHT = "clamp(50px, 6vh, 56px)";
 const HEADER_PADDING_X = "clamp(12px, 1.3vw, 20px)";
 const LEFT_BLOCK_MIN_WIDTH = "clamp(156px, 18vw, 190px)";
 const RIGHT_BLOCK_MIN_WIDTH = "clamp(210px, 24vw, 280px)";
+const SYSTEM_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 type HUDHeaderProps = {
   compact?: boolean;
@@ -61,7 +62,7 @@ export default function HUDHeader({
 
     const syncSystemTime = async () => {
       try {
-        const res = await fetch("/api/system", { cache: "no-store" });
+        const res = await fetch("/api/system");
         if (!res.ok) return;
         const data = (await res.json()) as { uptimeSec?: number };
         const nextUptime = Number(data?.uptimeSec || 0);
@@ -78,7 +79,7 @@ export default function HUDHeader({
     const id = setInterval(tick, 1000);
     const refreshId = setInterval(() => {
       void syncSystemTime();
-    }, 60000);
+    }, SYSTEM_REFRESH_INTERVAL_MS);
     return () => {
       clearInterval(id);
       clearInterval(refreshId);

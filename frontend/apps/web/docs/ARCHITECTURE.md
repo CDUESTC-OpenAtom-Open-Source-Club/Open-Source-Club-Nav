@@ -91,6 +91,14 @@
 3. 新增、更新、删除操作走 `/api/admin/*` 接口。
 4. 写操作结束后重新请求列表，保证后台单页状态和数据一致。
 
+## 链接健康检测
+
+- 链接主数据在后端 `nav_items` 表，健康检测结果在 `nav_item_health` 表。
+- 定期检测逐个请求所有启用链接，不并行探测。
+- 内容管理页读取全量健康结果，用于显示每条链接的 `未检测 / 有效 / 异常`。
+- 健康检测页只展示异常对象，不展示正常对象，也不使用模拟兜底数据。
+- 当没有异常时，健康检测页显示空态，不构造“暂无数据 / 运行正常”的假行。
+
 ## mock 与真实数据切换
 
 开关：`.env`
@@ -109,6 +117,23 @@ USE_MOCK_DATA=true
 - 不依赖 MySQL
 - 部分接口直接返回 route 内置静态数据
 - 管理后台也能展示关键统计模块
+
+### 资源矩阵数据契约
+
+资源矩阵与普通 mock 数据不同，它以后以前端 `src/data/resources.ts` 的 `DEFAULT_RESOURCE_CATEGORIES` 为源头。后端 `nav_items` 里的 `resource_matrix` 种子必须映射这份前端结构。
+
+固定映射：
+
+| Frontend category id | UI 名称 | Backend `sub_type` |
+| --- | --- | --- |
+| `intelligence` | 智库 | `think_tank` |
+| `surface` | 校园 | `campus` |
+| `armory` | 工具 | `tools` |
+
+完整字段映射和校验命令见仓库根目录文档：
+
+- `docs/resource-matrix-data-contract.md`
+- `npm run check:resource-seeds`
 
 ### 真实模式
 ```env
