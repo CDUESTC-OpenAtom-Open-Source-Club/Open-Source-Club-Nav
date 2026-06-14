@@ -959,7 +959,7 @@ export default function AdminPage() {
   // 删除链接后刷新相关分区数据
   const removeLink = async (id: number) => {
     try {
-      const res = await fetch(`/api/admin/links?id=${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/links/${id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = await readJsonSafe<{ error?: string }>(res);
         throw new Error(data?.error || "删除链接失败");
@@ -991,7 +991,7 @@ export default function AdminPage() {
     if (editLinkId === null) return;
     setError("");
     try {
-      const res = await fetch(`/api/admin/links`, {
+      const res = await fetch(`/api/admin/links/${editLinkId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: editLinkId, ...editForm }),
@@ -1061,7 +1061,7 @@ export default function AdminPage() {
 
   const removeUser = async (targetUser: AdminUser) => {
     try {
-      const res = await fetch(`/api/admin/users?id=${targetUser.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/users/${targetUser.id}`, { method: "DELETE" });
       const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "删除用户失败");
       await Promise.all([loadUsers(), loadLogs().catch(() => {})]);
