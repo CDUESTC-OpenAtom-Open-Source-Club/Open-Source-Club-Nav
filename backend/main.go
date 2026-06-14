@@ -2,10 +2,13 @@
 package main
 
 import (
+	"context"
+
 	"open-source-club-nav/backend/config"
 	"open-source-club-nav/backend/db/migrate"
 	_ "open-source-club-nav/backend/docs"
 	"open-source-club-nav/backend/router"
+	"open-source-club-nav/backend/scheduler"
 	"open-source-club-nav/backend/utils"
 
 	migrateLib "github.com/golang-migrate/migrate/v4"
@@ -34,6 +37,11 @@ func main() {
 		logger.Fatal("Redis 连接失败", zap.Error(err))
 	}
 	logger.Info("Redis 连接成功")
+
+	// 启动链接健康检测定时任务
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	scheduler.StartLinkHealthScheduler(ctx, db)
 
 	r := router.InitRouter(db, cfg)
 	serverAddr := cfg.ServerAddr()
