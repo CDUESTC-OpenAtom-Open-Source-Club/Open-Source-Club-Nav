@@ -73,10 +73,37 @@ func GetAdminStats(c *gin.Context) {
 		}
 	}
 
+	// 3. 今日点击排行，用于后台首页快速判断用户实际点击对象
+	type TopClickRow struct {
+		LinkID            uint    `json:"link_id"`
+		Title             string  `json:"title"`
+		URL               string  `json:"url"`
+		Module            string  `json:"module"`
+		ResourceSubModule *string `json:"resource_sub_module"`
+		Clicks            int     `json:"clicks"`
+	}
+	var topClicks []TopClickRow
+	db.Raw(`SELECT
+		COALESCE(m.nav_item_id, 0) AS link_id,
+		COALESCE(NULLIF(n.title, ''), NULLIF(m.target_label, ''), '未命名链接') AS title,
+		COALESCE(NULLIF(n.link_url, ''), NULLIF(m.target_url, ''), '') AS url,
+		COALESCE(n.content_type, '') AS module,
+		NULLIF(n.sub_type, '') AS resource_sub_module,
+		COUNT(*) AS clicks
+		FROM metrics m
+		LEFT JOIN nav_items n ON n.id = m.nav_item_id
+		WHERE m.event_type = 'click'
+		  AND m.created_at >= CURDATE()
+		  AND m.created_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY)
+		GROUP BY m.nav_item_id, n.title, m.target_label, n.link_url, m.target_url, n.content_type, n.sub_type
+		ORDER BY clicks DESC
+		LIMIT 5`).Scan(&topClicks)
+
 	c.JSON(http.StatusOK, gin.H{
-		"today":    today,
-		"days":     days,
-		"trend7":   trend7,
-		"hourly24": hourly24,
+		"today":     today,
+		"days":      days,
+		"trend7":    trend7,
+		"hourly24":  hourly24,
+		"topClicks": topClicks,
 	})
 }

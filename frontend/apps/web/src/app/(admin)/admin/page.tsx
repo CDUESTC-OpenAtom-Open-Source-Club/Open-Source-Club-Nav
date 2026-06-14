@@ -1953,12 +1953,46 @@ export default function AdminPage() {
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: "10px 12px" }}>
-          <div style={{ display: "grid", gap: 4 }}>
-            <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
-            <div style={{ fontSize: 12, color: "#64748B" }}>
-              {autoDetectEnabled
-                ? `自动检测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
-                : "自动检测未开启"}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+            {/* 进度条看板 - 仅手动触发时显示 */}
+            {healthProgress && healthProgress.total > 0 && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                minWidth: 280,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", gap: 0, marginBottom: 4, height: 8 }}>
+                    <div style={{
+                      width: `${Math.min(100, (healthProgress.checked / healthProgress.total) * 100)}%`,
+                      height: 8,
+                      borderRadius: "4px 0 0 4px",
+                      background: "linear-gradient(90deg, #93C5FD, #2563EB)",
+                      transition: "width 0.15s ease",
+                    }} />
+                    <div style={{
+                      flex: 1,
+                      height: 8,
+                      borderRadius: "0 4px 4px 0",
+                      background: "#E2E8F0",
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#475569", whiteSpace: "nowrap" }}>
+                    {Math.round((healthProgress.checked / healthProgress.total) * 100)}%
+                    · {healthProgress.checked}/{healthProgress.total}
+                    {healthProgress.failed > 0 && <span style={{ color: "#DC2626", marginLeft: 4 }}>异常 {healthProgress.failed}</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div style={{ display: "grid", gap: 4 }}>
+              <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
+              <div style={{ fontSize: 12, color: "#64748B" }}>
+                {autoDetectEnabled
+                  ? `自动检测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
+                  : "自动检测未开启"}
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
