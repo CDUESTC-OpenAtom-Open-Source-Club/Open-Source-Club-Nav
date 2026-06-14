@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Activity, BarChart3, Clock3, Eye, LayoutDashboard, MousePointerClick, ServerCog, Users } from "lucide-react";
+import { Activity, ArrowRight, BarChart3, Clock3, Eye, Gauge, LayoutDashboard, ListChecks, MousePointerClick, ServerCog, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import PortalTooltip from "@/components/shared/PortalTooltip";
 type AdminUser = {
   id: number;
   username: string;
@@ -51,29 +52,60 @@ type HourStat = {
   unique_visitors: number;
   link_clicks: number;
 };
+type TopClick = {
+  link_id?: number | null;
+  title: string;
+  url?: string | null;
+  module?: NavModule | string;
+  resource_sub_module?: ResourceSubModule | null;
+  clicks: number;
+};
 type StatMetricKey = "link_clicks" | "page_views" | "unique_visitors";
 type SystemInfo = {
   uptimeSec: number;
   cpuCores: number;
-  mem: { usageRate: number };
+  mem: {
+    usageRate: number | null;
+    processAllocBytes?: number | null;
+    processSysBytes?: number | null;
+    usedBytes?: number | null;
+    totalBytes?: number | null;
+    availableBytes?: number | null;
+    source?: string;
+    systemAvailable?: boolean;
+  };
   network?: {
     rxBytes: number | null;
     txBytes: number | null;
     totalBytes: number | null;
     sampledAt: string;
+    available?: boolean;
+    source?: string;
   };
 };
 
 type LinkHealth = {
+  id?: number;
   link_id: number;
   title: string;
+  url?: string;
   status_code: number | null;
-  is_ok: number;
-  message: string;
+  is_ok: boolean | number;
+  message?: string | null;
   checked_at: string;
   module?: NavModule;
   resource_sub_module?: ResourceSubModule | null;
 };
+
+type HealthProgress = {
+  checked: number;
+  total: number;
+  failed: number;
+  skipped?: number;
+  current_title?: string;
+  current_url?: string;
+} | null;
+
 type LinkLog = {
   id: number;
   link_id: number | null;
@@ -97,6 +129,8 @@ const baseSections = [
   { id: "health", label: "健康检测" },
   { id: "logs", label: "操作日志" },
 ] as const;
+
+const ERROR_AUTO_DISMISS_MS = 4000;
 
 async function readJsonSafe<T>(res: Response): Promise<T | null> {
   const text = await res.text();
@@ -139,6 +173,21 @@ function moduleLabel(moduleValue: unknown, subModuleValue?: unknown): string {
   if (moduleKey === "mini_games") return "小游戏";
   if (moduleKey === "friend_links") return "友情链接";
   return "未分类";
+}
+
+function isHealthOk(item: LinkHealth): boolean {
+  return item.is_ok === true || item.is_ok === 1;
+}
+
+function formatHealthCheckedAt(value?: string | null): string {
+  if (!value) return "-";
+  return String(value).replace("T", " ").slice(0, 19);
+}
+
+function healthStatusText(item: LinkHealth): string {
+  if (isHealthOk(item)) return "运行正常";
+  if (item.status_code) return `HTTP ${item.status_code}`;
+  return "连接失败";
 }
 
 function toHumanDetail(log: LinkLog): string {
@@ -236,6 +285,7 @@ function getActionTag(action: string): { text: string; fg: string; bg: string } 
 
 function formatDurationFromSec(totalSec: number): string {
   const safe = Math.max(0, Math.floor(Number(totalSec || 0)));
+  if (safe <= 0) return "<1秒";
   const days = Math.floor(safe / 86400);
   const hours = Math.floor((safe % 86400) / 3600);
   const minutes = Math.floor((safe % 3600) / 60);
@@ -259,13 +309,26 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${value.toFixed(fixed)} ${units[unitIndex]}`;
 }
 
+function formatDateTime(value?: string | null): string {
+  if (!value) return "-";
+  return String(value).replace("T", " ").slice(0, 19);
+}
+
 function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
   const source = input || ({} as SystemInfo);
   const uptimeSec = Number(source.uptimeSec || 0);
   const cpuCores = Number(source.cpuCores || 0);
-  const memUsage = Number(source.mem?.usageRate || 0);
+  const rawMemUsage = source.mem?.usageRate;
+  const memUsage = rawMemUsage === null || rawMemUsage === undefined ? null : Number(rawMemUsage);
   const mem = {
-    usageRate: Number.isFinite(memUsage) ? memUsage : 0,
+    usageRate: memUsage !== null && Number.isFinite(memUsage) ? memUsage : null,
+    processAllocBytes: source.mem?.processAllocBytes ?? null,
+    processSysBytes: source.mem?.processSysBytes ?? null,
+    usedBytes: source.mem?.usedBytes ?? null,
+    totalBytes: source.mem?.totalBytes ?? null,
+    availableBytes: source.mem?.availableBytes ?? null,
+    source: source.mem?.source || "unavailable",
+    systemAvailable: Boolean(source.mem?.systemAvailable),
   };
   const totalBytesRaw = source.network?.totalBytes;
   const hasRealNetwork = totalBytesRaw !== null && totalBytesRaw !== undefined && Number.isFinite(Number(totalBytesRaw));
@@ -275,12 +338,16 @@ function withSystemFallback(input: SystemInfo | null | undefined): SystemInfo {
         txBytes: source.network?.txBytes === undefined ? null : source.network.txBytes,
         totalBytes: Number(totalBytesRaw),
         sampledAt: source.network?.sampledAt || new Date().toISOString(),
+        available: true,
+        source: source.network?.source || "system",
       }
     : {
         rxBytes: null,
         txBytes: null,
-        totalBytes: 0,
-        sampledAt: new Date().toISOString(),
+        totalBytes: null,
+        sampledAt: source.network?.sampledAt || new Date().toISOString(),
+        available: false,
+        source: source.network?.source || "unavailable",
       };
   return { uptimeSec, cpuCores, mem, network };
 }
@@ -296,11 +363,14 @@ export default function AdminPage() {
   const [system, setSystem] = useState<SystemInfo | null>(null);
   const [health, setHealth] = useState<LinkHealth[]>([]);
   const [logs, setLogs] = useState<LinkLog[]>([]);
-  const [trend7, setTrend7] = useState<Array<{ stat_date: string; link_clicks: number }>>([]);
   const [hourly24, setHourly24] = useState<HourStat[]>([]);
+  const [todayStat, setTodayStat] = useState<StatDay | null>(null);
+  const [topClicks, setTopClicks] = useState<TopClick[]>([]);
   const [activeSection, setActiveSection] = useState("overview");
   const [loadedSections, setLoadedSections] = useState<Record<string, boolean>>({});
   const [healthChecking, setHealthChecking] = useState(false);
+  const [healthProgress, setHealthProgress] = useState<HealthProgress>(null);
+  const [checkingLinkId, setCheckingLinkId] = useState<number | null>(null);
   const [autoDetectDialogOpen, setAutoDetectDialogOpen] = useState(false);
   const [autoDetectEnabled, setAutoDetectEnabled] = useState(false);
   const [autoDetectIntervalMinutes, setAutoDetectIntervalMinutes] = useState(15);
@@ -322,6 +392,13 @@ export default function AdminPage() {
     module: "resource_matrix" as NavModule,
     resource_sub_module: "think_tank" as ResourceSubModule,
   });
+  const [editLinkId, setEditLinkId] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: "",
+    url: "",
+    description: "",
+    sort: 0,
+  });
   const [userForm, setUserForm] = useState({
     username: "",
     password: "",
@@ -334,14 +411,16 @@ export default function AdminPage() {
 
   // 今日 KPI（无数据时使用零值占位）
   const today = useMemo(
-    () =>
-      stats[stats.length - 1] || {
+    () => {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      return todayStat || stats.find((item) => String(item.stat_date).slice(0, 10) === todayKey) || stats[stats.length - 1] || {
         stat_date: new Date().toISOString().slice(0, 10),
         page_views: 0,
         unique_visitors: 0,
         link_clicks: 0,
-      },
-    [stats],
+      };
+    },
+    [stats, todayStat],
   );
 
   const hourlyStats = useMemo(() => {
@@ -369,6 +448,16 @@ export default function AdminPage() {
     const hovered = hoveredHourlyIndex === null ? null : hourlyStats[hoveredHourlyIndex] || null;
     return { totals, hovered };
   }, [hourlyStats, hoveredHourlyIndex]);
+
+  const hasHourlyDetail = useMemo(
+    () => hourlyOverview.totals.page_views > 0 || hourlyOverview.totals.unique_visitors > 0 || hourlyOverview.totals.link_clicks > 0,
+    [hourlyOverview],
+  );
+  const hasDailyActivity = today.page_views > 0 || today.unique_visitors > 0 || today.link_clicks > 0;
+  const hourlyDataNote = hasDailyActivity && !hasHourlyDetail
+    ? "日统计已更新，小时明细暂无事件采样"
+    : "日统计与小时明细来自同一统计接口";
+  const recentLogs = useMemo(() => logs.slice(0, 5), [logs]);
 
   const hourlyLineChart = useMemo(() => {
     const metricKeys: StatMetricKey[] = ["page_views", "unique_visitors", "link_clicks"];
@@ -447,8 +536,10 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (user?.role !== "super" && activeSection === "users") {
-      setActiveSection("overview");
+      const timer = window.setTimeout(() => setActiveSection("overview"), 0);
+      return () => window.clearTimeout(timer);
     }
+    return undefined;
   }, [activeSection, user]);
 
   const healthMapByLinkId = useMemo(() => {
@@ -459,6 +550,15 @@ export default function AdminPage() {
       }
     }
     return map;
+  }, [health]);
+
+  const failedHealth = useMemo(() => health.filter((item) => !isHealthOk(item)), [health]);
+  const latestHealthCheckedAt = useMemo(() => {
+    const timestamps = health
+      .map((item) => Date.parse(String(item.checked_at || "")))
+      .filter((value) => Number.isFinite(value));
+    if (!timestamps.length) return "-";
+    return formatHealthCheckedAt(new Date(Math.max(...timestamps)).toISOString());
   }, [health]);
 
   const monthlyStats = useMemo(() => {
@@ -522,64 +622,6 @@ export default function AdminPage() {
     };
   }, [activeStatMetric, filteredMonthlyStats, hoveredMonthlyIndex]);
 
-  const lineChart = useMemo(() => {
-    const source = trend7.length
-      ? trend7
-      : Array.from({ length: 7 }).map((_, i) => ({
-          stat_date: `D${i + 1}`,
-          link_clicks: 0,
-        }));
-
-    const width = 760;
-    const height = 220;
-    const padding = { top: 18, right: 18, bottom: 32, left: 26 };
-    const innerWidth = width - padding.left - padding.right;
-    const innerHeight = height - padding.top - padding.bottom;
-    const maxValue = Math.max(3, ...source.map((item) => item.link_clicks || 0));
-
-    const points = source.map((item, index) => {
-      const x =
-        padding.left +
-        (source.length === 1 ? innerWidth / 2 : (innerWidth / Math.max(1, source.length - 1)) * index);
-      const y =
-        padding.top +
-        innerHeight -
-        ((item.link_clicks || 0) / maxValue) * innerHeight;
-      return {
-        ...item,
-        x,
-        y,
-      };
-    });
-
-    const buildSmoothPath = (list: typeof points) => {
-      if (!list.length) return "";
-      if (list.length === 1) return `M ${list[0].x} ${list[0].y}`;
-      let path = `M ${list[0].x} ${list[0].y}`;
-      for (let i = 0; i < list.length - 1; i += 1) {
-        const current = list[i];
-        const next = list[i + 1];
-        const midX = (current.x + next.x) / 2;
-        path += ` C ${midX} ${current.y}, ${midX} ${next.y}, ${next.x} ${next.y}`;
-      }
-      return path;
-    };
-
-    const linePath = buildSmoothPath(points);
-
-    const areaPath = points.length
-      ? `${linePath} L ${points[points.length - 1].x} ${padding.top + innerHeight} L ${points[0].x} ${padding.top + innerHeight} Z`
-      : "";
-
-    const yTicks = Array.from({ length: 4 }).map((_, index) => {
-      const value = Math.round((maxValue / 3) * (3 - index));
-      const y = padding.top + (innerHeight / 3) * index;
-      return { value, y };
-    });
-
-    return { width, height, padding, innerWidth, innerHeight, points, linePath, areaPath, yTicks };
-  }, [trend7]);
-
   const markSectionLoaded = useCallback((sectionId: string) => {
     setLoadedSections((prev) => (prev[sectionId] ? prev : { ...prev, [sectionId]: true }));
   }, []);
@@ -589,15 +631,18 @@ export default function AdminPage() {
     const statsData = await readJsonSafe<{
       days?: StatDay[];
       stats?: StatDay[];
-      trend7?: Array<{ stat_date: string; link_clicks: number }>;
+      today?: StatDay;
       hourly24?: HourStat[];
       hourly?: HourStat[];
+      topClicks?: TopClick[];
+      top_clicks?: TopClick[];
     }>(statsRes);
 
     setStats(statsData?.days || statsData?.stats || []);
-    setTrend7(statsData?.trend7 || []);
+    setTodayStat(statsData?.today || null);
     setHourly24(statsData?.hourly24 || statsData?.hourly || []);
-  }, [markSectionLoaded]);
+    setTopClicks(statsData?.topClicks || statsData?.top_clicks || []);
+  }, []);
 
   const loadSystem = useCallback(async () => {
     const sysRes = await fetch("/api/admin/system", { cache: "no-store" });
@@ -714,8 +759,8 @@ export default function AdminPage() {
         }
 
         setUser(me.user);
-        await Promise.all([loadOverview(), loadLinks()]);
-        setLoadedSections({ overview: true, links: true });
+        await Promise.all([loadOverview(), loadLinks(), loadLogs().catch(() => {})]);
+        setLoadedSections({ overview: true, links: true, logs: true });
       } catch {
         setError("加载后台数据失败");
       } finally {
@@ -724,7 +769,15 @@ export default function AdminPage() {
     };
 
     void init();
-  }, [loadLinks, loadOverview, router]);
+  }, [loadLinks, loadLogs, loadOverview, router]);
+
+  useEffect(() => {
+    if (!error) return undefined;
+    const timer = window.setTimeout(() => {
+      setError("");
+    }, ERROR_AUTO_DISMISS_MS);
+    return () => window.clearTimeout(timer);
+  }, [error]);
 
   // 懒加载对应分区数据，并滚动到目标分区
   const scrollToSection = (sectionId: string) => {
@@ -762,22 +815,22 @@ export default function AdminPage() {
   };
 
   const jumpToLinkFromHealth = useCallback(async (item: LinkHealth) => {
-    const module = (item.module || "friend_links") as NavModule;
+    const navModule = (item.module || "friend_links") as NavModule;
     const resourceSubModule = (item.resource_sub_module || "think_tank") as ResourceSubModule;
     setError("");
     setActiveSection("links");
     setLinksNavExpanded(true);
-    setActiveLinkModule(module);
-    if (module === "resource_matrix") {
+    setActiveLinkModule(navModule);
+    if (navModule === "resource_matrix") {
       setActiveResourceSubModule(resourceSubModule);
     }
     setLinkForm((prev) => ({
       ...prev,
-      module,
-      resource_sub_module: module === "resource_matrix" ? resourceSubModule : prev.resource_sub_module,
+      module: navModule,
+      resource_sub_module: navModule === "resource_matrix" ? resourceSubModule : prev.resource_sub_module,
     }));
     try {
-      await fetchLinksForScope(module, module === "resource_matrix" ? resourceSubModule : undefined);
+      await fetchLinksForScope(navModule, navModule === "resource_matrix" ? resourceSubModule : undefined);
       setFocusedLinkId(item.link_id);
     } catch {
       setError("跳转到内容管理失败");
@@ -866,6 +919,40 @@ export default function AdminPage() {
     }
   };
 
+  // 打开编辑弹窗
+  const openEditLink = (item: LinkItem) => {
+    setEditLinkId(item.id);
+    setEditForm({
+      title: item.title,
+      url: item.url,
+      description: item.description || "",
+      sort: item.sort ?? 0,
+    });
+  };
+
+  // 提交编辑
+  const submitEditLink = async (e: FormEvent) => {
+    e.preventDefault();
+    if (editLinkId === null) return;
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/links`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editLinkId, ...editForm }),
+      });
+      const data = await readJsonSafe<{ error?: string }>(res);
+      if (!res.ok) throw new Error(data?.error || "编辑链接失败");
+      setEditLinkId(null);
+      await Promise.all([
+        loadLinks(),
+        loadLogs().catch(() => {}),
+      ]);
+    } catch (err) {
+      setError(String((err as Error).message || "编辑链接失败"));
+    }
+  };
+
   const submitUser = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -928,13 +1015,49 @@ export default function AdminPage() {
     }
   };
 
-  const runHealthCheck = async () => {
+  const runHealthCheck = useCallback(async () => {
     if (healthChecking) return;
     setHealthChecking(true);
+    setHealthProgress({ checked: 0, total: 0, failed: 0 });
+
     try {
-      const res = await fetch("/api/admin/link-health", { method: "POST" });
-      const data = await readJsonSafe<{ error?: string }>(res);
-      if (!res.ok) throw new Error(data?.error || "检测失败");
+      const res = await fetch("/api/admin/link-health?stream=1", { method: "POST" });
+      if (!res.ok) {
+        const data = await readJsonSafe<{ error?: string }>(res);
+        throw new Error(data?.error || "检测失败");
+      }
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error("无法获取响应流");
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6);
+            try {
+              const data = JSON.parse(jsonStr) as HealthProgress;
+              if (data) {
+                setHealthProgress(data);
+              }
+            } catch {
+              // ignore parse errors
+            }
+          }
+        }
+      }
+
       await loadHealth();
       const nowIso = new Date().toISOString();
       setLastAutoDetectAt(nowIso);
@@ -945,6 +1068,29 @@ export default function AdminPage() {
       setError(String((err as Error).message || "检测失败"));
     } finally {
       setHealthChecking(false);
+      // 检测完成后短暂延迟再隐藏进度条（让用户看到100%状态）
+      setTimeout(() => setHealthProgress(null), 500);
+    }
+  }, [healthChecking, loadHealth]);
+
+  const checkSingleLink = async (linkId: number) => {
+    if (checkingLinkId !== null) return;
+    setError("");
+    setCheckingLinkId(linkId);
+    try {
+      const res = await fetch(`/api/admin/link-health/${linkId}`, { method: "POST" });
+      const data = await readJsonSafe<{ error?: string; health?: LinkHealth }>(res);
+      if (!res.ok) throw new Error(data?.error || "检测失败");
+      if (data?.health) {
+        setHealth((prev) => [data.health as LinkHealth, ...prev.filter((item) => item.link_id !== linkId)]);
+      } else {
+        await loadHealth();
+      }
+      void loadLogs().catch(() => {});
+    } catch (err) {
+      setError(String((err as Error).message || "检测失败"));
+    } finally {
+      setCheckingLinkId(null);
     }
   };
 
@@ -977,7 +1123,7 @@ export default function AdminPage() {
       void runHealthCheck();
     }, autoDetectIntervalMinutes * 60 * 1000);
     return () => window.clearInterval(intervalId);
-  }, [autoDetectEnabled, autoDetectIntervalMinutes, healthChecking]);
+  }, [autoDetectEnabled, autoDetectIntervalMinutes, runHealthCheck]);
 
   useEffect(() => {
     if (activeSection !== "health" && activeSection !== "links") return;
@@ -1028,6 +1174,23 @@ export default function AdminPage() {
     return <div style={{ padding: 24 }}>Loading...</div>;
   }
   if (!user) return null;
+
+  const memUsageRate = system?.mem?.usageRate;
+  const hasSystemMem = typeof memUsageRate === "number" && Number.isFinite(memUsageRate);
+  const processMemBytes = system?.mem?.processAllocBytes ?? system?.mem?.processSysBytes ?? null;
+  const memCardLabel = hasSystemMem ? "系统内存" : "进程内存";
+  const memCardValue = hasSystemMem
+    ? `${memUsageRate}%`
+    : processMemBytes !== null ? formatBytes(processMemBytes) : "暂无采样";
+  const memCardMeta = hasSystemMem
+    ? system?.mem?.usedBytes && system?.mem?.totalBytes
+      ? `${formatBytes(system.mem.usedBytes)} / ${formatBytes(system.mem.totalBytes)}`
+      : "系统采样"
+    : processMemBytes !== null ? "Go 运行时采样" : "暂无采样";
+  const networkBytes = system?.network?.totalBytes;
+  const hasNetworkBytes = typeof networkBytes === "number" && Number.isFinite(networkBytes);
+  const networkCardValue = hasNetworkBytes ? formatBytes(networkBytes) : "暂无采样";
+  const networkCardMeta = hasNetworkBytes ? "系统网卡累计" : "本机未开放网卡统计";
 
   return (
     <div className="admin-shell" style={{ display: "grid", gap: 12, position: "relative", zIndex: 1 }}>
@@ -1092,8 +1255,11 @@ export default function AdminPage() {
       </div>
 
       {error ? (
-        <div style={{ color: "#DC2626", fontSize: 12 }}>{error}</div>
+        <div className="admin-console-error" style={{ color: "#B91C1C", fontSize: 13 }}>
+          {error}
+        </div>
       ) : null}
+
       {/* 按当前激活分区显示对应内容 */}
       {activeSection === "overview" ? (
         <div className="admin-section-transition">
@@ -1104,69 +1270,38 @@ export default function AdminPage() {
               </span>
               <div className="admin-console-pagehead-title">首页总览</div>
             </div>
-            <div className="admin-console-pagehead-desc">查看系统运行状态、今日访问数据和后台全局摘要。</div>
+            <div className="admin-console-pagehead-desc">优先看今日访问、点击排行和最近后台操作；内容治理与健康明细保留在对应模块。</div>
           </div>
-          <div className="admin-card admin-overview-panel" style={{ padding: 16, background: "linear-gradient(135deg,#FFFFFF 0%,#F3F8FF 55%,#EEF6FF 100%)", border: "1px solid #DCE8F8", boxShadow: "0 14px 28px rgba(37,99,235,0.08)" }}>
-            <div className="admin-console-title-row" style={{ marginBottom: 10 }}>
-              <span className="admin-console-icon-badge" style={{ background: "linear-gradient(135deg, rgba(37,99,235,0.18), rgba(14,165,233,0.22))", color: "#1D4ED8" }}>
-                <ServerCog size={16} />
-              </span>
-              <div style={{ fontWeight: 700, color: "#0F172A" }}>服务器运行情况</div>
+          <div className="admin-card admin-overview-panel" style={{ padding: 14, background: "linear-gradient(135deg,#FFFFFF 0%,#F7FBFF 100%)", border: "1px solid #DCE8F8", boxShadow: "0 10px 24px rgba(15,23,42,0.06)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+              <div className="admin-console-title-row">
+                <span className="admin-console-icon-badge" style={{ background: "rgba(37,99,235,0.12)", color: "#1D4ED8" }}>
+                  <ServerCog size={16} />
+                </span>
+                <div style={{ fontWeight: 800, color: "#0F172A" }}>运行状态</div>
+              </div>
+              <div style={{ fontSize: 12, color: "#64748B" }}>
+                采样：{formatDateTime(system?.network?.sampledAt)}
+              </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "180px 1fr", gap: 14, alignItems: "center" }}>
-              <div style={{ display: "grid", placeItems: "center" }}>
-                <div
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: "50%",
-                    background: "conic-gradient(#3B82F6 100%, #E2E8F0 0)",
-                    display: "grid",
-                    placeItems: "center",
-                    boxShadow: "0 10px 24px rgba(59,130,246,0.25)",
-                  }}
-                >
-                  <div style={{ width: 90, height: 90, borderRadius: "50%", background: "#fff", border: "1px solid #DBEAFE", display: "grid", placeItems: "center", textAlign: "center" }}>
-                    <div style={{ fontSize: 11, color: "#64748B" }}>流量消耗量</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: "#1D4ED8", lineHeight: 1.25 }}>
-                      {formatBytes(system?.network?.totalBytes)}
-                    </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+              {[
+                { label: "服务状态", value: system ? "在线" : "等待采样", meta: "5 秒自动刷新", icon: ShieldCheck, color: system ? "#059669" : "#64748B", bg: "rgba(5,150,105,0.12)" },
+                { label: "运行时长", value: formatDurationFromSec(system?.uptimeSec ?? 0), meta: "后端进程", icon: Clock3, color: "#2563EB", bg: "rgba(37,99,235,0.12)" },
+                { label: memCardLabel, value: memCardValue, meta: memCardMeta, icon: Gauge, color: "#0EA5E9", bg: "rgba(14,165,233,0.12)" },
+                { label: "网络流量", value: networkCardValue, meta: networkCardMeta, icon: Activity, color: hasNetworkBytes ? "#7C3AED" : "#64748B", bg: hasNetworkBytes ? "rgba(124,58,237,0.12)" : "rgba(100,116,139,0.12)" },
+              ].map((item) => (
+                <div key={item.label} style={{ border: "1px solid #E2E8F0", borderRadius: 10, background: "#FFFFFF", padding: 12, display: "grid", gap: 8, minHeight: 92 }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 12, color: "#64748B", fontWeight: 600 }}>{item.label}</span>
+                    <span className="admin-console-icon-badge" style={{ width: 30, height: 30, background: item.bg, color: item.color }}>
+                      <item.icon size={14} />
+                    </span>
                   </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", whiteSpace: "nowrap" }}>{item.value}</div>
+                  <div style={{ fontSize: 11, color: "#94A3B8" }}>{item.meta}</div>
                 </div>
-              </div>
-              <div style={{ display: "grid", gap: 10 }}>
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
-                    <span>运行时长</span>
-                    <span>{formatDurationFromSec(system?.uptimeSec ?? 0)}</span>
-                  </div>
-                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, Math.max(8, ((system?.uptimeSec ?? 0) / 86400) * 100))}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#93C5FD,#2563EB)" }} />
-                  </div>
-                </div>
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
-                    <span>CPU 核心数</span>
-                    <span>{system?.cpuCores ?? 0} cores</span>
-                  </div>
-                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, ((system?.cpuCores ?? 0) / 32) * 100)}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#60A5FA,#2563EB)" }} />
-                  </div>
-                </div>
-                <div style={{ display: "grid", gap: 4 }}>
-                  <div style={{ fontSize: 12, color: "#334155", display: "flex", justifyContent: "space-between" }}>
-                    <span>内存占用</span>
-                    <span>{system?.mem?.usageRate ?? 0}%</span>
-                  </div>
-                  <div style={{ height: 9, borderRadius: 999, background: "#E2E8F0", overflow: "hidden" }}>
-                    <div style={{ width: `${Math.min(100, system?.mem?.usageRate ?? 0)}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#22D3EE,#0EA5E9)" }} />
-                  </div>
-                </div>
-                <div style={{ marginTop: 2, fontSize: 12, color: "#64748B", display: "flex", justifyContent: "space-between" }}>
-                  <span>服务状态实时更新</span>
-                  <span>{system?.network?.sampledAt ? `采样: ${String(system.network.sampledAt).replace("T", " ").slice(0, 19)}` : "采样: -"}</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -1174,27 +1309,99 @@ export default function AdminPage() {
             className="admin-console-kpi-grid"
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
               gap: 10,
             }}
           >
-            {[ 
-              { label: "今日访问量 (PV)", value: today.page_views, icon: Eye, tint: "linear-gradient(135deg, rgba(14,165,233,0.16), rgba(14,165,233,0.26))", color: "#0EA5E9" },
-              { label: "今日访客数 (UV)", value: today.unique_visitors, icon: Users, tint: "linear-gradient(135deg, rgba(5,150,105,0.16), rgba(16,185,129,0.24))", color: "#059669" },
-              { label: "今日点击量", value: today.link_clicks, icon: MousePointerClick, tint: "linear-gradient(135deg, rgba(37,99,235,0.16), rgba(59,130,246,0.26))", color: "#1D4ED8" },
+            {[
+              { label: "今日访问量 (PV)", value: today.page_views, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.page_views}` : "日统计口径", icon: Eye, tint: "rgba(14,165,233,0.14)", color: "#0EA5E9" },
+              { label: "今日访客数 (UV)", value: today.unique_visitors, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.unique_visitors}` : "日统计口径", icon: Users, tint: "rgba(5,150,105,0.14)", color: "#059669" },
+              { label: "今日点击量", value: today.link_clicks, detail: hasHourlyDetail ? `小时明细 ${hourlyOverview.totals.link_clicks}` : "日统计口径", icon: MousePointerClick, tint: "rgba(37,99,235,0.14)", color: "#1D4ED8" },
             ].map((item) => (
-              <div key={item.label} className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 12, background: "rgba(214,231,250,0.95)", borderColor: "#93C5FD", boxShadow: "0 10px 26px rgba(37,99,235,0.16)" }}>
+              <div key={item.label} className="admin-card admin-console-kpi-card admin-overview-panel" style={{ padding: 14, background: "#FFFFFF", borderColor: "#E2E8F0", boxShadow: "0 10px 24px rgba(15,23,42,0.06)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <div style={{ fontSize: 12, color: "#334155", fontWeight: 600 }}>{item.label}</div>
+                  <div style={{ fontSize: 12, color: "#334155", fontWeight: 700 }}>{item.label}</div>
                   <span className="admin-console-icon-badge" style={{ background: item.tint, color: item.color }}>
                     <item.icon size={14} />
                   </span>
                 </div>
-                <div style={{ fontSize: 26, color: "#1D4ED8", fontWeight: 800 }}>
+                <div style={{ fontSize: 28, color: item.color, fontWeight: 850, lineHeight: 1 }}>
                   {item.value}
                 </div>
+                <div style={{ fontSize: 12, color: "#64748B" }}>{item.detail}</div>
               </div>
             ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12 }}>
+            <div className="admin-card admin-overview-panel" style={{ padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div className="admin-console-title-row">
+                  <span className="admin-console-icon-badge" style={{ background: "rgba(37,99,235,0.12)", color: "#2563EB" }}>
+                    <TrendingUp size={15} />
+                  </span>
+                  <div style={{ fontWeight: 800, color: "#0F172A" }}>今日点击排行</div>
+                </div>
+                <span style={{ fontSize: 12, color: "#64748B" }}>{topClicks.length ? "Top 5" : "暂无点击"}</span>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {topClicks.length ? topClicks.map((item, index) => (
+                  <div key={`${item.link_id || item.url || item.title}-${index}`} style={{ display: "grid", gridTemplateColumns: "28px minmax(0, 1fr) auto", gap: 10, alignItems: "center", border: "1px solid #F1F5F9", borderRadius: 10, padding: "9px 10px", background: index === 0 ? "#F8FAFF" : "#FFFFFF" }}>
+                    <div style={{ width: 24, height: 24, borderRadius: 999, display: "grid", placeItems: "center", background: index === 0 ? "#DBEAFE" : "#F1F5F9", color: index === 0 ? "#1D4ED8" : "#64748B", fontSize: 12, fontWeight: 800 }}>
+                      {index + 1}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.title || "未命名链接"}</div>
+                      <div style={{ fontSize: 11, color: "#64748B", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {moduleLabel(item.module, item.resource_sub_module)}
+                        {item.url ? ` · ${item.url}` : ""}
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: "#2563EB" }}>{Number(item.clicks || 0)}</div>
+                  </div>
+                )) : (
+                  <div style={{ border: "1px dashed #CBD5E1", borderRadius: 10, padding: 14, color: "#64748B", fontSize: 13, background: "#F8FAFC" }}>
+                    今日还没有可排序的点击事件。
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="admin-card admin-overview-panel" style={{ padding: 14, display: "grid", gap: 12, alignContent: "start", background: "#FFFFFF", borderColor: "#E2E8F0" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                <div className="admin-console-title-row">
+                  <span className="admin-console-icon-badge" style={{ background: "rgba(15,118,110,0.12)", color: "#0F766E" }}>
+                    <ListChecks size={15} />
+                  </span>
+                  <div style={{ fontWeight: 800, color: "#0F172A" }}>最近操作</div>
+                </div>
+                <button type="button" onClick={() => scrollToSection("logs")} className="admin-btn-ghost" style={{ height: 30, padding: "0 10px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  查看全部 <ArrowRight size={13} />
+                </button>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {recentLogs.length ? recentLogs.map((log) => {
+                  const tag = getActionTag(log.action);
+                  return (
+                    <div key={log.id} style={{ border: "1px solid #F1F5F9", borderRadius: 10, padding: "9px 10px", display: "grid", gap: 5, background: "#FFFFFF" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                        <span style={{ display: "inline-flex", alignItems: "center", borderRadius: 999, padding: "2px 8px", fontSize: 11, fontWeight: 700, color: tag.fg, background: tag.bg }}>
+                          {tag.text}
+                        </span>
+                        <span style={{ fontSize: 11, color: "#94A3B8", whiteSpace: "nowrap" }}>{formatDateTime(log.created_at)}</span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#334155", lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {formatLogObjectAndDetail(log)}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#64748B" }}>{log.actor_username || "-"} · {log.actor_role || "-"}</div>
+                    </div>
+                  );
+                }) : (
+                  <div style={{ border: "1px dashed #CBD5E1", borderRadius: 10, padding: 14, color: "#64748B", fontSize: 13, background: "#F8FAFC" }}>
+                    暂无后台操作日志。
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           <div className="admin-card admin-console-chart-card admin-console-anchor-card admin-overview-panel" style={{ padding: 12 }}>
             <div style={{ display: "grid", gap: 10 }}>
@@ -1207,7 +1414,7 @@ export default function AdminPage() {
                     <div style={{ fontWeight: 800, color: "#0F172A" }}>今日概况（24 小时）</div>
                   </div>
                   <div style={{ fontSize: 12, color: "#64748B", lineHeight: 1.5 }}>
-                    按小时展示访问量、访客数与点击量的变化趋势。
+                    按小时展示访问量、访客数与点击量的变化趋势。{hourlyDataNote}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1248,14 +1455,21 @@ export default function AdminPage() {
                 }}
               >
                 <div style={{ fontSize: 12, color: "#475569", fontWeight: 700 }}>
-                  {hourlyOverview.hovered ? `${String(hourlyOverview.hovered.hour).padStart(2, "0")}:00 - ${String(hourlyOverview.hovered.hour).padStart(2, "0")}:59` : "今日累计"}
+                  {hourlyOverview.hovered
+                    ? `${String(hourlyOverview.hovered.hour).padStart(2, "0")}:00 - ${String(hourlyOverview.hovered.hour).padStart(2, "0")}:59`
+                    : hasHourlyDetail ? "今日累计（小时明细）" : "今日累计（日统计）"}
                 </div>
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                  {(Object.keys(STAT_METRIC_META) as StatMetricKey[]).map((metricKey) => (
-                    <span key={`hourly-overview-${metricKey}`} style={{ fontSize: 12, color: STAT_METRIC_META[metricKey].color, fontWeight: 700 }}>
-                      {STAT_METRIC_META[metricKey].label}：{hourlyOverview.hovered ? Number(hourlyOverview.hovered[metricKey] || 0) : Number(hourlyOverview.totals[metricKey] || 0)}
-                    </span>
-                  ))}
+                  {(Object.keys(STAT_METRIC_META) as StatMetricKey[]).map((metricKey) => {
+                    const value = hourlyOverview.hovered
+                      ? Number(hourlyOverview.hovered[metricKey] || 0)
+                      : hasHourlyDetail ? Number(hourlyOverview.totals[metricKey] || 0) : Number(today[metricKey] || 0);
+                    return (
+                      <span key={`hourly-overview-${metricKey}`} style={{ fontSize: 12, color: STAT_METRIC_META[metricKey].color, fontWeight: 700 }}>
+                        {STAT_METRIC_META[metricKey].label}：{value}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1653,7 +1867,14 @@ export default function AdminPage() {
                 >
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.url}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                    <PortalTooltip
+                      trigger={item.url}
+                      content={item.description || undefined}
+                      id={`admin-link-url-tooltip-${item.id}`}
+                      title={item.description || item.url}
+                    />
+                  </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" }}>
                     {item.created_at ? String(item.created_at).replace("T", " ").slice(0, 19) : "-"}
@@ -1661,12 +1882,53 @@ export default function AdminPage() {
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontWeight: 600 }}>
                     {(() => {
                       const h = healthMapByLinkId.get(item.id);
-                      if (!h) return <span style={{ color: "#64748B" }}>未检测</span>;
-                      if (h.is_ok) return <span style={{ color: "#059669" }}>有效</span>;
-                      return <span style={{ color: "#DC2626" }}>异常</span>;
+                      const isChecking = checkingLinkId === item.id;
+                      if (isChecking) {
+                        return (
+                          <button
+                            type="button"
+                            disabled
+                            className="admin-link-health-trigger admin-link-health-trigger--checking"
+                          >
+                            检测中...
+                          </button>
+                        );
+                      }
+                      if (!h) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => checkSingleLink(item.id)}
+                            className="admin-link-health-trigger admin-link-health-trigger--unknown"
+                          >
+                            未检测
+                          </button>
+                        );
+                      }
+                      if (isHealthOk(h)) {
+                        return (
+                          <button
+                            type="button"
+                            onClick={() => checkSingleLink(item.id)}
+                            className="admin-link-health-trigger admin-link-health-trigger--ok"
+                          >
+                            有效
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => checkSingleLink(item.id)}
+                          className="admin-link-health-trigger admin-link-health-trigger--bad"
+                        >
+                          异常
+                        </button>
+                      );
                     })()}
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
+                    <button type="button" onClick={() => openEditLink(item)} className="admin-btn-ghost" style={{ color: "#1D4ED8", borderColor: "#93C5FD" }}>编辑</button>
                     <button type="button" onClick={() => removeLink(item.id)} className="admin-btn-ghost" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}>删除</button>
                   </td>
                 </tr>
@@ -1681,40 +1943,107 @@ export default function AdminPage() {
       </div>
       ) : null}
 
+      {/* 编辑链接弹窗 */}
+      {editLinkId !== null && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.35)", backdropFilter: "blur(4px)" }} onClick={() => setEditLinkId(null)}>
+          <form
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={submitEditLink}
+            style={{ background: "#fff", borderRadius: 14, padding: 28, width: 520, maxWidth: "90vw", boxShadow: "0 24px 64px rgba(15,23,42,0.18)", display: "grid", gap: 16 }}
+          >
+            <div style={{ fontSize: 17, fontWeight: 700, color: "#0F172A" }}>编辑链接</div>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>标题</span>
+              <input className="admin-input" value={editForm.title} onChange={(e) => setEditForm({ ...editForm, title: e.target.value })} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>URL</span>
+              <input className="admin-input" value={editForm.url} onChange={(e) => setEditForm({ ...editForm, url: e.target.value })} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>描述</span>
+              <input className="admin-input" value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
+            </label>
+            <label style={{ display: "grid", gap: 4 }}>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>排序</span>
+              <input className="admin-input" type="number" value={editForm.sort} onChange={(e) => setEditForm({ ...editForm, sort: Number(e.target.value || 0) })} />
+            </label>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+              <button type="button" onClick={() => setEditLinkId(null)} className="admin-btn-ghost" style={{ color: "#334155" }}>取消</button>
+              <button type="submit" className="admin-btn" style={{ background: "#1890FF", color: "#fff" }}>保存</button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {activeSection === "health" ? (
       <div className="admin-section-transition">
       <div className="admin-card admin-console-pagehead" style={{ padding: 18, border: "1px solid #E6ECF5", background: "linear-gradient(180deg,#FFFFFF 0%,#F8FBFF 100%)" }}>
         <div className="admin-console-pagehead-title">链接健康检测</div>
-        <div className="admin-console-pagehead-desc">监控链接可用性、异常比例与最近探测结果。</div>
+        <div className="admin-console-pagehead-desc">逐个探测所有启用链接；下方仅展示异常对象，正常状态在内容管理中查看。</div>
       </div>
       <div id="health" className="admin-card" style={{ padding: 20, background: "#F3F6FA", border: "1px solid #E6ECF5", borderRadius: 12, display: "grid", gap: 16, boxShadow: "0 8px 24px rgba(15,23,42,0.04)" }}>
         <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", gap: 12 }}>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, boxShadow: "inset 0 0 0 1px rgba(24,144,255,0.06)" }}>
             <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评估</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: "#1890FF" }}>
-              {health.length ? `${Math.round((health.filter((h) => h.is_ok).length / health.length) * 100)}%` : "100%"}
+              {health.length ? `${Math.round(((health.length - failedHealth.length) / health.length) * 100)}%` : "-"}
             </div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>总监控项</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>已检测项</div>
             <div style={{ fontSize: 22, fontWeight: 700 }}>{health.length}</div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>正常</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#059669" }}>{health.filter((h) => h.is_ok).length}</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>异常</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#DC2626" }}>{failedHealth.length}</div>
           </div>
           <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>异常</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#DC2626" }}>{health.filter((h) => !h.is_ok).length}</div>
+            <div style={{ fontSize: 12, color: "#64748B" }}>最近探测</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap" }}>{latestHealthCheckedAt}</div>
           </div>
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: "10px 12px" }}>
-          <div style={{ display: "grid", gap: 4 }}>
-            <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
-            <div style={{ fontSize: 12, color: "#64748B" }}>
-              {autoDetectEnabled
-                ? `自动检测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
-                : "自动检测未开启"}
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+            {/* 进度条看板 - 仅手动触发时显示 */}
+            {healthProgress && healthProgress.total > 0 && (
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                minWidth: 280,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", gap: 0, marginBottom: 4, height: 8 }}>
+                    <div style={{
+                      width: `${Math.min(100, (healthProgress.checked / healthProgress.total) * 100)}%`,
+                      height: 8,
+                      borderRadius: "4px 0 0 4px",
+                      background: "linear-gradient(90deg, #93C5FD, #2563EB)",
+                      transition: "width 0.15s ease",
+                    }} />
+                    <div style={{
+                      flex: 1,
+                      height: 8,
+                      borderRadius: "0 4px 4px 0",
+                      background: "#E2E8F0",
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 12, color: "#475569", whiteSpace: "nowrap" }}>
+                    {Math.round((healthProgress.checked / healthProgress.total) * 100)}%
+                    · {healthProgress.checked}/{healthProgress.total}
+                    {healthProgress.failed > 0 && <span style={{ color: "#DC2626", marginLeft: 4 }}>异常 {healthProgress.failed}</span>}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div style={{ display: "grid", gap: 4 }}>
+              <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
+              <div style={{ fontSize: 12, color: "#64748B" }}>
+                {autoDetectEnabled
+                  ? `自动检测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
+                  : "自动检测未开启"}
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -1742,42 +2071,39 @@ export default function AdminPage() {
               </tr>
             </thead>
             <tbody>
-              {(health.length ? health : [{ link_id: 0, title: "暂无数据", status_code: null, is_ok: 1, message: "", checked_at: "-" }]).map((h) => (
-                <tr key={h.link_id} style={{ background: h.is_ok ? "#fff" : "#FFF1F0" }}>
+              {failedHealth.map((h) => (
+                <tr key={h.link_id} style={{ background: "#FFF1F0" }}>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>
-                    {h.link_id ? (
-                      <button
-                        type="button"
-                        onClick={() => { void jumpToLinkFromHealth(h); }}
-                        className="admin-btn-ghost"
-                        style={{ padding: "2px 8px", height: "auto", borderRadius: 6 }}
-                      >
-                        {h.title || `#${h.link_id}`}
-                      </button>
-                    ) : (h.title || `#${h.link_id}`)}
+                    <button
+                      type="button"
+                      onClick={() => { void jumpToLinkFromHealth(h); }}
+                      className="admin-btn-ghost"
+                      style={{ padding: "2px 8px", height: "auto", borderRadius: 6 }}
+                    >
+                      {h.title || `#${h.link_id}`}
+                    </button>
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }}>
-                    {(() => {
-                      const module = (h.module || "friend_links") as NavModule;
-                      const sub = (h.resource_sub_module || "think_tank") as ResourceSubModule;
-                      const moduleLabel = NAV_MODULE_META[module]?.label || "未知";
-                      if (module !== "resource_matrix") return moduleLabel;
-                      return `${moduleLabel} / ${RESOURCE_SUB_MODULE_META[sub]?.label || "智库"}`;
-                    })()}
+                    {moduleLabel(h.module, h.resource_sub_module)}
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    <span style={{ color: h.is_ok ? "#059669" : "#DC2626", fontWeight: 700 }}>
-                      {h.is_ok ? "运行正常" : "服务不可用"}
+                    <span style={{ color: "#DC2626", fontWeight: 700 }}>
+                      {healthStatusText(h)}
                     </span>
-                    {!h.is_ok && h.status_code ? <span style={{ marginLeft: 8, fontSize: 12, background: "#F3F4F6", padding: "2px 8px", borderRadius: 999, color: "#475569" }}>HTTP {h.status_code}</span> : null}
+                    {h.message ? <span style={{ marginLeft: 8, fontSize: 12, color: "#64748B" }}>{h.message}</span> : null}
                   </td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }} title={String(h.checked_at || "")}>
-                    {String(h.checked_at || "").replace("T", " ").slice(0, 19)}
+                    {formatHealthCheckedAt(h.checked_at)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {!failedHealth.length ? (
+            <div style={{ padding: "14px", color: "#64748B", fontSize: 13, borderTop: "1px solid #F1F5F9" }}>
+              当前没有异常链接
+            </div>
+          ) : null}
         </div>
       </div>
       </div>
@@ -1984,7 +2310,3 @@ function formatLogObjectAndDetail(log: LinkLog): string {
   if (detail === "-") return target;
   return `${target} | ${detail}`;
 }
-
-
-
-

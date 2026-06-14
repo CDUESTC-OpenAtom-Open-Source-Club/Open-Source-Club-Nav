@@ -6,15 +6,14 @@ export async function GET(request: Request) {
 
   try {
     const raw = await resp.json();
-    // Go 閸氬海顏潻鏂挎礀 { userId, username, role }閿涘苯澧犵粩顖涙埂閺?{ user: { id, username, role } }
+    const source = raw.user ?? raw;
     const user = {
-      id: raw.userId ?? raw.id,
-      username: raw.username,
-      role: raw.role,
+      id: source.userId ?? source.id,
+      username: source.username,
+      role: source.role,
     };
     return Response.json({ user });
   } catch {
     return Response.json({ error: "鐟欙絾鐎介悽銊﹀煕娣団剝浼呮径杈Е" }, { status: 500 });
   }
 }
-

@@ -18,6 +18,8 @@ const RESOURCE_SUB_DEFAULT_TAG = {
   tools: "Dev",
 };
 
+const PUBLIC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 const TAG_COLORS = {
   Learning: { bg: "#EFF6FF", text: "#2563EB", border: "#BFDBFE" },
   Practice: { bg: "#F0FDF4", text: "#059669", border: "#BBF7D0" },
@@ -1159,7 +1161,7 @@ export default function CentralHub({
         const subModules = ["think_tank", "campus", "tools"];
         const responses = await Promise.all(
           subModules.map((subModule) =>
-            fetch(`/api/links?module=resource_matrix&resource_sub_module=${subModule}`, { cache: "no-store" })
+            fetch(`/api/links?module=resource_matrix&resource_sub_module=${subModule}`)
               .then((res) => (res.ok ? res.json() : null))
               .catch(() => null),
           ),
@@ -1208,7 +1210,7 @@ export default function CentralHub({
     void syncResourceCategories();
     const timer = setInterval(() => {
       void syncResourceCategories();
-    }, 5000);
+    }, PUBLIC_REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(timer);
@@ -1221,8 +1223,8 @@ export default function CentralHub({
     const syncHomeStats = async () => {
       try {
         const [orgStatsRes, activitiesRes] = await Promise.all([
-          fetch(ORG_STATS_API, { cache: "no-store" }),
-          fetch(ACTIVITIES_API, { cache: "no-store" }),
+          fetch(ORG_STATS_API),
+          fetch(ACTIVITIES_API),
         ]);
         const [orgStats, activityPayload] = await Promise.all([
           orgStatsRes.ok ? orgStatsRes.json() : null,
@@ -1244,7 +1246,7 @@ export default function CentralHub({
     };
 
     syncHomeStats();
-    const refreshId = setInterval(syncHomeStats, 120000);
+    const refreshId = setInterval(syncHomeStats, PUBLIC_REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearInterval(refreshId);
@@ -1386,7 +1388,7 @@ export default function CentralHub({
                 ))}
               </div>
 
-              <GlobeCanvas size={globeSize} />
+              <GlobeCanvas size={globeSize} isDarkMode={isDarkMode} />
 
               {/* 右侧 HUD 面板 */}
               <div

@@ -19,6 +19,7 @@ const BASE_FRIEND_LINKS = [
 ];
 
 const PANEL_WIDTH = "clamp(214px, 16vw, 252px)";
+const PUBLIC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const applyCategoryHoverStyle = (target: HTMLElement) => {
   target.style.background = "#F8FAFC";
@@ -72,7 +73,7 @@ export default function LeftPanel({
 
     const syncFriendLinks = async () => {
       try {
-        const res = await fetch("/api/links?module=friend_links", { cache: "no-store" });
+        const res = await fetch("/api/links?module=friend_links");
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
         const list = Array.isArray(data?.links) ? data.links : [];
@@ -92,7 +93,7 @@ export default function LeftPanel({
     void syncFriendLinks();
     const timer = window.setInterval(() => {
       void syncFriendLinks();
-    }, 5000);
+    }, PUBLIC_REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
@@ -104,7 +105,7 @@ export default function LeftPanel({
 
     const syncMiniGames = async () => {
       try {
-        const res = await fetch("/api/links?module=mini_games", { cache: "no-store" });
+        const res = await fetch("/api/links?module=mini_games");
         if (!res.ok) return;
         const data = await res.json().catch(() => null);
         const list = Array.isArray(data?.links) ? data.links : [];
@@ -124,7 +125,7 @@ export default function LeftPanel({
     void syncMiniGames();
     const timer = window.setInterval(() => {
       void syncMiniGames();
-    }, 5000);
+    }, PUBLIC_REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

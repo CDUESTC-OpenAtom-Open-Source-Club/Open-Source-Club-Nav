@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 
 type Particle = {
   x: number;
@@ -34,8 +35,33 @@ type GridPulse = {
   amp: number;
 };
 
-export default function TechBackground() {
+type TechBackgroundProps = {
+  isDarkMode?: boolean;
+};
+
+const getTheme = (isDarkMode: boolean) => ({
+  primaryRgb: isDarkMode ? "59,130,246" : "37,99,235",
+  gridAlpha: isDarkMode ? 0.035 : 0.018,
+  pulseBaseAlpha: isDarkMode ? 0.05 : 0.025,
+  scanAlpha: isDarkMode ? 0.09 : 0.04,
+  glowAlpha: isDarkMode ? 0.06 : 0.025,
+  mouseGlowAlpha: isDarkMode ? 0.12 : 0.05,
+  mouseStrokeAlpha: isDarkMode ? 0.2 : 0.08,
+  particleLinkAlpha: isDarkMode ? 0.08 : 0.035,
+  mouseLinkAlpha: isDarkMode ? 0.12 : 0.05,
+  orbitAlpha: isDarkMode ? 0.2 : 0.08,
+  canvasOpacity: isDarkMode ? 0.65 : 0.36,
+  canvasFilter: isDarkMode ? "saturate(1)" : "saturate(0.78) brightness(1.08)",
+  blendMode: isDarkMode ? "screen" : "multiply",
+});
+
+export default function TechBackground({ isDarkMode = false }: TechBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const themeRef = useRef(getTheme(isDarkMode));
+
+  useEffect(() => {
+    themeRef.current = getTheme(isDarkMode);
+  }, [isDarkMode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -101,13 +127,14 @@ export default function TechBackground() {
       }
 
       orbits = [];
+      const theme = themeRef.current;
       for (let i = 0; i < 3; i += 1) {
         orbits.push({
           x: Math.random() * canvas.width,
           y: Math.random() * canvas.height,
           r: 0,
           speed: Math.random() * 0.5 + 0.2,
-          opacity: 0.2,
+          opacity: theme.orbitAlpha,
         });
       }
 
@@ -129,11 +156,12 @@ export default function TechBackground() {
     };
 
     const drawGrid = () => {
+      const theme = themeRef.current;
       const step = 40;
       ctx.lineWidth = 0.5;
 
       for (let x = 0; x <= canvas.width; x += step) {
-        ctx.strokeStyle = "rgba(59,130,246,0.035)";
+        ctx.strokeStyle = `rgba(${theme.primaryRgb},${theme.gridAlpha})`;
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, canvas.height);
@@ -141,7 +169,7 @@ export default function TechBackground() {
       }
 
       for (let y = 0; y <= canvas.height; y += step) {
-        ctx.strokeStyle = "rgba(59,130,246,0.035)";
+        ctx.strokeStyle = `rgba(${theme.primaryRgb},${theme.gridAlpha})`;
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(canvas.width, y);
@@ -152,9 +180,9 @@ export default function TechBackground() {
         const pulse = gridPulses[i];
         const alpha = Math.max(
           0,
-          Math.sin(time * 1.6 + pulse.phase) * pulse.amp + 0.05,
+          Math.sin(time * 1.6 + pulse.phase) * pulse.amp + theme.pulseBaseAlpha,
         );
-        ctx.fillStyle = `rgba(59,130,246,${alpha})`;
+        ctx.fillStyle = `rgba(${theme.primaryRgb},${alpha})`;
         ctx.beginPath();
         ctx.arc(pulse.x, pulse.y, 1, 0, Math.PI * 2);
         ctx.fill();
@@ -162,17 +190,19 @@ export default function TechBackground() {
     };
 
     const drawScanLine = () => {
+      const theme = themeRef.current;
       time += 0.005;
       const scanY = (Math.sin(time) * 0.5 + 0.5) * canvas.height;
       const grad = ctx.createLinearGradient(0, scanY - 40, 0, scanY + 40);
-      grad.addColorStop(0, "rgba(59,130,246,0)");
-      grad.addColorStop(0.5, "rgba(59,130,246,0.09)");
-      grad.addColorStop(1, "rgba(59,130,246,0)");
+      grad.addColorStop(0, `rgba(${theme.primaryRgb},0)`);
+      grad.addColorStop(0.5, `rgba(${theme.primaryRgb},${theme.scanAlpha})`);
+      grad.addColorStop(1, `rgba(${theme.primaryRgb},0)`);
       ctx.fillStyle = grad;
       ctx.fillRect(0, scanY - 40, canvas.width, 80);
     };
 
     const drawAtmosphericGlow = () => {
+      const theme = themeRef.current;
       const grad = ctx.createRadialGradient(
         canvas.width * (0.5 + Math.sin(time * 0.3) * 0.18),
         canvas.height * (0.5 + Math.cos(time * 0.3) * 0.18),
@@ -181,14 +211,15 @@ export default function TechBackground() {
         canvas.height * 0.5,
         canvas.width * 0.8,
       );
-      grad.addColorStop(0, "rgba(59,130,246,0.06)");
-      grad.addColorStop(1, "rgba(59,130,246,0)");
+      grad.addColorStop(0, `rgba(${theme.primaryRgb},${theme.glowAlpha})`);
+      grad.addColorStop(1, `rgba(${theme.primaryRgb},0)`);
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     };
 
     const drawMouseEffect = () => {
       if (!mouse.active) return;
+      const theme = themeRef.current;
 
       const grad = ctx.createRadialGradient(
         mouse.x,
@@ -198,14 +229,14 @@ export default function TechBackground() {
         mouse.y,
         100,
       );
-      grad.addColorStop(0, "rgba(59,130,246,0.12)");
-      grad.addColorStop(1, "rgba(59,130,246,0)");
+      grad.addColorStop(0, `rgba(${theme.primaryRgb},${theme.mouseGlowAlpha})`);
+      grad.addColorStop(1, `rgba(${theme.primaryRgb},0)`);
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(mouse.x, mouse.y, 100, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = "rgba(59,130,246,0.2)";
+      ctx.strokeStyle = `rgba(${theme.primaryRgb},${theme.mouseStrokeAlpha})`;
       ctx.lineWidth = 0.5;
       ctx.beginPath();
       ctx.moveTo(mouse.x - 15, mouse.y);
@@ -216,6 +247,7 @@ export default function TechBackground() {
     };
 
     const updateAndDrawParticles = () => {
+      const theme = themeRef.current;
       const speedFactor = Math.min(1, mouse.speed / 48);
       const mouseInfluenceScale = 1 - speedFactor * 0.5;
       const particleLinkScale = 1 - speedFactor * 0.7;
@@ -241,7 +273,7 @@ export default function TechBackground() {
         if (p1.y > canvas.height) p1.y = 0;
         if (p1.y < 0) p1.y = canvas.height;
 
-        ctx.fillStyle = `rgba(59,130,246,${p1.opacity})`;
+        ctx.fillStyle = `rgba(${theme.primaryRgb},${p1.opacity})`;
         ctx.beginPath();
         ctx.arc(p1.x, p1.y, p1.size, 0, Math.PI * 2);
         ctx.fill();
@@ -251,7 +283,7 @@ export default function TechBackground() {
             (mouse.x - p1.x) ** 2 + (mouse.y - p1.y) ** 2,
           );
           if (dist < 150) {
-            ctx.strokeStyle = `rgba(59,130,246,${0.12 * (1 - dist / 150) * mouseLinkScale})`;
+            ctx.strokeStyle = `rgba(${theme.primaryRgb},${theme.mouseLinkAlpha * (1 - dist / 150) * mouseLinkScale})`;
             ctx.beginPath();
             ctx.moveTo(mouse.x, mouse.y);
             ctx.lineTo(p1.x, p1.y);
@@ -264,7 +296,7 @@ export default function TechBackground() {
           const p2 = particles[j];
           const dist = Math.sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2);
           if (dist < 100) {
-            ctx.strokeStyle = `rgba(59,130,246,${0.08 * (1 - dist / 100) * particleLinkScale})`;
+            ctx.strokeStyle = `rgba(${theme.primaryRgb},${theme.particleLinkAlpha * (1 - dist / 100) * particleLinkScale})`;
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(p2.x, p2.y);
@@ -275,6 +307,7 @@ export default function TechBackground() {
     };
 
     const updateAndDrawStreams = () => {
+      const theme = themeRef.current;
       dataStreams.forEach((stream) => {
         stream.y += stream.speed;
         if (stream.y > canvas.height) stream.y = -stream.len;
@@ -285,10 +318,10 @@ export default function TechBackground() {
           0,
           stream.y + stream.len,
         );
-        grad.addColorStop(0, "rgba(59,130,246,0)");
+        grad.addColorStop(0, `rgba(${theme.primaryRgb},0)`);
         grad.addColorStop(
           1,
-          `rgba(59,130,246,${stream.opacity})`,
+          `rgba(${theme.primaryRgb},${stream.opacity})`,
         );
 
         ctx.strokeStyle = grad;
@@ -301,6 +334,7 @@ export default function TechBackground() {
     };
 
     const updateAndDrawOrbits = () => {
+      const theme = themeRef.current;
       orbits.forEach((orbit) => {
         let currentSpeed = orbit.speed;
         let decay = 0.002;
@@ -320,12 +354,12 @@ export default function TechBackground() {
         orbit.opacity -= decay;
         if (orbit.opacity <= 0) {
           orbit.r = 0;
-          orbit.opacity = 0.2;
+          orbit.opacity = theme.orbitAlpha;
           orbit.x = Math.random() * canvas.width;
           orbit.y = Math.random() * canvas.height;
         }
 
-        ctx.strokeStyle = `rgba(59,130,246,${orbit.opacity})`;
+        ctx.strokeStyle = `rgba(${theme.primaryRgb},${orbit.opacity})`;
         ctx.lineWidth = 0.5;
         ctx.beginPath();
         ctx.arc(orbit.x, orbit.y, orbit.r, 0, Math.PI * 2);
@@ -386,6 +420,8 @@ export default function TechBackground() {
     };
   }, []);
 
+  const renderedTheme = getTheme(isDarkMode);
+
   return (
     <canvas
       ref={canvasRef}
@@ -395,7 +431,9 @@ export default function TechBackground() {
         width: "100%",
         height: "100%",
         pointerEvents: "none",
-        opacity: 0.65,
+        opacity: renderedTheme.canvasOpacity,
+        filter: renderedTheme.canvasFilter,
+        mixBlendMode: renderedTheme.blendMode as CSSProperties["mixBlendMode"],
       }}
       aria-hidden="true"
     />

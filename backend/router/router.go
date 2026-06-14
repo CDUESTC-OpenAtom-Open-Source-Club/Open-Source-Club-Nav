@@ -110,6 +110,7 @@ func registerAdminRoutes(g *gin.RouterGroup) {
 		authG.GET("/system", handler.GetAdminSystem)
 		authG.GET("/link-health", handler.GetLinkHealth)
 		authG.POST("/link-health", handler.CheckLinkHealth)
+		authG.POST("/link-health/:id", handler.CheckSingleLinkHealth)
 		authG.GET("/login-audit", handler.GetLoginAuditLogs)
 
 		registerSuperAdminRoutes(authG.Group(""))

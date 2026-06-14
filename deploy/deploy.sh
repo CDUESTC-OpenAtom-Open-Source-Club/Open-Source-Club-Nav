@@ -28,7 +28,7 @@ fi
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 DEPLOY_DIR="${DEPLOY_PATH:-/opt/openatom-club}"
 ECOSYSTEM_FILE="${DEPLOY_DIR}/deploy/ecosystem.config.js"
-BACKEND_CONFIG="${DEPLOY_DIR}/backend/config.prod.yaml"
+BACKEND_CONFIG="${DEPLOY_DIR}/backend/config.yaml"
 ENV_FILE="${DEPLOY_DIR}/.env"
 ROLLBACK_FILE="${DEPLOY_DIR}/.env.rollback"
 LOCK_FILE="/tmp/openatom-deploy.lock"

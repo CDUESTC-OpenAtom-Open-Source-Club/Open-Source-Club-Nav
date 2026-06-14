@@ -210,7 +210,9 @@ CREATE TABLE IF NOT EXISTS nav_item_health (
   is_ok TINYINT(1) NOT NULL DEFAULT 0,
   message VARCHAR(500) NULL,
   checked_at DATETIME(3) NOT NULL,
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  KEY idx_nav_item_health_link_id (link_id),
+  KEY idx_nav_item_health_ok_time (is_ok, checked_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

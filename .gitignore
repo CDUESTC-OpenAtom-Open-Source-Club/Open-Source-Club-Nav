@@ -4,11 +4,13 @@ backend/config.local.yaml
 backend/config.yaml
 # 编译产物
 backend/bin/
+backend/backend
 backend/nav-gateway
 
 # === Frontend ===
 # 构建产物
 frontend/apps/web/dist-prod/
+frontend/apps/web/dist/
 frontend/apps/web/.next/
 frontend/apps/web/build/
 frontend/apps/web/out/
@@ -50,6 +52,8 @@ node_modules/
 .env.local
 .env.*.local
 !.env.example
+.deploy-env
+.deployed-tag
 
 # === IDE ===
 .idea/

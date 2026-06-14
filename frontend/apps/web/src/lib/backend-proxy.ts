@@ -8,6 +8,15 @@ export type FetchBackendOptions = {
   method?: string;
   body?: unknown;
   headers?: Record<string, string>;
+  cache?: RequestCache;
+  forwardCookies?: boolean;
+  nextRevalidateSeconds?: number;
+};
+
+export type PublicBackendCacheOptions = FetchBackendOptions & {
+  browserMaxAgeSeconds?: number;
+  sharedMaxAgeSeconds?: number;
+  staleWhileRevalidateSeconds?: number;
 };
 
 export async function fetchBackend(
@@ -25,7 +34,7 @@ export async function fetchBackend(
   };
 
   const cookie = request.headers.get("cookie");
-  if (cookie) {
+  if ((options?.forwardCookies ?? true) && cookie) {
     headers.Cookie = cookie;
   }
 
@@ -33,7 +42,16 @@ export async function fetchBackend(
     method,
     headers,
     credentials: "include",
+    cache: options?.cache,
   };
+  if (
+    (method === "GET" || method === "HEAD") &&
+    options?.nextRevalidateSeconds !== undefined
+  ) {
+    (fetchOptions as RequestInit & { next?: { revalidate: number } }).next = {
+      revalidate: options.nextRevalidateSeconds,
+    };
+  }
 
   if (options?.body !== undefined && method !== "GET" && method !== "HEAD") {
     fetchOptions.body = JSON.stringify(options.body);
@@ -79,6 +97,20 @@ export async function proxyRequest(
   return fetchBackend(request, path, options);
 }
 
+export async function fetchPublicBackend(
+  request: Request,
+  path: string,
+  options?: PublicBackendCacheOptions,
+): Promise<Response> {
+  const sharedMaxAgeSeconds = options?.sharedMaxAgeSeconds ?? 300;
+  const response = await fetchBackend(request, path, {
+    ...options,
+    forwardCookies: false,
+    nextRevalidateSeconds: options?.nextRevalidateSeconds ?? sharedMaxAgeSeconds,
+  });
+  return withPublicCache(response, options);
+}
+
 export const proxyToBackend = fetchBackend;
 
 export { BACKEND_API_URL };
@@ -100,4 +132,33 @@ function normalizeBackendPath(path: string): string {
   }
 
   return `${trimmedPrefix}${path.slice(4)}`;
+}
+
+function withPublicCache(response: Response, options?: PublicBackendCacheOptions): Response {
+  const browserMaxAgeSeconds = options?.browserMaxAgeSeconds ?? 60;
+  const sharedMaxAgeSeconds = options?.sharedMaxAgeSeconds ?? 300;
+  const staleWhileRevalidateSeconds = options?.staleWhileRevalidateSeconds ?? 86400;
+
+  const headers = new Headers(response.headers);
+  headers.delete("set-cookie");
+  if (!response.ok) {
+    headers.set("Cache-Control", "no-store");
+    headers.delete("CDN-Cache-Control");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+  headers.set(
+    "Cache-Control",
+    `public, max-age=${browserMaxAgeSeconds}, s-maxage=${sharedMaxAgeSeconds}, stale-while-revalidate=${staleWhileRevalidateSeconds}`,
+  );
+  headers.set("CDN-Cache-Control", `public, max-age=${sharedMaxAgeSeconds}`);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }

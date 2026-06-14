@@ -71,8 +71,8 @@ Go 后端仍保留一套 JWT 头鉴权：
 | --- | --- | --- | --- | --- | --- |
 | `GET` | `/api/admin/stats` | `GET /api/admin/stats` | Cookie | `已实现` | 后台统计概览 |
 | `GET` | `/api/admin/system` | `GET /api/admin/system` | Cookie | `已实现` | 系统运行信息 |
-| `GET` | `/api/admin/link-health` | `GET /api/admin/link-health?limit=` | Cookie | `已实现` | 获取链接健康检查结果 |
-| `POST` | `/api/admin/link-health` | `POST /api/admin/link-health` | Cookie | `已实现` | 触发健康检查 |
+| `GET` | `/api/admin/link-health` | `GET /api/admin/link-health?limit=&status=` | Cookie | `已实现` | 获取链接健康检查结果；`status=failed` 只返回异常 |
+| `POST` | `/api/admin/link-health` | `POST /api/admin/link-health` | Cookie | `已实现` | 逐个触发所有启用链接的健康检查 |
 | `GET` | `/api/admin/logs` | `GET /api/admin/logs` | Cookie | `已实现` | 获取后台操作日志 |
 | `GET` | `/api/admin/login-audit` | `GET /api/admin/login-audit` | Cookie | `已实现` | 获取后台登录审计日志 |
 | `GET` | `/api/admin/links` | `GET /api/links` | Cookie | `已实现` | 后台读取链接列表，BFF 走公共查询口 |

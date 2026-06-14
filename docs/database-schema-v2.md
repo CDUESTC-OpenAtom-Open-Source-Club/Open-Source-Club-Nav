@@ -12,6 +12,7 @@
 
 - 接口文档：[backend-api.md](/Users/blackevil/OpenAtom-Club-Nav-main/docs/backend-api.md)
 - 旧版表设计：[database-schema.md](/Users/blackevil/OpenAtom-Club-Nav-main/docs/database-schema.md)
+- 资源矩阵前后端数据契约：[resource-matrix-data-contract.md](resource-matrix-data-contract.md)
 
 ## 1. 最终执行原则
 
@@ -118,6 +119,7 @@
 
 - 当前后台的 `/api/admin/links` 与前台 `/api/links` 都应统一走此表
 - 不再单独保留 `friend_links`
+- `resource_matrix` 内容的源头是前端 `frontend/apps/web/src/data/resources.ts`，后端 `nav_items` 种子必须按 [资源矩阵前后端数据契约](resource-matrix-data-contract.md) 同步
 
 ### 3.3 `misc`
 
@@ -201,22 +203,31 @@
 用途：
 
 - 导航项链接最新健康检查结果
+- 与 `nav_items` 保持 1:1 运行态关系，不承载链接标题、排序、模块等业务主数据
+- 健康检测页只展示 `is_ok = 0` 的异常记录，内容管理页读取全量结果显示单条链接状态
 
 字段：
 
 | 字段 | 类型 | 约束 | 说明 |
 | --- | --- | --- | --- |
-| `nav_item_id` | `BIGINT UNSIGNED` | 主键 | 对应导航项 |
-| `url` | `VARCHAR(500)` | 非空 | 检查 URL |
+| `id` | `BIGINT UNSIGNED` | 主键 | 健康记录 ID |
+| `link_id` | `BIGINT UNSIGNED` | 非空 | 对应 `nav_items.id` |
+| `title` | `VARCHAR(120)` | 可空 | 检测时的标题快照 |
 | `status_code` | `INT` | 可空 | HTTP 状态码 |
 | `is_ok` | `TINYINT(1)` | 非空 | 是否成功 |
-| `checked_at` | `DATETIME` | 非空 | 检查时间 |
-| `message` | `VARCHAR(255)` | 可空 | 错误信息 |
-| `response_time_ms` | `INT` | 可空 | 响应耗时 |
+| `message` | `VARCHAR(500)` | 可空 | 错误信息或状态说明 |
+| `checked_at` | `DATETIME` | 非空 | 最近检查时间 |
 
 索引：
 
-- `idx_nav_item_health_checked_at (checked_at)`
+- `idx_nav_item_health_link_id (link_id)`
+- `idx_nav_item_health_ok_time (is_ok, checked_at)`
+
+运行规则：
+
+- 定期检测逐个扫描 `nav_items.active = 1` 且 `link_url` 非空、不是 `#` 的链接
+- 检测结果 upsert 到 `nav_item_health`
+- `nav_items` 保持业务内容稳定，不写入健康状态字段
 
 ### 3.8 `daily_stats`
 

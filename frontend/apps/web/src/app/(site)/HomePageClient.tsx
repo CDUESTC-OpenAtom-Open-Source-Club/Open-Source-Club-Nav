@@ -31,12 +31,53 @@ import {
 
 const STORAGE_KEY = "kcos_booted";
 const THEME_MODE_STORAGE_KEY = "kcos_theme_mode";
+const THEME_SWITCH_SYNC_MS = 1200;
+const THEME_SWITCH_COMMIT_MS = 480;
+const THEME_COLOR_TRANSITION_MS = 1000;
 const VALID_THEME_MODES = new Set(["light", "dark", "auto"]);
 const GITHUB_USER_API = "/api/github-users";
+const getInitialThemeMode = () => {
+  if (typeof window === "undefined") return "auto";
+
+  try {
+    const savedThemeMode = window.localStorage.getItem(THEME_MODE_STORAGE_KEY);
+    return savedThemeMode && VALID_THEME_MODES.has(savedThemeMode) ? savedThemeMode : "auto";
+  } catch {
+    return "auto";
+  }
+};
 const resolveAutoDarkMode = () => {
   const hour = new Date().getHours();
   return hour >= 19 || hour < 7;
 };
+const getAvatarFallbackText = (login = "") => {
+  const normalized = String(login || "").trim();
+  return (normalized.slice(0, 2) || "?").toUpperCase();
+};
+
+function AboutMemberAvatar({ avatarUrl, name, login }) {
+  const [loadFailed, setLoadFailed] = useState(!avatarUrl);
+
+  if (!avatarUrl || loadFailed) {
+    return (
+      <div className="about-member-avatar-fallback" aria-label={`${name} GitHub 头像兜底`}>
+        {getAvatarFallbackText(login || name)}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      className="about-member-avatar-img"
+      src={avatarUrl}
+      alt={`${name} GitHub 头像`}
+      loading="lazy"
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setLoadFailed(true)}
+    />
+  );
+}
 
 export default function HomePage() {
   // 页面主状态（启动动画、主题、关于弹层、响应式断点等）
@@ -48,7 +89,9 @@ export default function HomePage() {
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [aboutOpen, setAboutOpen] = useState(false);
   const [activeAboutSection, setActiveAboutSection] = useState("mission");
-  const [themeMode, setThemeMode] = useState("auto");
+  const [themeMode, setThemeMode] = useState(() => getInitialThemeMode());
+  const [isThemeSwitching, setIsThemeSwitching] = useState(false);
+  const [themeTransitionTarget, setThemeTransitionTarget] = useState<string | null>(null);
   const [clientPrefsReady, setClientPrefsReady] = useState(false);
   const [autoDarkMode, setAutoDarkMode] = useState(() => resolveAutoDarkMode());
   const [isMobileViewport, setIsMobileViewport] = useState(false);
@@ -61,6 +104,8 @@ export default function HomePage() {
   const [githubUserProfiles, setGithubUserProfiles] = useState({});
   const [adminTapCount, setAdminTapCount] = useState(0);
   const adminTapTimerRef = useRef(null);
+  const themeSwitchTimerRef = useRef(null);
+  const themeSwitchCommitTimerRef = useRef(null);
   const lastMobileScrollTopRef = useRef(0);
   const mobileActivityRef = useRef(null);
   const mobileActivityScrollTimerRef = useRef(null);
@@ -356,6 +401,33 @@ export default function HomePage() {
     });
   }, [pathname, router, searchParams]);
 
+  const handleThemeModeChange = useCallback((nextMode) => {
+    if (typeof window === "undefined") {
+      setThemeMode(nextMode);
+      return;
+    }
+
+    if (themeSwitchTimerRef.current) {
+      window.clearTimeout(themeSwitchTimerRef.current);
+    }
+    if (themeSwitchCommitTimerRef.current) {
+      window.clearTimeout(themeSwitchCommitTimerRef.current);
+    }
+
+    const nextResolvedTheme = nextMode === "auto" ? (autoDarkMode ? "dark" : "light") : nextMode;
+    setIsThemeSwitching(true);
+    setThemeTransitionTarget(nextResolvedTheme);
+    themeSwitchCommitTimerRef.current = window.setTimeout(() => {
+      setThemeMode(nextMode);
+      themeSwitchCommitTimerRef.current = null;
+    }, THEME_SWITCH_COMMIT_MS);
+    themeSwitchTimerRef.current = window.setTimeout(() => {
+      setIsThemeSwitching(false);
+      setThemeTransitionTarget(null);
+      themeSwitchTimerRef.current = null;
+    }, THEME_SWITCH_SYNC_MS);
+  }, [autoDarkMode]);
+
   const handleHiddenAdminEntry = useCallback((event) => {
     event.preventDefault();
     if (adminTapTimerRef.current) {
@@ -445,7 +517,6 @@ export default function HomePage() {
     });
 
     fetch(`${GITHUB_USER_API}?${params.toString()}`, {
-      cache: "no-store",
       signal: controller.signal,
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -482,6 +553,17 @@ export default function HomePage() {
     }, 0);
 
     return () => window.clearTimeout(hydrateId);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (themeSwitchTimerRef.current && typeof window !== "undefined") {
+        window.clearTimeout(themeSwitchTimerRef.current);
+      }
+      if (themeSwitchCommitTimerRef.current && typeof window !== "undefined") {
+        window.clearTimeout(themeSwitchCommitTimerRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -648,22 +730,26 @@ export default function HomePage() {
       {!booted && <StartupSplash onComplete={handleBootComplete} />}
 
     <div
-      className={isDarkMode ? "home-theme-dark" : "home-theme-light"}
+      className={`${isDarkMode ? "home-theme-dark" : "home-theme-light"}${isThemeSwitching ? " home-theme-switching" : ""}`}
       data-kcos-theme-root="true"
       data-theme={effectiveTheme}
+      data-theme-target={themeTransitionTarget || effectiveTheme}
       data-theme-mode={themeMode}
+      data-theme-switching={isThemeSwitching ? "true" : undefined}
       onMouseMove={isPhoneViewport ? undefined : handleMouseMove}
       style={{
         ...themeVars,
+        "--theme-transition-duration": isThemeSwitching ? `${THEME_COLOR_TRANSITION_MS}ms` : "360ms",
+        "--theme-transition-ease": isThemeSwitching ? "cubic-bezier(0.37, 0, 0.21, 1)" : "cubic-bezier(0.22, 1, 0.36, 1)",
         colorScheme: effectiveTheme,
         minHeight: "100dvh",
         height: isMobileViewport ? "auto" : "100dvh",
-        background: "var(--page-bg)",
+        backgroundColor: "var(--page-bg)",
         color: "var(--text-primary)",
         display: "flex",
         flexDirection: "column",
         opacity: fadeIn ? 1 : 0,
-        transition: "opacity 0.5s ease, background-color 0.36s ease, color 0.36s ease",
+        transition: "opacity 0.5s ease, background-color var(--theme-transition-duration) var(--theme-transition-ease), color var(--theme-transition-duration) var(--theme-transition-ease)",
         fontFamily: '"Inter", -apple-system, sans-serif',
         overflow: isMobileViewport ? "auto" : "hidden",
       }}
@@ -672,7 +758,7 @@ export default function HomePage() {
         compact={isMobileViewport}
         isDarkMode={isDarkMode}
         themeMode={themeMode}
-        onThemeModeChange={setThemeMode}
+        onThemeModeChange={handleThemeModeChange}
         mobileMenuOpen={mobileMenuOpen}
         onToggleMobileMenu={() => {
           if (mobileMenuOpen) {
@@ -744,7 +830,11 @@ export default function HomePage() {
                 flexShrink: 0,
               }}
             >
-              <RightPanel isDarkMode={isDarkMode} embedded />
+              <RightPanel
+                isDarkMode={isDarkMode}
+                isThemeSwitching={isThemeSwitching}
+                embedded
+              />
             </div>
           )}
         </div>
@@ -754,7 +844,10 @@ export default function HomePage() {
             className="hidden xl:flex"
             style={{ display: "flex", flexShrink: 0 }}
           >
-            <RightPanel isDarkMode={isDarkMode} />
+            <RightPanel
+              isDarkMode={isDarkMode}
+              isThemeSwitching={isThemeSwitching}
+            />
           </div>
         )}
       </div>
@@ -1336,11 +1429,10 @@ export default function HomePage() {
 
                       return (
                         <div key={member.name} className="about-member-card">
-                          <img
-                            className="about-member-avatar-img"
-                            src={avatarUrl}
-                            alt={`${member.name} GitHub 头像`}
-                            loading="lazy"
+                          <AboutMemberAvatar
+                            avatarUrl={avatarUrl}
+                            name={member.name}
+                            login={member.githubLogin}
                           />
                           <div className="about-member-name">{member.name}</div>
                           <div className="about-member-role">{member.role}</div>
@@ -1537,14 +1629,27 @@ export default function HomePage() {
           border-color: #BFDBFE;
           box-shadow: 0 10px 20px rgba(15,23,42,0.08);
         }
-        .about-member-avatar-img {
+        .about-member-avatar-img,
+        .about-member-avatar-fallback {
           width: 56px;
           height: 56px;
           border-radius: 50%;
           border: 1px solid #BFDBFE;
-          object-fit: cover;
           flex-shrink: 0;
           box-shadow: 0 6px 14px rgba(15, 23, 42, 0.08);
+        }
+        .about-member-avatar-img {
+          object-fit: cover;
+        }
+        .about-member-avatar-fallback {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #EFF6FF;
+          color: #0A84FF;
+          font-size: 16px;
+          font-weight: 800;
+          letter-spacing: 0;
         }
         .about-member-name {
           font-size: 14px;

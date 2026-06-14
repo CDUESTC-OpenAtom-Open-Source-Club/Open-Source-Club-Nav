@@ -3,6 +3,7 @@ package handler
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"open-source-club-nav/backend/model"
@@ -17,6 +18,19 @@ import (
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
+
+type linkHealthResult struct {
+	ID                uint      `json:"id"`
+	LinkID            uint      `json:"link_id"`
+	Title             string    `json:"title"`
+	URL               string    `json:"url"`
+	StatusCode        *int      `json:"status_code"`
+	IsOK              bool      `json:"is_ok"`
+	Message           *string   `json:"message"`
+	CheckedAt         time.Time `json:"checked_at"`
+	Module            string    `json:"module"`
+	ResourceSubModule *string   `json:"resource_sub_module"`
+}
 
 // GetAdminMe 获取当前登录管理员信息（GET /api/admin/me）
 func GetAdminMe(c *gin.Context) {
@@ -78,35 +92,57 @@ func GetAdminLogs(c *gin.Context) {
 }
 
 // GetAdminSystem 获取系统运行状态（GET /api/admin/system）
-// 从 Linux /proc 文件系统读取真实系统指标
+// 优先返回跨平台可用的后端进程指标；Linux 上补充 /proc 系统指标。
 func GetAdminSystem(c *gin.Context) {
 	hostname, _ := os.Hostname()
 	now := time.Now()
-	uptimeSec := int(now.Unix() - bootTimeUnix())
+	uptimeSec := int(time.Since(processStartedAt).Seconds())
 
 	cpuCores := runtime.NumCPU()
 
-	memTotal, memAvail := readMemInfo()
-	var memUsageRate float64
-	if memTotal > 0 {
-		memUsageRate = float64(memTotal-memAvail) / float64(memTotal) * 100
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	mem := gin.H{
+		"processAllocBytes": memStats.Alloc,
+		"processSysBytes":   memStats.Sys,
+		"source":            "go_runtime",
+		"systemAvailable":   false,
+		"usageRate":         nil,
 	}
 
-	rxBytes, txBytes := readNetDev()
-	totalBytes := rxBytes + txBytes
+	memTotal, memAvail := readMemInfo()
+	if memTotal > 0 {
+		memUsed := memTotal - memAvail
+		mem["usageRate"] = round2(float64(memUsed) / float64(memTotal) * 100)
+		mem["usedBytes"] = memUsed * 1024
+		mem["totalBytes"] = memTotal * 1024
+		mem["availableBytes"] = memAvail * 1024
+		mem["source"] = "proc_meminfo"
+		mem["systemAvailable"] = true
+	}
+
+	rxBytes, txBytes, netOK := readNetDev()
+	network := gin.H{
+		"available": netOK,
+		"sampledAt": now.Format(time.RFC3339),
+	}
+	if netOK {
+		network["rxBytes"] = rxBytes
+		network["txBytes"] = txBytes
+		network["totalBytes"] = rxBytes + txBytes
+		network["source"] = "proc_net_dev"
+	} else {
+		network["rxBytes"] = nil
+		network["txBytes"] = nil
+		network["totalBytes"] = nil
+		network["source"] = "unavailable"
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"uptimeSec": uptimeSec,
 		"cpuCores":  cpuCores,
-		"mem": gin.H{
-			"usageRate": round2(memUsageRate),
-		},
-		"network": gin.H{
-			"rxBytes":   rxBytes,
-			"txBytes":   txBytes,
-			"totalBytes": totalBytes,
-			"sampledAt": now.Format(time.RFC3339),
-		},
+		"mem":       mem,
+		"network":   network,
 		"hostname":  hostname,
 		"goVersion": runtime.Version(),
 		"status":    "ok",
@@ -170,11 +206,11 @@ func parseMemInfoValue(line string) int64 {
 	return 0
 }
 
-// readNetDev 从 /proc/net/dev 读取所有非 lo 接口的 rx/tx 字节数
-func readNetDev() (rxBytes int64, txBytes int64) {
+// readNetDev 从 /proc/net/dev 读取所有非 lo 接口的 rx/tx 字节数。
+func readNetDev() (rxBytes int64, txBytes int64, ok bool) {
 	f, err := os.Open("/proc/net/dev")
 	if err != nil {
-		return 0, 0
+		return 0, 0, false
 	}
 	defer f.Close()
 
@@ -198,9 +234,11 @@ func readNetDev() (rxBytes int64, txBytes int64) {
 		if len(rest) >= 10 {
 			if v, err := strconv.ParseInt(rest[0], 10, 64); err == nil {
 				rxBytes += v
+				ok = true
 			}
 			if v, err := strconv.ParseInt(rest[8], 10, 64); err == nil {
 				txBytes += v
+				ok = true
 			}
 		}
 	}
@@ -414,20 +452,27 @@ func logAction(db *gorm.DB, c *gin.Context, action string, navItemID *uint, deta
 	uname, _ := username.(string)
 	r, _ := role.(string)
 
-	log := model.NavItemLog{
-		NavItemID:     navItemID,
-		Action:        action,
-		ActorUserID:   uid,
-		ActorUsername: uname,
-		ActorRole:     r,
-		CreatedAt:     time.Now(),
+	columns := []string{"action", "actor_username", "actor_role", "detail", "created_at"}
+	placeholders := []string{"?", "?", "?", "?", "?"}
+	args := []interface{}{action, uname, r, nullableString(detail), time.Now()}
+
+	if tableHasColumn(db, "nav_item_logs", "actor_user_id") {
+		columns = append(columns, "actor_user_id")
+		placeholders = append(placeholders, "?")
+		args = append(args, uid)
 	}
-	if detail != "" {
-		d := detail
-		log.Detail = &d
+	if tableHasColumn(db, "nav_item_logs", "nav_item_id") {
+		columns = append(columns, "nav_item_id")
+		placeholders = append(placeholders, "?")
+		args = append(args, nullableUint(navItemID))
+	} else if tableHasColumn(db, "nav_item_logs", "link_id") {
+		columns = append(columns, "link_id")
+		placeholders = append(placeholders, "?")
+		args = append(args, nullableUint(navItemID))
 	}
 
-	if err := db.Create(&log).Error; err != nil {
+	sql := fmt.Sprintf("INSERT INTO nav_item_logs (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	if err := db.Exec(sql, args...).Error; err != nil {
 		utils.Logger.Warn("写入操作日志失败", zap.Error(err))
 	}
 }
@@ -441,72 +486,511 @@ func GetLinkHealth(c *gin.Context) {
 		limit = 200
 	}
 
-	var healthChecks []model.NavItemHealth
-	db.Order("checked_at DESC").Limit(limit).Find(&healthChecks)
+	linkColumn := healthLinkColumn(db)
+	hasID := healthTableHasColumn(db, "id")
+	hasTitle := healthTableHasColumn(db, "title")
+	idSelect := "0 AS id"
+	if hasID {
+		idSelect = "h.id"
+	}
+	titleSelect := "n.title AS title"
+	if hasTitle {
+		titleSelect = "COALESCE(NULLIF(h.title, ''), n.title) AS title"
+	}
+
+	where := ""
+	if strings.EqualFold(strings.TrimSpace(c.Query("status")), "failed") {
+		where = "AND h.is_ok = 0"
+	}
+
+	var healthChecks []linkHealthResult
+	query := fmt.Sprintf(`
+SELECT
+  %s,
+  h.%s AS link_id,
+  %s,
+  n.link_url AS url,
+  h.status_code,
+  h.is_ok,
+  h.message,
+  h.checked_at,
+  n.content_type AS module,
+  n.sub_type AS resource_sub_module
+FROM nav_item_health h
+JOIN nav_items n ON n.id = h.%s
+WHERE n.content_type IN ('resource_matrix', 'friend_links', 'mini_games')
+%s
+ORDER BY h.checked_at DESC
+LIMIT ?
+`, idSelect, linkColumn, titleSelect, linkColumn, where)
+
+	if err := db.Raw(query, limit).Scan(&healthChecks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "加载健康检测失败"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{"health": healthChecks})
 }
 
-// CheckLinkHealth 触发链接健康检查（POST /api/admin/link-health）
-func CheckLinkHealth(c *gin.Context) {
-	db := c.MustGet("db").(*gorm.DB)
+// linkHealthInternalResult 内部检测结果结构
+type linkHealthInternalResult struct {
+	linkID         uint
+	title          string
+	url            string
+	isOK           bool
+	statusCode     *int
+	message        string
+	responseTimeMs int
+}
 
+// RunLinkHealthCheckInternal 执行链接健康检测核心逻辑（可被定时任务和HTTP handler调用）
+// useStream=true 时返回 SSE stream 数据（由 handler 调用）
+// useStream=false 时静默执行（由定时任务调用），返回统计数据
+func RunLinkHealthCheckInternal(db *gorm.DB, useStream bool, streamWriter ...func(string)) (checked, failed, skipped, total int) {
 	// 获取所有活跃的 nav_items
 	type NavItemBasic struct {
-		ID  uint
-		URL string
+		ID    uint
+		Title string
+		URL   string
 	}
 	var items []NavItemBasic
-	db.Raw("SELECT id, link_url AS url FROM nav_items WHERE active = 1 AND link_url != ''").Scan(&items)
+	db.Raw(`
+SELECT id, title, link_url AS url
+FROM nav_items
+WHERE active = 1
+  AND content_type IN ('resource_matrix', 'friend_links', 'mini_games')
+  AND TRIM(link_url) != ''
+  AND TRIM(link_url) != '#'
+ORDER BY id ASC
+`).Scan(&items)
 
-	checked := 0
+	total = len(items)
+	if total == 0 {
+		return 0, 0, 0, 0
+	}
+
+	linkColumn := healthLinkColumn(db)
+	healthCacheTTL := envDuration("LINK_HEALTH_CACHE_TTL", 24*time.Hour)
+	cleanupStaleLinkHealth(db, linkColumn)
+	healthColumns := map[string]bool{
+		"title":            healthTableHasColumn(db, "title"),
+		"url":              healthTableHasColumn(db, "url"),
+		"response_time_ms": healthTableHasColumn(db, "response_time_ms"),
+	}
+
+	// 并发控制：semaphore 限制并发上限为5
+	sem := make(chan struct{}, 5)
+	results := make(chan linkHealthInternalResult, total)
+
+	// 统计计数器
+	checkedCount := 0
+	failedCount := 0
+	skippedCount := 0
+
 	client := &http.Client{Timeout: 5 * time.Second}
 
+	// 并发检测
 	for _, item := range items {
 		if item.URL == "" {
 			continue
 		}
-
-		isOK := true
-		statusCode := 0
-		var responseTimeMs int
-		var message string
-
-		start := time.Now()
-		resp, err := client.Head(item.URL)
-		responseTimeMs = int(time.Since(start).Milliseconds())
-
-		if err != nil {
-			isOK = false
-			message = err.Error()
-			if len(message) > 255 {
-				message = message[:255]
-			}
-		} else {
-			statusCode = resp.StatusCode
-			resp.Body.Close()
-			if resp.StatusCode >= 400 {
-				isOK = false
-				message = resp.Status
-			}
+		if healthCacheTTL > 0 && hasRecentLinkHealth(db, linkColumn, item.ID, healthCacheTTL) {
+			skippedCount++
+			continue
 		}
 
-		now := time.Now()
-		health := model.NavItemHealth{
-			NavItemID:      item.ID,
-			URL:            item.URL,
-			StatusCode:     &statusCode,
-			IsOK:           isOK,
-			CheckedAt:      now,
-			Message:        &message,
-			ResponseTimeMs: &responseTimeMs,
-		}
+		sem <- struct{}{} // 获取并发槽位
+		go func(item NavItemBasic) {
+			defer func() { <-sem }() // 释放槽位
 
-		db.Save(&health)
-		checked++
+			start := time.Now()
+			isOK, statusCode, message := probeLinkWithRetry(client, item.URL, 2)
+			responseTimeMs := int(time.Since(start).Milliseconds())
+
+			now := time.Now()
+			if err := upsertLinkHealth(db, linkColumn, healthColumns, item.ID, item.Title, item.URL, statusCode, isOK, message, responseTimeMs, now); err != nil {
+				utils.Logger.Warn("写入链接健康状态失败", zap.Uint("link_id", item.ID), zap.Error(err))
+			}
+
+			results <- linkHealthInternalResult{
+				linkID:         item.ID,
+				title:          item.Title,
+				url:            item.URL,
+				isOK:           isOK,
+				statusCode:     statusCode,
+				message:        message,
+				responseTimeMs: responseTimeMs,
+			}
+		}(item)
 	}
 
-	c.JSON(http.StatusOK, gin.H{"checked": checked, "total": len(items)})
+	// 收集结果并推送进度（如果使用 SSE）
+	for i := 0; i < total; i++ {
+		r := <-results
+		checkedCount++
+		if !r.isOK {
+			failedCount++
+		}
+
+		if useStream && len(streamWriter) > 0 {
+			progressData := fmt.Sprintf(`{"checked":%d,"total":%d,"failed":%d,"current_title":"%s","current_url":"%s"}`,
+				checkedCount, total, failedCount, r.title, r.url)
+			streamWriter[0](progressData)
+		}
+	}
+
+	checked = checkedCount
+	failed = failedCount
+	skipped = skippedCount
+	return checked, failed, skipped, total
+}
+
+// CheckLinkHealth 触发链接健康检查（POST /api/admin/link-health）
+// 支持 ?stream=1 参数返回 SSE stream
+func CheckLinkHealth(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+
+	// 判断是否使用 SSE stream
+	useStream := c.Query("stream") == "1"
+
+	if useStream {
+		// SSE 模式：返回实时进度
+		c.Header("Content-Type", "text/event-stream")
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
+		c.Header("Access-Control-Allow-Origin", "*")
+
+		// SSE 写入函数
+		streamWriter := func(data string) {
+			c.Writer.WriteString(fmt.Sprintf("event: progress\ndata: %s\n\n", data))
+			c.Writer.Flush()
+		}
+
+		// 执行检测
+		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, true, streamWriter)
+
+		// 发送完成事件
+		completeData := fmt.Sprintf(`{"checked":%d,"total":%d,"failed":%d,"skipped":%d}`,
+			checked, total, failed, skipped)
+		c.Writer.WriteString(fmt.Sprintf("event: complete\ndata: %s\n\n", completeData))
+		c.Writer.Flush()
+
+		// 记录日志
+		detailBytes, _ := json.Marshal(gin.H{
+			"checked": checked,
+			"failed":  failed,
+			"skipped": skipped,
+			"total":   total,
+			"reason":  "manual_probe_stream",
+		})
+		logAction(db, c, "check_health", nil, string(detailBytes))
+	} else {
+		// 传统 JSON 模式
+		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, false)
+
+		detailBytes, _ := json.Marshal(gin.H{
+			"checked": checked,
+			"failed":  failed,
+			"skipped": skipped,
+			"total":   total,
+			"reason":  "manual_probe",
+		})
+		logAction(db, c, "check_health", nil, string(detailBytes))
+
+		c.JSON(http.StatusOK, gin.H{"checked": checked, "failed": failed, "skipped": skipped, "total": total})
+	}
+}
+
+// CheckSingleLinkHealth 检查单个链接的健康状态（POST /api/admin/link-health/:id）
+func CheckSingleLinkHealth(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+
+	idStr := c.Param("id")
+	linkID, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的链接ID"})
+		return
+	}
+
+	// 获取链接信息
+	type NavItemBasic struct {
+		ID                uint
+		Title             string
+		URL               string
+		Module            string
+		ResourceSubModule *string `gorm:"column:resource_sub_module"`
+	}
+	var item NavItemBasic
+	if err := db.Raw(`
+SELECT id, title, link_url AS url, content_type AS module, NULLIF(sub_type, '') AS resource_sub_module
+FROM nav_items
+WHERE id = ? AND active = 1
+  AND content_type IN ('resource_matrix', 'friend_links', 'mini_games')
+  AND TRIM(link_url) != ''
+  AND TRIM(link_url) != '#'
+`, linkID).Scan(&item).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "链接不存在或已禁用"})
+		return
+	}
+
+	if item.URL == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "链接URL为空"})
+		return
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	linkColumn := healthLinkColumn(db)
+	healthColumns := map[string]bool{
+		"title":            healthTableHasColumn(db, "title"),
+		"url":              healthTableHasColumn(db, "url"),
+		"response_time_ms": healthTableHasColumn(db, "response_time_ms"),
+	}
+
+	start := time.Now()
+	isOK, statusCode, message := probeLink(client, item.URL)
+	responseTimeMs := int(time.Since(start).Milliseconds())
+
+	now := time.Now()
+	if err := upsertLinkHealth(db, linkColumn, healthColumns, item.ID, item.Title, item.URL, statusCode, isOK, message, responseTimeMs, now); err != nil {
+		utils.Logger.Warn("写入链接健康状态失败", zap.Uint("link_id", item.ID), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入健康状态失败"})
+		return
+	}
+
+	detailBytes, _ := json.Marshal(gin.H{
+		"link_id":          item.ID,
+		"title":            item.Title,
+		"url":              item.URL,
+		"is_ok":            isOK,
+		"status_code":      statusCode,
+		"message":          message,
+		"response_time_ms": responseTimeMs,
+		"reason":           "single_probe",
+	})
+	logAction(db, c, "check_health", &item.ID, string(detailBytes))
+
+	failed := 0
+	if !isOK {
+		failed = 1
+	}
+	healthMessage := message
+	c.JSON(http.StatusOK, gin.H{
+		"checked": 1,
+		"failed":  failed,
+		"skipped": 0,
+		"total":   1,
+		"health": linkHealthResult{
+			LinkID:            item.ID,
+			Title:             item.Title,
+			URL:               item.URL,
+			StatusCode:        statusCode,
+			IsOK:              isOK,
+			Message:           &healthMessage,
+			CheckedAt:         now,
+			Module:            item.Module,
+			ResourceSubModule: item.ResourceSubModule,
+		},
+	})
+}
+
+func healthTableHasColumn(db *gorm.DB, columnName string) bool {
+	return tableHasColumn(db, "nav_item_health", columnName)
+}
+
+func tableHasColumn(db *gorm.DB, tableName string, columnName string) bool {
+	var count int64
+	if err := db.Raw(`
+SELECT COUNT(*)
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE()
+  AND TABLE_NAME = ?
+  AND COLUMN_NAME = ?
+`, tableName, columnName).Scan(&count).Error; err != nil {
+		return false
+	}
+	return count > 0
+}
+
+func healthLinkColumn(db *gorm.DB) string {
+	if healthTableHasColumn(db, "link_id") {
+		return "link_id"
+	}
+	return "nav_item_id"
+}
+
+func hasRecentLinkHealth(db *gorm.DB, linkColumn string, linkID uint, ttl time.Duration) bool {
+	var count int64
+	cutoff := time.Now().Add(-ttl)
+	query := fmt.Sprintf("%s = ? AND checked_at >= ?", linkColumn)
+	if err := db.Table("nav_item_health").Where(query, linkID, cutoff).Count(&count).Error; err != nil {
+		return false
+	}
+	return count > 0
+}
+
+func probeLink(client *http.Client, targetURL string) (bool, *int, string) {
+	statusCode, statusText, err := requestLink(client, http.MethodHead, targetURL)
+	if err == nil && statusCode != nil && (*statusCode == http.StatusForbidden || *statusCode == http.StatusMethodNotAllowed) {
+		statusCode, statusText, err = requestLink(client, http.MethodGet, targetURL)
+	}
+	if err != nil {
+		return false, nil, truncateHealthMessage(err.Error())
+	}
+	if statusCode == nil {
+		return false, nil, "未返回 HTTP 状态"
+	}
+	if *statusCode >= 400 {
+		return false, statusCode, truncateHealthMessage(statusText)
+	}
+	return true, statusCode, "OK"
+}
+
+// probeLinkWithRetry 带重试的链接探测，maxRetries=2 表示最多重试2次（共3次尝试）
+func probeLinkWithRetry(client *http.Client, targetURL string, maxRetries int) (bool, *int, string) {
+	var lastStatusCode *int
+	var lastMessage string
+
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		isOK, statusCode, message := probeLink(client, targetURL)
+		if isOK {
+			return true, statusCode, "OK"
+		}
+		lastStatusCode = statusCode
+		lastMessage = message
+	}
+
+	return false, lastStatusCode, lastMessage
+}
+
+func requestLink(client *http.Client, method string, targetURL string) (*int, string, error) {
+	req, err := http.NewRequest(method, targetURL, nil)
+	if err != nil {
+		return nil, "", err
+	}
+	req.Header.Set("User-Agent", "OpenAtomClubNav-LinkHealth/1.0")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, "", err
+	}
+	defer resp.Body.Close()
+
+	statusCode := resp.StatusCode
+	return &statusCode, resp.Status, nil
+}
+
+func truncateHealthMessage(message string) string {
+	const maxLength = 500
+	message = strings.TrimSpace(message)
+	if len(message) <= maxLength {
+		return message
+	}
+	return message[:maxLength]
+}
+
+func upsertLinkHealth(
+	db *gorm.DB,
+	linkColumn string,
+	healthColumns map[string]bool,
+	linkID uint,
+	title string,
+	targetURL string,
+	statusCode *int,
+	isOK bool,
+	message string,
+	responseTimeMs int,
+	checkedAt time.Time,
+) error {
+	setClauses := []string{"status_code = ?", "is_ok = ?", "message = ?", "checked_at = ?"}
+	args := []interface{}{nullableInt(statusCode), boolToInt(isOK), message, checkedAt}
+	if healthColumns["title"] {
+		setClauses = append(setClauses, "title = ?")
+		args = append(args, title)
+	}
+	if healthColumns["url"] {
+		setClauses = append(setClauses, "url = ?")
+		args = append(args, targetURL)
+	}
+	if healthColumns["response_time_ms"] {
+		setClauses = append(setClauses, "response_time_ms = ?")
+		args = append(args, responseTimeMs)
+	}
+	args = append(args, linkID)
+
+	updateSQL := fmt.Sprintf("UPDATE nav_item_health SET %s WHERE %s = ?", strings.Join(setClauses, ", "), linkColumn)
+	result := db.Exec(updateSQL, args...)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected > 0 {
+		return nil
+	}
+
+	columns := []string{linkColumn, "status_code", "is_ok", "message", "checked_at"}
+	placeholders := []string{"?", "?", "?", "?", "?"}
+	insertArgs := []interface{}{linkID, nullableInt(statusCode), boolToInt(isOK), message, checkedAt}
+	if healthColumns["title"] {
+		columns = append(columns, "title")
+		placeholders = append(placeholders, "?")
+		insertArgs = append(insertArgs, title)
+	}
+	if healthColumns["url"] {
+		columns = append(columns, "url")
+		placeholders = append(placeholders, "?")
+		insertArgs = append(insertArgs, targetURL)
+	}
+	if healthColumns["response_time_ms"] {
+		columns = append(columns, "response_time_ms")
+		placeholders = append(placeholders, "?")
+		insertArgs = append(insertArgs, responseTimeMs)
+	}
+
+	insertSQL := fmt.Sprintf("INSERT INTO nav_item_health (%s) VALUES (%s)", strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	return db.Exec(insertSQL, insertArgs...).Error
+}
+
+func cleanupStaleLinkHealth(db *gorm.DB, linkColumn string) {
+	sql := fmt.Sprintf(`
+DELETE h
+FROM nav_item_health h
+LEFT JOIN nav_items n ON n.id = h.%s
+WHERE n.id IS NULL
+   OR n.active != 1
+   OR n.content_type NOT IN ('resource_matrix', 'friend_links', 'mini_games')
+   OR TRIM(n.link_url) = ''
+   OR TRIM(n.link_url) = '#'
+`, linkColumn)
+	if err := db.Exec(sql).Error; err != nil {
+		utils.Logger.Warn("清理过期链接健康状态失败", zap.Error(err))
+	}
+}
+
+func nullableInt(value *int) interface{} {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func nullableUint(value *uint) interface{} {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func nullableString(value string) interface{} {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func boolToInt(value bool) int {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 // GetLoginAuditLogs 获取登录审计日志（GET /api/admin/login-audit）
