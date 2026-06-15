@@ -1,14 +1,24 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import {
+  SITE_ALTERNATE_NAMES,
   SITE_DESCRIPTION,
+  SITE_GITHUB_URL,
   SITE_IMAGE_PATH,
   SITE_NAME,
+  SITE_OFFICIAL_URL,
   SITE_SHORT_DESCRIPTION,
   SITE_TITLE,
   SITE_URL,
   absoluteSiteUrl,
 } from "@/lib/site";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -38,10 +48,15 @@ export const metadata: Metadata = {
   authors: [{ name: SITE_NAME, url: SITE_URL }],
   creator: SITE_NAME,
   publisher: SITE_NAME,
+  manifest: "/manifest.webmanifest",
   formatDetection: {
     email: false,
     address: false,
     telephone: false,
+  },
+  icons: {
+    icon: [{ url: "/icon.png", type: "image/png", sizes: "64x64" }],
+    apple: [{ url: "/icon.png", type: "image/png", sizes: "64x64" }],
   },
   openGraph: {
     type: "website",
@@ -77,7 +92,7 @@ export const metadata: Metadata = {
     },
   },
   alternates: {
-    canonical: SITE_URL,
+    canonical: absoluteSiteUrl("/"),
   },
   verification: {
     google: "google48ddc25dbc63e4c3.html",
@@ -95,45 +110,45 @@ export default function RootLayout({
 }>) {
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "WebSite",
-    name: SITE_NAME,
-    alternateName: ["OpenAtom Club Nav", "KCOS 导航"],
-    url: SITE_URL,
-    description: SITE_SHORT_DESCRIPTION,
-    publisher: {
-      "@type": "Organization",
-      name: SITE_NAME,
-      url: SITE_URL,
-      logo: {
-        "@type": "ImageObject",
-        url: absoluteSiteUrl(SITE_IMAGE_PATH),
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${SITE_URL}/#organization`,
+        name: SITE_NAME,
+        alternateName: SITE_ALTERNATE_NAMES,
+        url: SITE_URL,
+        logo: {
+          "@type": "ImageObject",
+          url: absoluteSiteUrl(SITE_IMAGE_PATH),
+          width: 714,
+          height: 672,
+        },
+        sameAs: [SITE_GITHUB_URL, SITE_OFFICIAL_URL],
       },
-    },
-    potentialAction: {
-      "@type": "SearchAction",
-      target: {
-        "@type": "EntryPoint",
-        urlTemplate: `${SITE_URL}/?q={search_term_string}`,
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#website`,
+        name: SITE_NAME,
+        alternateName: SITE_ALTERNATE_NAMES,
+        url: SITE_URL,
+        inLanguage: "zh-CN",
+        description: SITE_SHORT_DESCRIPTION,
+        publisher: {
+          "@id": `${SITE_URL}/#organization`,
+        },
       },
-      "query-input": "required name=search_term_string",
-    },
+    ],
   };
 
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <head>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-        <link rel="icon" href="/icon.png" type="image/png" sizes="64x64" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className={`${inter.className} min-h-full flex flex-col`}>
         {children}
       </body>
     </html>

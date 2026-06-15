@@ -242,3 +242,16 @@ jobs:
 
           rm -f "/tmp/${ARTIFACT_NAME}.tar.gz"
           REMOTE
+
+      - uses: actions/checkout@v4
+        continue-on-error: true
+
+      - uses: actions/setup-node@v4
+        continue-on-error: true
+        with:
+          node-version: 22
+
+      - name: Notify IndexNow
+        continue-on-error: true
+        working-directory: frontend/apps/web
+        run: npm run indexnow:submit
