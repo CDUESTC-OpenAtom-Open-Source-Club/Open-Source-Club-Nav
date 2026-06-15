@@ -81,6 +81,7 @@ jobs:
 
           tar -czf "${ARTIFACT_NAME}.tar.gz" \
             deploy/update.sh \
+            deploy/reset-database.sh \
             deploy/ecosystem.config.js \
             backend/config.yaml \
             backend/db/migrate \
