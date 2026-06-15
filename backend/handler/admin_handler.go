@@ -717,8 +717,10 @@ ORDER BY id ASC
 		}(item)
 	}
 
+	expectedResults := total - skippedCount
+
 	// 收集结果并推送进度（如果使用 SSE）
-	for i := 0; i < total; i++ {
+	for i := 0; i < expectedResults; i++ {
 		r := <-results
 		checkedCount++
 		if !r.isOK {
@@ -923,7 +925,7 @@ func hasRecentLinkHealth(db *gorm.DB, linkColumn string, linkID uint, ttl time.D
 
 func probeLink(client *http.Client, targetURL string) (bool, *int, string) {
 	statusCode, statusText, err := requestLink(client, http.MethodHead, targetURL)
-	if err == nil && statusCode != nil && (*statusCode == http.StatusForbidden || *statusCode == http.StatusMethodNotAllowed) {
+	if err == nil && statusCode != nil && *statusCode >= http.StatusBadRequest {
 		statusCode, statusText, err = requestLink(client, http.MethodGet, targetURL)
 	}
 	if err != nil {
