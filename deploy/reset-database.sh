@@ -26,7 +26,12 @@ DEPLOY_DIR="${DEPLOY_PATH:-/opt/openatom-club}"
 DB_NAME="test_db"
 DB_USER="root"
 DB_PASS="${MYSQL_PASSWORD:-openatom_dev_password}"
-MYSQL_CONTAINER="${MYSQL_CONTAINER:-openatom-mysql-test}"
+# 根据环境选择默认容器名
+if [[ "${ENV}" == "prod" ]]; then
+  MYSQL_CONTAINER="${MYSQL_CONTAINER:-openatom-mysql-prod}"
+else
+  MYSQL_CONTAINER="${MYSQL_CONTAINER:-openatom-mysql-test}"
+fi
 BACKUP_DIR="${DEPLOY_DIR}/backups/mysql-reset"
 ECOSYSTEM_FILE="${DEPLOY_DIR}/deploy/ecosystem.config.js"
 LOCK_FILE="/tmp/openatom-reset-${ENV}.lock"
