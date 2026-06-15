@@ -13,11 +13,6 @@ import { RESOURCE_CATEGORIES } from "@/data/resources";
 
 const ICON_MAP: Record<string, LucideIcon> = { Brain, MapPin, Wrench };
 
-const BASE_FRIEND_LINKS = [
-  { title: "电子科技大学成都学院", url: "https://www.cduestc.fun/" },
-  { title: "科成星球", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club" },
-];
-
 const PANEL_WIDTH = "clamp(214px, 16vw, 252px)";
 const PUBLIC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
@@ -133,14 +128,8 @@ export default function LeftPanel({
   }, []);
 
   const friendLinks = useMemo(() => {
-    const seen = new Set<string>();
-    const merged = [...BASE_FRIEND_LINKS, ...remoteFriendLinks];
-    return merged.filter((item) => {
-      const key = `${item.title}::${item.url}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    // 直接使用从 API 获取的数据，不再合并硬编码数据
+    return remoteFriendLinks;
   }, [remoteFriendLinks]);
 
   return (

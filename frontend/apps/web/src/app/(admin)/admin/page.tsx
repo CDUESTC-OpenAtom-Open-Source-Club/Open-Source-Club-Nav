@@ -1985,19 +1985,19 @@ export default function AdminPage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "标题", "URL", "点击次数", "创建时间", "健康状态", "操作"].map((h) => (
+                {["序号", "标题", "URL", "点击次数", "创建时间", "健康状态", "操作"].map((h) => (
                   <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {links.map((item) => (
+              {links.map((item, index) => (
                 <tr
                   key={item.id}
                   id={`admin-link-row-${item.id}`}
                   style={focusedLinkId === item.id ? { background: "#EFF6FF" } : undefined}
                 >
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.id}</td>
+                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{index + 1}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
                   <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
                     <PortalTooltip
