@@ -25,11 +25,15 @@ fi
 DEPLOY_DIR="${DEPLOY_PATH:-/opt/openatom-club}"
 DB_NAME="test_db"
 DB_USER="root"
+DB_PASS="${MYSQL_PASSWORD:-openatom_dev_password}"
+MYSQL_CONTAINER="${MYSQL_CONTAINER:-openatom-mysql-test}"
 BACKUP_DIR="${DEPLOY_DIR}/backups/mysql-reset"
-MIGRATE_DIR="${DEPLOY_DIR}/backend/db/migrate"
-MIGRATE_BIN="${DEPLOY_DIR}/backend/bin/openatom-backend-linux-amd64"
 ECOSYSTEM_FILE="${DEPLOY_DIR}/deploy/ecosystem.config.js"
 LOCK_FILE="/tmp/openatom-reset-${ENV}.lock"
+
+# MySQL 命令通过 podman exec 执行
+MYSQL_CMD="podman exec -i ${MYSQL_CONTAINER} mysql -u ${DB_USER} -p${DB_PASS}"
+MYSQLDUMP_CMD="podman exec -i ${MYSQL_CONTAINER} mysqldump -u ${DB_USER} -p${DB_PASS}"
 
 log() { echo "[reset-${ENV} $(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 die() { log "ERROR: $*"; exit 1; }
@@ -50,8 +54,7 @@ if [[ "${SKIP_BACKUP}" != "true" ]]; then
   BACKUP_FILE="${BACKUP_DIR}/$(date '+%Y%m%d_%H%M%S')-pre-reset.sql"
 
   log "执行 MySQL 备份..."
-  if mysqldump -h 127.0.0.1 -P 3306 -u"${DB_USER}" \
-    --single-transaction --quick --lock-tables=false \
+  if ${MYSQLDUMP_CMD} --single-transaction --quick --lock-tables=false \
     "${DB_NAME}" > "${BACKUP_FILE}" 2>/dev/null; then
     gzip "${BACKUP_FILE}"
     log "MySQL 备份完成: ${BACKUP_FILE}.gz"
@@ -75,10 +78,10 @@ sleep 3
 
 # ── 4. Drop 并 recreate 数据库 ───────────────────────────────────────────────────
 log "执行 DROP DATABASE ${DB_NAME}..."
-mysql -h 127.0.0.1 -P 3306 -u"${DB_USER}" -e "DROP DATABASE IF EXISTS ${DB_NAME};" 2>/dev/null || die "DROP DATABASE 失败"
+${MYSQL_CMD} -e "DROP DATABASE IF EXISTS ${DB_NAME};" 2>/dev/null || die "DROP DATABASE 失败"
 
 log "执行 CREATE DATABASE ${DB_NAME}..."
-mysql -h 127.0.0.1 -P 3306 -u"${DB_USER}" -e "CREATE DATABASE ${DB_NAME} DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;" 2>/dev/null || die "CREATE DATABASE 失败"
+${MYSQL_CMD} -e "CREATE DATABASE ${DB_NAME} DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_unicode_ci;" 2>/dev/null || die "CREATE DATABASE 失败"
 
 # ── 5. 重启服务（触发迁移） ───────────────────────────────────────────────────────
 log "重启后端服务..."
@@ -117,7 +120,7 @@ check_count() {
   local table="$1"
   local expected="$2"
   local actual
-  actual=$(mysql -h 127.0.0.1 -P 3306 -u"${DB_USER}" -N -e "SELECT COUNT(*) FROM ${DB_NAME}.${table};" 2>/dev/null)
+  actual=$(${MYSQL_CMD} -N -e "SELECT COUNT(*) FROM ${DB_NAME}.${table};" 2>/dev/null)
   if [[ "${actual}" != "${expected}" ]]; then
     log "WARN: ${table} 计数异常: expected=${expected}, actual=${actual}"
     return 1
@@ -136,7 +139,7 @@ check_count "mini_games" "${EXPECTED_MINI_GAMES}" || true
 check_empty() {
   local table="$1"
   local actual
-  actual=$(mysql -h 127.0.0.1 -P 3306 -u"${DB_USER}" -N -e "SELECT COUNT(*) FROM ${DB_NAME}.${table};" 2>/dev/null)
+  actual=$(${MYSQL_CMD} -N -e "SELECT COUNT(*) FROM ${DB_NAME}.${table};" 2>/dev/null)
   if [[ "${actual}" != "0" ]]; then
     log "WARN: ${table} 应为空，但实际有 ${actual} 条记录"
     return 1
