@@ -26,18 +26,33 @@ func getHealthCheckInterval() time.Duration {
 	return time.Duration(minutes) * time.Minute
 }
 
+// shouldRunOnStart 从环境变量读取是否启动时立即执行检测，默认 true
+// 在数据库重置期间可设置为 false，避免运行时表被污染
+func shouldRunOnStart() bool {
+	val := os.Getenv("LINK_HEALTH_RUN_ON_START")
+	if val == "" {
+		return true // 默认启动时执行
+	}
+	// "false", "0", "no" 表示不执行
+	return val != "false" && val != "0" && val != "no"
+}
+
 // StartLinkHealthScheduler 启动链接健康检测定时任务
 func StartLinkHealthScheduler(ctx context.Context, db *gorm.DB) {
 	interval := getHealthCheckInterval()
+	runOnStart := shouldRunOnStart()
 	ticker := time.NewTicker(interval)
 
 	utils.Logger.Info("链接健康检测定时任务启动",
 		zap.Duration("interval", interval),
+		zap.Bool("run_on_start", runOnStart),
 	)
 
 	go func() {
-		// 启动后立即执行一次
-		runScheduledHealthCheck(db)
+		// 启动后根据配置决定是否立即执行一次
+		if runOnStart {
+			runScheduledHealthCheck(db)
+		}
 
 		for {
 			select {

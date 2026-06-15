@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
+import type { DeviceTier } from "@/hooks/useDeviceCapability";
 import * as THREE from "three";
 
 /**
@@ -15,6 +16,8 @@ export type GlobeCanvasProps = {
   isDarkMode?: boolean;
   pulse?: boolean;
   size?: number;
+  /** "high" 全精度 | "medium" 降面数 | 传入时覆盖自动检测 */
+  quality?: DeviceTier;
 };
 
 type SceneRuntime = {
@@ -39,7 +42,7 @@ const getGlobeTheme = (isDarkMode: boolean) => ({
   blendMode: isDarkMode ? "screen" : "multiply",
 });
 
-export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 260 }: GlobeCanvasProps) {
+export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 260, quality = "high" }: GlobeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const sceneRef = useRef<SceneRuntime>({});
@@ -55,10 +58,28 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
     const canvas = canvasRef.current;
     if (!canvas) return;
 
+    // ── IntersectionObserver：离开视口时暂停 WebGL 渲染 ──
+    let isVisible = true;
+    const visibilityObserver = new IntersectionObserver(
+      ([entry]) => { isVisible = entry.isIntersecting; },
+      { rootMargin: "100px" },
+    );
+    visibilityObserver.observe(canvas);
+
+    // 根据质量等级调整几何体面数和粒子数
+    const isHigh = quality !== "medium" && quality !== "low";
+    const sphereSegW = isHigh ? 22 : 12;
+    const sphereSegH = isHigh ? 16 : 8;
+    const outerSegW = isHigh ? 18 : 10;
+    const outerSegH = isHigh ? 12 : 6;
+    const ringSegments = isHigh ? 80 : 40;
+    const particleCount = isHigh ? 60 : 24;
+    const maxDpr = isHigh ? 2 : 1.5;
+
     const w = size;
     const h = size;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: isHigh, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     renderer.setSize(w, h, false);
     renderer.setClearColor(0x000000, 0);
 
@@ -66,7 +87,7 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
     const camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 100);
     camera.position.z = 3.8;
 
-    const sphereGeo = new THREE.SphereGeometry(1.4, 22, 16);
+    const sphereGeo = new THREE.SphereGeometry(1.4, sphereSegW, sphereSegH);
     const initialTheme = themeRef.current;
     const sphereMat = new THREE.MeshBasicMaterial({
       color: initialTheme.sphereColor, wireframe: true, transparent: true, opacity: initialTheme.sphereOpacityBase,
@@ -74,14 +95,14 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
     const sphere = new THREE.Mesh(sphereGeo, sphereMat);
     scene.add(sphere);
 
-    const outerGeo = new THREE.SphereGeometry(1.52, 18, 12);
+    const outerGeo = new THREE.SphereGeometry(1.52, outerSegW, outerSegH);
     const outerMat = new THREE.MeshBasicMaterial({
       color: initialTheme.outerColor, wireframe: true, transparent: true, opacity: initialTheme.outerOpacity,
     });
     const outer = new THREE.Mesh(outerGeo, outerMat);
     scene.add(outer);
 
-    const ringGeo = new THREE.TorusGeometry(1.48, 0.006, 2, 80);
+    const ringGeo = new THREE.TorusGeometry(1.48, 0.006, 2, ringSegments);
     const ringMat = new THREE.MeshBasicMaterial({
       color: initialTheme.ringColor, transparent: true, opacity: initialTheme.ringOpacityBase,
     });
@@ -89,14 +110,13 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
     scene.add(ring);
 
     const ring2 = new THREE.Mesh(
-      new THREE.TorusGeometry(1.56, 0.004, 2, 80),
+      new THREE.TorusGeometry(1.56, 0.004, 2, ringSegments),
       new THREE.MeshBasicMaterial({ color: initialTheme.sphereColor, transparent: true, opacity: initialTheme.ring2Opacity }),
     );
     const ring2Mat = ring2.material as THREE.MeshBasicMaterial;
     ring2.rotation.x = Math.PI / 3;
     scene.add(ring2);
 
-    const particleCount = 60;
     const positions = new Float32Array(particleCount * 3);
     for (let i = 0; i < particleCount; i++) {
       const theta = Math.random() * Math.PI * 2;
@@ -120,6 +140,10 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
     const animate = () => {
       if (cleanup) return;
       frameRef.current = requestAnimationFrame(animate);
+
+      // 不可见时跳过渲染，仅保留 rAF 调度
+      if (!isVisible) return;
+
       t += 0.01;
       sphere.rotation.y += 0.004;
       outer.rotation.y -= 0.002;
@@ -148,11 +172,12 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
 
     return () => {
       cleanup = true;
+      visibilityObserver.disconnect();
       if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
       sceneRef.current.renderer?.dispose();
       sceneRef.current = {};
     };
-  }, [pulse, size]);
+  }, [pulse, size, quality]);
 
   const renderedTheme = getGlobeTheme(isDarkMode);
 

@@ -71,6 +71,14 @@ export default function TechBackground({ isDarkMode = false }: TechBackgroundPro
     const ctx = canvas.getContext("2d");
     if (!parent || !ctx) return undefined;
 
+    // ── IntersectionObserver：离开视口时暂停动画，节省 CPU/GPU ──
+    let isVisible = true;
+    const visibilityObserver = new IntersectionObserver(
+      ([entry]) => { isVisible = entry.isIntersecting; },
+      { rootMargin: "100px" },
+    );
+    visibilityObserver.observe(parent);
+
     let animationFrameId = 0;
     let particles: Particle[] = [];
     let dataStreams: DataStream[] = [];
@@ -368,6 +376,12 @@ export default function TechBackground({ isDarkMode = false }: TechBackgroundPro
     };
 
     const animate = () => {
+      // 不可见时跳过绘制，仅保留 rAF 调度（开销极低）
+      if (!isVisible) {
+        animationFrameId = window.requestAnimationFrame(animate);
+        return;
+      }
+
       // Smooth mouse follow to avoid jitter when pointer moves fast.
       mouse.prevX = mouse.x;
       mouse.prevY = mouse.y;
@@ -413,6 +427,7 @@ export default function TechBackground({ isDarkMode = false }: TechBackgroundPro
     animate();
 
     return () => {
+      visibilityObserver.disconnect();
       resizeObserver.disconnect();
       parent.removeEventListener("mousemove", handlePointerMove);
       parent.removeEventListener("mouseleave", handlePointerLeave);

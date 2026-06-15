@@ -1695,7 +1695,6 @@ export default function WorksCarousel({ isDarkMode = false }) {
   const focused = worksData[currentIndex];
   const totalStars = worksData.reduce((sum: number, w: any) => sum + w.stars, 0);
   const avgStars = Math.round(totalStars / Math.max(1, total));
-  const onlineCount = worksData.filter((w: any) => w.status.includes("已上线")).length;
   const topTags = Object.entries(
     worksData.reduce((acc: Record<string, number>, work: any) => {
       work.tags.forEach((tag: string) => {
@@ -2065,22 +2064,22 @@ export default function WorksCarousel({ isDarkMode = false }) {
       >
         <InsightCard
           icon={TrendingUp}
-          label="Total Stars"
+          label="Repo Stars"
           value={totalStars.toLocaleString()}
           tint="#0A84FF"
           isDarkMode={isDarkMode}
         />
         <InsightCard
           icon={Layers}
-          label="Projects Online"
-          value={`${onlineCount}/${total}`}
+          label={worksSource === "github" ? "Public Repos" : "Works Listed"}
+          value={total.toLocaleString()}
           tint="#10B981"
           isDarkMode={isDarkMode}
         />
         <InsightCard
           icon={Radar}
-          label="Avg Stars"
-          value={`${avgStars} / project`}
+          label="Avg Repo Stars"
+          value={`${avgStars} / repo`}
           tint="#F59E0B"
           isDarkMode={isDarkMode}
         />

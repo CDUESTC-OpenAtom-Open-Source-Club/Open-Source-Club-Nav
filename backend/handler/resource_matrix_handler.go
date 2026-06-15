@@ -10,29 +10,69 @@ import (
 	"gorm.io/gorm"
 )
 
-// SearchResourceMatrix 查询资源矩阵列表
-// 路由：GET /api/resources?module=resource_matrix
-// SearchResourceMatrix 查询资源矩阵列表
-// 路由：GET /api/resources?module=resource_matrix
-func SearchResourceMatrix(c *gin.Context) {
-	db := c.MustGet("db").(*gorm.DB)
-	var resources []model.ResourceMatrix
-
-	// （可选）加模糊查询：按name/category搜索
-	keyword := c.Query("keyword")
-	query := db
-	if keyword != "" {
-		// 把sort换成id排序
-		query = query.Where("name LIKE ? OR category LIKE ?", "%"+keyword+"%", "%"+keyword+"%").Order("id ASC")
-	} else {
-		// 把sort换成id排序
-		query = query.Order("id ASC")
+// navItemToResourceMatrix 将 NavItem 转换为 ResourceMatrix 格式
+// 用于 legacy /api/resources 接口兼容
+func navItemToResourceMatrix(item model.NavItem) model.ResourceMatrix {
+	// 将 sub_type 映射为 category
+	category := item.SubType
+	if category == "" {
+		category = item.Category
 	}
 
-	// 查询表数据
-	if err := query.Find(&resources).Error; err != nil {
+	// 根据 sub_type 或 icon 生成标签
+	tag := item.Icon
+	if tag == "" {
+		switch category {
+		case "think_tank":
+			tag = "Learning"
+		case "campus":
+			tag = "Campus"
+		case "tools":
+			tag = "Dev"
+		}
+	}
+
+	return model.ResourceMatrix{
+		Model: gorm.Model{
+			ID: item.ID,
+			CreatedAt: item.CreatedAt,
+			UpdatedAt: item.UpdatedAt,
+		},
+		Category: category,
+		Name:     item.Title,
+		Url:      item.LinkUrl,
+		Desc:     item.Description,
+		Tag:      tag,
+	}
+}
+
+// SearchResourceMatrix 查询资源矩阵列表
+// 路由：GET /api/resources?module=resource_matrix
+// 数据来源：nav_items 表中 content_type='resource_matrix' 的记录
+func SearchResourceMatrix(c *gin.Context) {
+	db := c.MustGet("db").(*gorm.DB)
+
+	// 从 nav_items 表读取资源矩阵数据，避免 resource_matrix 表显示第三套数据
+	var navItems []model.NavItem
+	query := db.Model(&model.NavItem{}).Where("content_type = ?", "resource_matrix")
+
+	// 可选：按 keyword 模糊搜索
+	keyword := c.Query("keyword")
+	if keyword != "" {
+		likeKeyword := "%" + keyword + "%"
+		query = query.Where("title LIKE ? OR description LIKE ? OR sub_type LIKE ?", likeKeyword, likeKeyword, likeKeyword)
+	}
+
+	// 按 sort 排序
+	if err := query.Order("sort ASC, id ASC").Find(&navItems).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
+	}
+
+	// 转换为 legacy ResourceMatrix 格式
+	resources := make([]model.ResourceMatrix, 0, len(navItems))
+	for _, item := range navItems {
+		resources = append(resources, navItemToResourceMatrix(item))
 	}
 
 	// 返回对齐上级格式

@@ -115,8 +115,9 @@ export default function GamesPage() {
             <Link
               href="/"
               className="games-hero__back"
+              title="返回开放原子社团导航主页"
             >
-              返回首页
+              返回社团导航主页
             </Link>
           </div>
 
