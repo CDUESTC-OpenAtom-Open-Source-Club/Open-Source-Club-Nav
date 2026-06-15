@@ -53,7 +53,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -p "${TEST_DEPLOY_PORT}" \
             "${TEST_DEPLOY_USER}@${TEST_DEPLOY_HOST}" \
-            "DEPLOY_PATH='${TEST_DEPLOY_PATH}' bash -s" <<'REMOTE'
+            "DEPLOY_PATH='${TEST_DEPLOY_PATH}' SKIP_BACKUP='${SKIP_BACKUP}' bash -s" <<'REMOTE'
           set -Eeuo pipefail
 
           cd "${DEPLOY_PATH}"
@@ -115,7 +115,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -p "${PROD_DEPLOY_PORT}" \
             "${PROD_DEPLOY_USER}@${PROD_DEPLOY_HOST}" \
-            "DEPLOY_PATH='${PROD_DEPLOY_PATH}' bash -s" <<'REMOTE'
+            "DEPLOY_PATH='${PROD_DEPLOY_PATH}' SKIP_BACKUP='${SKIP_BACKUP}' bash -s" <<'REMOTE'
           set -Eeuo pipefail
 
           cd "${DEPLOY_PATH}"
