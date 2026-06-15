@@ -21,6 +21,10 @@ if [[ -z "${ENV}" ]]; then
   exit 1
 fi
 
+# ── 辅助函数（必须先定义）───────────────────────────────────────────────────
+log() { echo "[reset-${ENV} $(date '+%Y-%m-%d %H:%M:%S')] $*"; }
+die() { log "ERROR: $*"; exit 1; }
+
 # ── 常量 ──────────────────────────────────────────────────────────────────────
 DEPLOY_DIR="${DEPLOY_PATH:-/opt/openatom-club}"
 DB_NAME="test_db"
@@ -32,48 +36,57 @@ BACKUP_DIR="${DEPLOY_DIR}/backups/mysql-reset"
 ECOSYSTEM_FILE="${DEPLOY_DIR}/deploy/ecosystem.config.js"
 LOCK_FILE="/tmp/openatom-reset-${ENV}.lock"
 
-# MySQL 命令执行方式：
-# - 如果指定了 MYSQL_CONTAINER，使用 podman exec
-# - 否则尝试直接连接（适用于 MySQL 直接运行在主机或端口映射的情况）
+# ── MySQL 命令执行方式检测 ────────────────────────────────────────────────────
+# 优先级：
+# 1. 指定的 MYSQL_CONTAINER 环境变量（podman exec）
+# 2. 检测是否有 podman 和 MySQL 容器运行
+# 3. 直接 MySQL 连接（MySQL 在主机或端口映射）
+
 detect_mysql_access() {
-  if [[ -n "${MYSQL_CONTAINER:-}" ]]; then
-    # 使用指定的容器名
-    MYSQL_CMD="podman exec -i ${MYSQL_CONTAINER} mysql -u ${DB_USER} -p${DB_PASS}"
-    MYSQLDUMP_CMD="podman exec -i ${MYSQL_CONTAINER} mysqldump -u ${DB_USER} -p${DB_PASS}"
-    return 0
+  # 方式 1：使用指定的容器名（如果有 podman）
+  if [[ -n "${MYSQL_CONTAINER:-}" ]] && command -v podman >/dev/null 2>&1; then
+    if podman ps --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER}$" 2>/dev/null; then
+      MYSQL_CMD="podman exec -i ${MYSQL_CONTAINER} mysql -u ${DB_USER} -p${DB_PASS}"
+      MYSQLDUMP_CMD="podman exec -i ${MYSQL_CONTAINER} mysqldump -u ${DB_USER} -p${DB_PASS}"
+      log "使用指定的 MySQL 容器: ${MYSQL_CONTAINER}"
+      return 0
+    fi
   fi
 
-  # 尝试检测可用的 MySQL 访问方式
-  # 先检查是否有 MySQL 容器运行
-  local container_name
-  if [[ "${ENV}" == "prod" ]]; then
-    container_name="openatom-mysql-prod"
-  else
-    container_name="openatom-mysql-test"
+  # 方式 2：自动检测容器（如果有 podman）
+  if command -v podman >/dev/null 2>&1; then
+    local container_name
+    if [[ "${ENV}" == "prod" ]]; then
+      container_name="openatom-mysql-prod"
+    else
+      container_name="openatom-mysql-test"
+    fi
+
+    if podman ps --format '{{.Names}}' | grep -q "^${container_name}$" 2>/dev/null; then
+      MYSQL_CMD="podman exec -i ${container_name} mysql -u ${DB_USER} -p${DB_PASS}"
+      MYSQLDUMP_CMD="podman exec -i ${container_name} mysqldump -u ${DB_USER} -p${DB_PASS}"
+      log "检测到 MySQL 容器: ${container_name}"
+      return 0
+    fi
   fi
 
-  if podman ps --format '{{.Names}}' | grep -q "^${container_name}$" 2>/dev/null; then
-    MYSQL_CMD="podman exec -i ${container_name} mysql -u ${DB_USER} -p${DB_PASS}"
-    MYSQLDUMP_CMD="podman exec -i ${container_name} mysqldump -u ${DB_USER} -p${DB_PASS}"
-    log "检测到 MySQL 容器: ${container_name}"
-    return 0
-  fi
+  # 方式 3：直接 MySQL 连接（带密码）
+  if command -v mysql >/dev/null 2>&1; then
+    if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1" >/dev/null 2>&1; then
+      MYSQL_CMD="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS}"
+      MYSQLDUMP_CMD="mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS}"
+      log "检测到 MySQL 直接连接: ${DB_HOST}:${DB_PORT}"
+      return 0
+    fi
 
-  # 尝试直接连接（MySQL 在主机或端口映射）
-  if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1" >/dev/null 2>&1; then
-    MYSQL_CMD="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS}"
-    MYSQLDUMP_CMD="mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS}"
-    log "检测到 MySQL 直接连接: ${DB_HOST}:${DB_PORT}"
-    return 0
-  fi
-
-  # 尝试不带密码（某些配置可能通过其他方式认证）
-  if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -e "SELECT 1" >/dev/null 2>&1; then
-    MYSQL_CMD="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER}"
-    MYSQLDUMP_CMD="mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER}"
-    DB_PASS=""
-    log "检测到 MySQL 直接连接（无密码）: ${DB_HOST}:${DB_PORT}"
-    return 0
+    # 方式 4：直接 MySQL 连接（无密码）
+    if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -e "SELECT 1" >/dev/null 2>&1; then
+      MYSQL_CMD="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER}"
+      MYSQLDUMP_CMD="mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER}"
+      DB_PASS=""
+      log "检测到 MySQL 直接连接（无密码）: ${DB_HOST}:${DB_PORT}"
+      return 0
+    fi
   fi
 
   return 1
@@ -82,9 +95,6 @@ detect_mysql_access() {
 if ! detect_mysql_access; then
   die "无法连接到 MySQL，请检查 MYSQL_CONTAINER, MYSQL_HOST, MYSQL_PORT 或 MYSQL_PASSWORD 配置"
 fi
-
-log() { echo "[reset-${ENV} $(date '+%Y-%m-%d %H:%M:%S')] $*"; }
-die() { log "ERROR: $*"; exit 1; }
 
 # ── 防并发 ────────────────────────────────────────────────────────────────────
 exec 200>"${LOCK_FILE}"
