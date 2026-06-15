@@ -105,6 +105,59 @@ jobs:
           printf '%s\n' "${PROD_DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
 
+      - name: Debug MySQL status on production server
+        env:
+          PROD_DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          PROD_DEPLOY_PORT: ${{ secrets.PROD_DEPLOY_PORT }}
+          PROD_DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          PROD_DEPLOY_PATH: ${{ secrets.PROD_DEPLOY_PATH }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${PROD_DEPLOY_PORT}" \
+            "${PROD_DEPLOY_USER}@${PROD_DEPLOY_HOST}" \
+            "DEPLOY_PATH='${PROD_DEPLOY_PATH}' bash -s" <<'REMOTE'
+          echo "=== 检查 MySQL 连接状态 ==="
+          echo "部署路径: ${DEPLOY_PATH}"
+          cd "${DEPLOY_PATH}"
+
+          # 检查后端配置
+          if [[ -f "backend/config.yaml" ]]; then
+            echo "--- backend/config.yaml ---"
+            cat backend/config.yaml
+          elif [[ -f "config.yaml" ]]; then
+            echo "--- config.yaml ---"
+            cat config.yaml
+          else
+            echo "未找到 config.yaml"
+          fi
+
+          # 检查环境变量
+          echo "--- PM2 环境变量 ---"
+          pm2 show openatom-backend 2>/dev/null | grep -i mysql || echo "无法获取 PM2 环境变量"
+
+          # 检查 MySQL 客户端
+          echo "--- MySQL 客户端检查 ---"
+          which mysql 2>/dev/null || echo "mysql 命令不存在"
+          which mysqldump 2>/dev/null || echo "mysqldump 命令不存在"
+
+          # 检查 Podman
+          echo "--- Podman 检查 ---"
+          which podman 2>/dev/null || echo "podman 命令不存在"
+          podman ps --format "{{.Names}}" 2>/dev/null | grep mysql || echo "无 MySQL 容器"
+
+          # 检查 Docker
+          echo "--- Docker 检查 ---"
+          which docker 2>/dev/null || echo "docker 命令不存在"
+          docker ps --format "{{.Names}}" 2>/dev/null | grep mysql || echo "无 MySQL 容器"
+
+          # 检查 systemd MySQL 服务
+          echo "--- Systemd MySQL 服务 ---"
+          systemctl list-units --type=service | grep mysql 2>/dev/null || echo "无 MySQL systemd 服务"
+
+          # 检查常见 MySQL 端口
+          echo "--- 网络端口检查 ---"
+          ss -tlnp | grep 3306 2>/dev/null || netstat -tlnp | grep 3306 2>/dev/null || echo "3306 端口未监听"
+          REMOTE
+
       - name: Run reset script on production server
         env:
           PROD_DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
