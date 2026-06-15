@@ -38,22 +38,48 @@ LOCK_FILE="/tmp/openatom-reset-${ENV}.lock"
 
 # ── MySQL 命令执行方式检测 ────────────────────────────────────────────────────
 # 优先级：
-# 1. 指定的 MYSQL_CONTAINER 环境变量（podman exec）
-# 2. 检测是否有 podman 和 MySQL 容器运行
-# 3. 直接 MySQL 连接（MySQL 在主机或端口映射）
+# 1. 指定的 MYSQL_CONTAINER 环境变量
+# 2. Docker 容器检测
+# 3. Podman 容器检测
+# 4. 直接 MySQL 连接
 
 detect_mysql_access() {
-  # 方式 1：使用指定的容器名（如果有 podman）
-  if [[ -n "${MYSQL_CONTAINER:-}" ]] && command -v podman >/dev/null 2>&1; then
-    if podman ps --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER}$" 2>/dev/null; then
+  # 方式 1：使用指定的容器名
+  if [[ -n "${MYSQL_CONTAINER:-}" ]]; then
+    # 先检查 Docker
+    if command -v docker >/dev/null 2>&1 && docker ps --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER}$" 2>/dev/null; then
+      MYSQL_CMD="docker exec -i ${MYSQL_CONTAINER} mysql -u ${DB_USER} -p${DB_PASS}"
+      MYSQLDUMP_CMD="docker exec -i ${MYSQL_CONTAINER} mysqldump -u ${DB_USER} -p${DB_PASS}"
+      log "使用 Docker 容器: ${MYSQL_CONTAINER}"
+      return 0
+    fi
+    # 再检查 Podman
+    if command -v podman >/dev/null 2>&1 && podman ps --format '{{.Names}}' | grep -q "^${MYSQL_CONTAINER}$" 2>/dev/null; then
       MYSQL_CMD="podman exec -i ${MYSQL_CONTAINER} mysql -u ${DB_USER} -p${DB_PASS}"
       MYSQLDUMP_CMD="podman exec -i ${MYSQL_CONTAINER} mysqldump -u ${DB_USER} -p${DB_PASS}"
-      log "使用指定的 MySQL 容器: ${MYSQL_CONTAINER}"
+      log "使用 Podman 容器: ${MYSQL_CONTAINER}"
       return 0
     fi
   fi
 
-  # 方式 2：自动检测容器（如果有 podman）
+  # 方式 2：自动检测 Docker 容器
+  if command -v docker >/dev/null 2>&1; then
+    # 常见容器名模式
+    local docker_containers
+    docker_containers=$(docker ps --format '{{.Names}}' 2>/dev/null | grep mysql)
+
+    if [[ -n "${docker_containers}" ]]; then
+      # 取第一个 MySQL 容器
+      local container_name
+      container_name=$(echo "${docker_containers}" | head -1)
+      MYSQL_CMD="docker exec -i ${container_name} mysql -u ${DB_USER} -p${DB_PASS}"
+      MYSQLDUMP_CMD="docker exec -i ${container_name} mysqldump -u ${DB_USER} -p${DB_PASS}"
+      log "检测到 Docker MySQL 容器: ${container_name}"
+      return 0
+    fi
+  fi
+
+  # 方式 3：自动检测 Podman 容器
   if command -v podman >/dev/null 2>&1; then
     local container_name
     if [[ "${ENV}" == "prod" ]]; then
@@ -65,12 +91,12 @@ detect_mysql_access() {
     if podman ps --format '{{.Names}}' | grep -q "^${container_name}$" 2>/dev/null; then
       MYSQL_CMD="podman exec -i ${container_name} mysql -u ${DB_USER} -p${DB_PASS}"
       MYSQLDUMP_CMD="podman exec -i ${container_name} mysqldump -u ${DB_USER} -p${DB_PASS}"
-      log "检测到 MySQL 容器: ${container_name}"
+      log "检测到 Podman MySQL 容器: ${container_name}"
       return 0
     fi
   fi
 
-  # 方式 3：直接 MySQL 连接（带密码）
+  # 方式 4：直接 MySQL 连接（带密码）
   if command -v mysql >/dev/null 2>&1; then
     if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -p"${DB_PASS}" -e "SELECT 1" >/dev/null 2>&1; then
       MYSQL_CMD="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER} -p${DB_PASS}"
@@ -79,7 +105,7 @@ detect_mysql_access() {
       return 0
     fi
 
-    # 方式 4：直接 MySQL 连接（无密码）
+    # 方式 5：直接 MySQL 连接（无密码）
     if mysql -h "${DB_HOST}" -P "${DB_PORT}" -u "${DB_USER}" -e "SELECT 1" >/dev/null 2>&1; then
       MYSQL_CMD="mysql -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER}"
       MYSQLDUMP_CMD="mysqldump -h ${DB_HOST} -P ${DB_PORT} -u ${DB_USER}"
