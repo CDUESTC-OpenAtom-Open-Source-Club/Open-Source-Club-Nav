@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "后台登录",
-  description: "KCOS 开放原子开源社团后台登录",
   robots: {
     index: false,
     follow: false,
@@ -13,7 +11,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function AdminLoginLayout({
+export default function AdminLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
