@@ -122,7 +122,8 @@ export default function Home() {
   };
 
   interface OrgStatsPayload {
-    members: number;
+    members: number | null;
+    membersSource?: string;
     projects: number;
     stars: number;
     source: ActivitySource | string;
@@ -133,11 +134,16 @@ export default function Home() {
 
   // 社团概览统计，从 /api/org-stats 拉取
   const [orgStats, setOrgStats] = useState<OrgStatsPayload>({
-    members: 0,
+    members: null,
     projects: 0,
     stars: 0,
     source: "mock",
   });
+
+  const memberStatLabel =
+    orgStats.membersSource === "github-unavailable" || orgStats.members === null
+      ? "members unavailable"
+      : `${orgStats.members} members`;
 
   useEffect(() => {
     fetch("/api/activities")
@@ -152,7 +158,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    fetch("/api/org-stats")
+    fetch("/api/org-stats", { cache: "no-store" })
       .then((res) => res.ok ? res.json() : null)
       .then((data: OrgStatsPayload | null) => {
         if (data) setOrgStats(data);
@@ -235,7 +241,7 @@ export default function Home() {
               <div className={statList}>
                 <span className={statPill}>
                   <span className={statDot} style={{ backgroundColor: "#3B82F6" }} />
-                  {orgStats.members} members
+                  {memberStatLabel}
                 </span>
                 <span className={statPill}>
                   <span className={statDot} style={{ backgroundColor: "#06B6D4" }} />

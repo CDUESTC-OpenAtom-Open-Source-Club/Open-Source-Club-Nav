@@ -334,18 +334,6 @@ INSERT INTO nav_items (content_type, sub_type, icon, title, description, content
 ('mini_games', NULL, 'Puzzle', '在线扫雷', '经典策略小游戏', '经典策略小游戏', 3, 1, 'mini_games', '', 'https://minesweeper.online/', NOW(3), NOW(3))
 ON DUPLICATE KEY UPDATE updated_at = NOW(3);
 
--- 友情链接
-INSERT INTO friend_links (title, link_url, sort, created_at, updated_at) VALUES
-('GitHub', 'https://github.com', 1, NOW(3), NOW(3)),
-('OpenAtom 开放原子', 'https://www.openatom.org/', 2, NOW(3), NOW(3)),
-('KCOS Club', 'https://opensouce-club.top/', 3, NOW(3), NOW(3)),
-('Gitee', 'https://gitee.com/', 4, NOW(3), NOW(3)),
-('MDN Web Docs', 'https://developer.mozilla.org/', 5, NOW(3), NOW(3)),
-('Stack Overflow', 'https://stackoverflow.com/', 6, NOW(3), NOW(3)),
-('阮一峰的网络日志', 'https://www.ruanyifeng.com/blog/', 7, NOW(3), NOW(3)),
-('FreeCodeCamp', 'https://www.freecodecamp.org/', 8, NOW(3), NOW(3))
-ON DUPLICATE KEY UPDATE updated_at = NOW(3);
-
 -- 小游戏
 INSERT INTO mini_games (game_type, name, play_url, status, sort, created_at, updated_at) VALUES
 ('internal', '2048', 'https://play2048.co/', 1, 1, NOW(3), NOW(3)),

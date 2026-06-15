@@ -4,6 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   Brain,
   ExternalLink,
+  Gamepad2,
   GitBranch,
   Info,
   LayoutGrid,
@@ -20,7 +21,7 @@ export type MobileNavItem = {
   href?: string;
   action?: () => void;
   external?: boolean;
-  icon?: "grid" | "sparkles" | "newspaper" | "info" | "github" | "branch" | "Brain" | "MapPin" | "Wrench";
+  icon?: "grid" | "sparkles" | "newspaper" | "info" | "github" | "branch" | "gamepad" | "Brain" | "MapPin" | "Wrench";
   active?: boolean;
   children?: MobileNavItem[];
 };
@@ -38,6 +39,7 @@ const ICON_MAP = {
   info: Info,
   github: GitHubMark,
   branch: GitBranch,
+  gamepad: Gamepad2,
   Brain,
   MapPin,
   Wrench,

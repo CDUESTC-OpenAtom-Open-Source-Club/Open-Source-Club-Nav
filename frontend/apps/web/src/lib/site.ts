@@ -13,6 +13,7 @@ export const SITE_ALTERNATE_NAMES = ["OpenAtom Club Nav", "KCOS 导航", "科成
 
 export const SITEMAP_ROUTES = [
   { path: "/", changeFrequency: "weekly", priority: 1 },
+  { path: "/home", changeFrequency: "weekly", priority: 0.8 },
   { path: "/games", changeFrequency: "monthly", priority: 0.6 },
 ] as const;
 

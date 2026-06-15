@@ -1,10 +1,15 @@
 // @ts-nocheck
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, X } from "lucide-react";
-import GlobeCanvas from "@/components/shared/GlobeCanvas";
-import WorksCarousel from "./WorksCarousel";
+import ErrorBoundary from "@/components/shared/ErrorBoundary";
+import { useDeviceCapability } from "@/hooks/useDeviceCapability";
 import { RESOURCE_CATEGORIES } from "@/data/resources";
+
+// ── 懒加载重型 3D / Canvas 组件 ──
+const GlobeCanvas = lazy(() => import("@/components/shared/GlobeCanvas"));
+const GlobeCanvasFallback = lazy(() => import("@/components/shared/GlobeCanvasFallback"));
+const WorksCarousel = lazy(() => import("./WorksCarousel"));
 
 const RESOURCE_SUB_TO_CATEGORY_ID = {
   think_tank: "intelligence",
@@ -198,8 +203,8 @@ const ACTIVITIES_API = "/api/activities";
 
 const DEFAULT_HOME_STATS = [
   { key: "members", label: "-- members", color: "#0A84FF" },
-  { key: "projects", label: "-- projects", color: "#06E5CC" },
-  { key: "stars", label: "-- stars", color: "#F59E0B" },
+  { key: "projects", label: "-- repos", color: "#06E5CC" },
+  { key: "stars", label: "-- repo stars", color: "#F59E0B" },
   { key: "activity", label: "syncing events", color: "#10B981" },
 ];
 
@@ -210,6 +215,16 @@ const formatCompactCount = (value) => {
     return `${(numeric / 1000).toFixed(numeric >= 10000 ? 0 : 1).replace(/\.0$/, "")}k`;
   }
   return String(numeric);
+};
+
+const buildMemberStatLabel = (orgStats) => {
+  if (orgStats?.membersSource === "github-unavailable") return "members unavailable";
+  if (orgStats?.members === null || orgStats?.members === undefined || orgStats?.members === "") {
+    return "members unavailable";
+  }
+  const githubMemberCount = Number(orgStats?.members);
+  if (!Number.isFinite(githubMemberCount) || githubMemberCount < 0) return "-- members";
+  return `${formatCompactCount(githubMemberCount)} members`;
 };
 
 const buildHomeStats = (orgStats, activityPayload) => {
@@ -224,17 +239,17 @@ const buildHomeStats = (orgStats, activityPayload) => {
   return [
     {
       key: "members",
-      label: `${formatCompactCount(orgStats?.members)} members`,
+      label: buildMemberStatLabel(orgStats),
       color: "#0A84FF",
     },
     {
       key: "projects",
-      label: `${formatCompactCount(orgStats?.projects)} projects`,
+      label: `${formatCompactCount(orgStats?.projects)} repos`,
       color: "#06E5CC",
     },
     {
       key: "stars",
-      label: `${formatCompactCount(orgStats?.stars)} stars`,
+      label: `${formatCompactCount(orgStats?.stars)} repo stars`,
       color: "#F59E0B",
     },
     {
@@ -1153,6 +1168,9 @@ export default function CentralHub({
   const [homeStats, setHomeStats] = useState(DEFAULT_HOME_STATS);
   const [resourceCategories, setResourceCategories] = useState(RESOURCE_CATEGORIES);
 
+  // 设备性能检测，决定加载全量 3D 还是降级版本
+  const deviceTier = useDeviceCapability();
+
   useEffect(() => {
     let cancelled = false;
 
@@ -1223,7 +1241,7 @@ export default function CentralHub({
     const syncHomeStats = async () => {
       try {
         const [orgStatsRes, activitiesRes] = await Promise.all([
-          fetch(ORG_STATS_API),
+          fetch(ORG_STATS_API, { cache: "no-store" }),
           fetch(ACTIVITIES_API),
         ]);
         const [orgStats, activityPayload] = await Promise.all([
@@ -1237,8 +1255,8 @@ export default function CentralHub({
         if (!cancelled) {
           setHomeStats([
             { key: "members", label: "members unavailable", color: "#64748B" },
-            { key: "projects", label: "projects unavailable", color: "#64748B" },
-            { key: "stars", label: "stars unavailable", color: "#64748B" },
+            { key: "projects", label: "repos unavailable", color: "#64748B" },
+            { key: "stars", label: "repo stars unavailable", color: "#64748B" },
             { key: "activity", label: "events unavailable", color: "#64748B" },
           ]);
         }
@@ -1388,7 +1406,16 @@ export default function CentralHub({
                 ))}
               </div>
 
-              <GlobeCanvas size={globeSize} isDarkMode={isDarkMode} />
+              {/* 3D Globe — 低端设备使用 CSS 降级版 */}
+              <ErrorBoundary fallback={<GlobeCanvasFallback size={globeSize} isDarkMode={isDarkMode} />}>
+                <Suspense fallback={<GlobeCanvasFallback size={globeSize} isDarkMode={isDarkMode} />}>
+                  {deviceTier === "low" ? (
+                    <GlobeCanvasFallback size={globeSize} isDarkMode={isDarkMode} />
+                  ) : (
+                    <GlobeCanvas size={globeSize} isDarkMode={isDarkMode} quality={deviceTier} />
+                  )}
+                </Suspense>
+              </ErrorBoundary>
 
               {/* 右侧 HUD 面板 */}
               <div
@@ -1698,7 +1725,29 @@ export default function CentralHub({
               display: "flex",
             }}
           >
-            <WorksCarousel isDarkMode={isDarkMode} />
+            {/* WorksCarousel — 懒加载 + 错误边界 */}
+            <ErrorBoundary>
+              <Suspense
+                fallback={
+                  <div
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: 0.3,
+                      fontSize: 14,
+                      color: isDarkMode ? "#94a3b8" : "#64748b",
+                    }}
+                  >
+                    Loading…
+                  </div>
+                }
+              >
+                <WorksCarousel isDarkMode={isDarkMode} />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </>
       )}

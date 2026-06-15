@@ -1,18 +1,67 @@
-import { FOOTER_QUICK_LINKS } from "@/constants/about";
 import { RESOURCE_CATEGORIES } from "@/data/resources";
 import type { MobileNavItem, MobileNavSection } from "@/components/home/MobileNavigation";
+
+type PublicNavLink = {
+  title?: unknown;
+  label?: unknown;
+  url?: unknown;
+  href?: unknown;
+  description?: unknown;
+};
+
+const BASE_FRIEND_LINKS = [
+  { title: "电子科技大学成都学院", url: "https://www.cduestc.fun/" },
+  { title: "科成星球", url: "https://github.com/CDUESTC-OpenAtom-Open-Source-Club" },
+];
+
+const BASE_MINI_GAME_LINKS = [
+  { title: "吃豆人小游戏", url: "/games", description: "站内经典小游戏入口" },
+];
+
+const toPublicNavLink = (item: PublicNavLink) => ({
+  title: String(item?.title || item?.label || "").trim(),
+  url: String(item?.url || item?.href || "").trim(),
+  description: String(item?.description || "").trim(),
+});
+
+const mergePublicNavLinks = (baseLinks: PublicNavLink[], remoteLinks: PublicNavLink[] = []) => {
+  const seen = new Set<string>();
+  return [...baseLinks, ...remoteLinks]
+    .map(toPublicNavLink)
+    .filter((item) => item.title && item.url)
+    .filter((item) => {
+      const key = `${item.title}::${item.url}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
+const describeLink = (item: ReturnType<typeof toPublicNavLink>) => {
+  if (item.description) return item.description;
+  return item.url.replace(/^https?:\/\//, "");
+};
+
+const isExternalHref = (url: string) => /^https?:\/\//.test(url);
 
 export function buildMobileNavSections({
   activeCategory,
   onCategorySelect,
   onOpenAbout,
   onOpenActivity,
+  friendLinks = [],
+  miniGameLinks = [],
 }: {
   activeCategory: string | null;
   onCategorySelect: (categoryId: string | null) => void;
   onOpenAbout: () => void;
   onOpenActivity: () => void;
+  friendLinks?: PublicNavLink[];
+  miniGameLinks?: PublicNavLink[];
 }): MobileNavSection[] {
+  const mergedFriendLinks = mergePublicNavLinks(BASE_FRIEND_LINKS, friendLinks);
+  const mergedMiniGameLinks = mergePublicNavLinks(BASE_MINI_GAME_LINKS, miniGameLinks);
+
   return [
     {
       id: "resources",
@@ -47,15 +96,27 @@ export function buildMobileNavSections({
       ],
     },
     {
-      id: "links",
-      label: "外部链接",
-      items: FOOTER_QUICK_LINKS.map((link) => ({
-        id: link.label,
-        label: link.label.toLowerCase().includes("github") ? "项目地址" : link.label,
-        description: link.href.replace(/^https?:\/\//, ""),
-        href: link.href,
-        external: true,
-        icon: link.label.toLowerCase().includes("github") ? "github" : "branch",
+      id: "friend-links",
+      label: "友情链接",
+      items: mergedFriendLinks.map((link) => ({
+        id: `friend-${link.title}-${link.url}`,
+        label: link.title,
+        description: describeLink(link),
+        href: link.url,
+        external: isExternalHref(link.url),
+        icon: link.url.toLowerCase().includes("github.com") ? "github" : "branch",
+      })),
+    },
+    {
+      id: "mini-games",
+      label: "小游戏",
+      items: mergedMiniGameLinks.map((link) => ({
+        id: `game-${link.title}-${link.url}`,
+        label: link.title,
+        description: describeLink(link),
+        href: link.url,
+        external: isExternalHref(link.url),
+        icon: "gamepad",
       })),
     },
   ];

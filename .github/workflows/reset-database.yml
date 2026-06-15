@@ -1,0 +1,148 @@
+# .github/workflows/reset-database.yml
+# 手动触发数据库重置 workflow
+# 用法: 在 GitHub Actions 页面选择环境 (test/prod) 并运行
+name: Reset Database
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - test
+          - production
+      skip_backup:
+        description: "Skip database backup (dangerous)"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  reset_test:
+    name: Reset test database
+    if: ${{ inputs.environment == 'test' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: reset-test
+      cancel-in-progress: false
+    environment: test
+    steps:
+      - name: Configure SSH
+        env:
+          TEST_DEPLOY_SSH_KEY: ${{ secrets.TEST_DEPLOY_SSH_KEY }}
+          TEST_SSH_KNOWN_HOSTS: ${{ secrets.TEST_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${TEST_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          printf '%s\n' "${TEST_DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Run reset script on test server
+        env:
+          TEST_DEPLOY_HOST: ${{ secrets.TEST_DEPLOY_HOST }}
+          TEST_DEPLOY_PORT: ${{ secrets.TEST_DEPLOY_PORT }}
+          TEST_DEPLOY_USER: ${{ secrets.TEST_DEPLOY_USER }}
+          TEST_DEPLOY_PATH: ${{ secrets.TEST_DEPLOY_PATH }}
+          SKIP_BACKUP: ${{ inputs.skip_backup }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${TEST_DEPLOY_PORT}" \
+            "${TEST_DEPLOY_USER}@${TEST_DEPLOY_HOST}" \
+            "DEPLOY_PATH='${TEST_DEPLOY_PATH}' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          cd "${DEPLOY_PATH}"
+          chmod +x deploy/reset-database.sh
+
+          SKIP_FLAG=""
+          if [[ "${SKIP_BACKUP}" == "true" ]]; then
+            SKIP_FLAG="--skip-backup"
+          fi
+
+          ./deploy/reset-database.sh --env test ${SKIP_FLAG}
+          REMOTE
+
+      - name: Verify API endpoints
+        env:
+          TEST_DEPLOY_HOST: ${{ secrets.TEST_DEPLOY_HOST }}
+        run: |
+          echo "Verifying API endpoints..."
+
+          # 验证友链数量
+          FRIEND_LINKS=$(curl -s "https://${TEST_DEPLOY_HOST}/api/links?module=friend_links" | jq '.links | length' || echo "failed")
+          echo "Friend links count: ${FRIEND_LINKS}"
+
+          # 验证资源矩阵数量
+          RESOURCES=$(curl -s "https://${TEST_DEPLOY_HOST}/api/resources" | jq '.data | length' || echo "failed")
+          echo "Resources count: ${RESOURCES}"
+
+          # 验证小游戏数量
+          GAMES=$(curl -s "https://${TEST_DEPLOY_HOST}/api/links?module=mini_games" | jq '.links | length' || echo "failed")
+          echo "Mini games count: ${GAMES}"
+
+  reset_production:
+    name: Reset production database
+    if: ${{ inputs.environment == 'production' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: reset-production
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - name: Configure SSH
+        env:
+          PROD_DEPLOY_SSH_KEY: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${PROD_SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          printf '%s\n' "${PROD_DEPLOY_SSH_KEY}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+      - name: Run reset script on production server
+        env:
+          PROD_DEPLOY_HOST: ${{ secrets.PROD_DEPLOY_HOST }}
+          PROD_DEPLOY_PORT: ${{ secrets.PROD_DEPLOY_PORT }}
+          PROD_DEPLOY_USER: ${{ secrets.PROD_DEPLOY_USER }}
+          PROD_DEPLOY_PATH: ${{ secrets.PROD_DEPLOY_PATH }}
+          SKIP_BACKUP: ${{ inputs.skip_backup }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "${PROD_DEPLOY_PORT}" \
+            "${PROD_DEPLOY_USER}@${PROD_DEPLOY_HOST}" \
+            "DEPLOY_PATH='${PROD_DEPLOY_PATH}' bash -s" <<'REMOTE'
+          set -Eeuo pipefail
+
+          cd "${DEPLOY_PATH}"
+          chmod +x deploy/reset-database.sh
+
+          SKIP_FLAG=""
+          if [[ "${SKIP_BACKUP}" == "true" ]]; then
+            SKIP_FLAG="--skip-backup"
+          fi
+
+          ./deploy/reset-database.sh --env prod ${SKIP_FLAG}
+          REMOTE
+
+      - name: Verify API endpoints
+        env:
+          PROD_DOMAIN: ${{ secrets.PROD_DOMAIN }}
+        run: |
+          echo "Verifying API endpoints..."
+
+          # 验证友链数量
+          FRIEND_LINKS=$(curl -s "https://${PROD_DOMAIN}/api/links?module=friend_links" | jq '.links | length' || echo "failed")
+          echo "Friend links count: ${FRIEND_LINKS}"
+
+          # 验证资源矩阵数量
+          RESOURCES=$(curl -s "https://${PROD_DOMAIN}/api/resources" | jq '.data | length' || echo "failed")
+          echo "Resources count: ${RESOURCES}"
+
+          # 验证小游戏数量
+          GAMES=$(curl -s "https://${PROD_DOMAIN}/api/links?module=mini_games" | jq '.links | length' || echo "failed")
+          echo "Mini games count: ${GAMES}"

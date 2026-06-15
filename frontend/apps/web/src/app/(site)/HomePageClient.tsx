@@ -36,6 +36,10 @@ const THEME_SWITCH_COMMIT_MS = 480;
 const THEME_COLOR_TRANSITION_MS = 1000;
 const VALID_THEME_MODES = new Set(["light", "dark", "auto"]);
 const GITHUB_USER_API = "/api/github-users";
+const PUBLIC_LINKS_API = "/api/links";
+const PUBLIC_LINK_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const DEFAULT_THEME_MODE = "auto";
+const DEFAULT_AUTO_DARK_MODE = false;
 const getInitialThemeMode = () => {
   if (typeof window === "undefined") return "auto";
 
@@ -54,6 +58,14 @@ const getAvatarFallbackText = (login = "") => {
   const normalized = String(login || "").trim();
   return (normalized.slice(0, 2) || "?").toUpperCase();
 };
+const normalizePublicLinks = (list = []) =>
+  (Array.isArray(list) ? list : [])
+    .map((item) => ({
+      title: String(item?.title || "").trim(),
+      url: String(item?.url || "").trim(),
+      description: String(item?.description || "").trim(),
+    }))
+    .filter((item) => item.title && item.url);
 
 function AboutMemberAvatar({ avatarUrl, name, login }) {
   const [loadFailed, setLoadFailed] = useState(!avatarUrl);
@@ -89,11 +101,11 @@ export default function HomePage() {
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const [aboutOpen, setAboutOpen] = useState(false);
   const [activeAboutSection, setActiveAboutSection] = useState("mission");
-  const [themeMode, setThemeMode] = useState(() => getInitialThemeMode());
+  const [themeMode, setThemeMode] = useState(DEFAULT_THEME_MODE);
   const [isThemeSwitching, setIsThemeSwitching] = useState(false);
   const [themeTransitionTarget, setThemeTransitionTarget] = useState<string | null>(null);
   const [clientPrefsReady, setClientPrefsReady] = useState(false);
-  const [autoDarkMode, setAutoDarkMode] = useState(() => resolveAutoDarkMode());
+  const [autoDarkMode, setAutoDarkMode] = useState(DEFAULT_AUTO_DARK_MODE);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
   const [isTabletViewport, setIsTabletViewport] = useState(false);
   const [isPhoneViewport, setIsPhoneViewport] = useState(false);
@@ -102,6 +114,8 @@ export default function HomePage() {
   const [mobileMenuCloseSignal, setMobileMenuCloseSignal] = useState(0);
   const [mobileScrollHint, setMobileScrollHint] = useState(null);
   const [githubUserProfiles, setGithubUserProfiles] = useState({});
+  const [mobileFriendLinks, setMobileFriendLinks] = useState([]);
+  const [mobileMiniGameLinks, setMobileMiniGameLinks] = useState([]);
   const [adminTapCount, setAdminTapCount] = useState(0);
   const adminTapTimerRef = useRef(null);
   const themeSwitchTimerRef = useRef(null);
@@ -498,6 +512,40 @@ export default function HomePage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    let cancelled = false;
+
+    const fetchPublicLinks = async (module) => {
+      try {
+        const params = new URLSearchParams({ module });
+        const res = await fetch(`${PUBLIC_LINKS_API}?${params.toString()}`);
+        if (!res.ok) return [];
+        const payload = await res.json().catch(() => null);
+        return normalizePublicLinks(payload?.links || payload?.data || []);
+      } catch {
+        return [];
+      }
+    };
+
+    const syncMobilePublicLinks = async () => {
+      const [friendLinks, miniGameLinks] = await Promise.all([
+        fetchPublicLinks("friend_links"),
+        fetchPublicLinks("mini_games"),
+      ]);
+      if (cancelled) return;
+      setMobileFriendLinks(friendLinks);
+      setMobileMiniGameLinks(miniGameLinks);
+    };
+
+    void syncMobilePublicLinks();
+    const timer = window.setInterval(syncMobilePublicLinks, PUBLIC_LINK_REFRESH_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, []);
+
   const mobileNavSections = buildMobileNavSections({
     activeCategory,
     onCategorySelect: (categoryId) => {
@@ -506,6 +554,8 @@ export default function HomePage() {
     },
     onOpenAbout: openAboutPanel,
     onOpenActivity: openActivityPanel,
+    friendLinks: mobileFriendLinks,
+    miniGameLinks: mobileMiniGameLinks,
   });
 
   useEffect(() => {
@@ -544,10 +594,7 @@ export default function HomePage() {
         setFadeIn(true);
       }
 
-      const savedThemeMode = localStorage.getItem(THEME_MODE_STORAGE_KEY);
-      if (savedThemeMode && VALID_THEME_MODES.has(savedThemeMode)) {
-        setThemeMode(savedThemeMode);
-      }
+      setThemeMode(getInitialThemeMode());
 
       setClientPrefsReady(true);
     }, 0);
@@ -957,7 +1004,11 @@ export default function HomePage() {
               fontSize: "clamp(9px, 0.65vw, 10px)",
               color: "var(--text-footer)",
               cursor: "pointer",
+              appearance: "none",
+              background: "transparent",
+              border: 0,
               padding: 0,
+              textDecoration: "underline",
               transition: "color 0.15s",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.color = "#0A84FF")}

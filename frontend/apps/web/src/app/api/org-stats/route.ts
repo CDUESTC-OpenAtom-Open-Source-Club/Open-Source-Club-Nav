@@ -1,10 +1,14 @@
-import { fetchPublicBackend } from "@/lib/backend-proxy";
+import { fetchOrgStats } from "@/services/github";
 
-export const revalidate = 3600;
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export async function GET(request: Request) {
-  return fetchPublicBackend(request, "/api/org-stats", {
-    browserMaxAgeSeconds: 300,
-    sharedMaxAgeSeconds: 3600,
+export async function GET() {
+  const stats = await fetchOrgStats();
+  return Response.json(stats, {
+    headers: {
+      "Cache-Control": "no-store",
+      "CDN-Cache-Control": "no-store",
+    },
   });
 }
