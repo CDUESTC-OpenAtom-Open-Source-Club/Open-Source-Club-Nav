@@ -13,6 +13,7 @@ Before a pull request can be merged, every human contributor must sign the [Cont
 The CLA check is automated by GitHub Actions. If you have not signed yet, the bot will comment on your pull request. Reply with the exact signature sentence shown by the bot.
 
 Maintainers and automated bots may be allowlisted in the workflow when appropriate.
+Current repository collaborators are allowlisted so existing maintainers can keep the maintenance flow lightweight. New external contributors still need to sign the CLA before their first pull request can be merged.
 
 ## Branches
 
