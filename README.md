@@ -15,6 +15,10 @@ KCOS 开放原子开源社团导航平台，面向高校开源社团的资源导
 - 运行观测：后台展示前端网关、后端 API、数据库、Redis 和进程资源状态。
 - SEO：站点 metadata、搜索引擎验证文件、robots、动态 sitemap 和结构化数据。
 
+## 参与贡献
+
+欢迎通过 Issue 和 Pull Request 参与项目维护。提交前请阅读 [CONTRIBUTING.md](CONTRIBUTING.md)，并按 PR 流程完成 [CLA](CLA.md) 签署、Conventional Commits 标题、CI 检查和代码评审。
+
 ## 技术栈
 
 - Frontend：Next.js 16、React 19、TypeScript、Tailwind CSS、Three.js
