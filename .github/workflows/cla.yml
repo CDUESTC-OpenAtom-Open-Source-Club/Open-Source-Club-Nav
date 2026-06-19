@@ -32,8 +32,8 @@ jobs:
           path-to-document: https://github.com/CDUESTC-OpenAtom-Open-Source-Club/Open-Source-Club-Nav/blob/main/CLA.md
           path-to-signatures: signatures/version1/cla.json
           branch: cla-signatures
-          allowlist: dependabot[bot],github-actions[bot],renovate[bot]
+          allowlist: Memsetqwq,honkai-yan,Dirinkbottle,Tippydes,zrzqbr,Orange050808,universal-cat,iamkuangzhang,muzimu217,giseleth,bai-xi-km,ling301036,Lycorius03,Nerdlet369,forest1-gif,LRXZH,V09201030,Rainy-lin,whale123-whale,ylx157,venusooooo,dependabot[bot],github-actions[bot],renovate[bot]
           custom-pr-sign-comment: I have read the CLA Document and I hereby sign the CLA
-          custom-notsigned-prcomment: "Thank you for your contribution. Please read the Contributor License Agreement at $pathToCLADocument and comment: I have read the CLA Document and I hereby sign the CLA"
+          custom-notsigned-prcomment: "Thank you for your contribution. Please read the Contributor License Agreement at https://github.com/CDUESTC-OpenAtom-Open-Source-Club/Open-Source-Club-Nav/blob/main/CLA.md and comment: I have read the CLA Document and I hereby sign the CLA"
           custom-allsigned-prcomment: All contributors have signed the CLA.
           lock-pullrequest-aftermerge: false
