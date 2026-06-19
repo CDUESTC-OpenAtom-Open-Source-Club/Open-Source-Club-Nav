@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a reproducible problem.
+title: "fix: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please keep the report focused and reproducible.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Web frontend
+        - Go backend
+        - Mobile app
+        - Database
+        - Deployment/CI
+        - Documentation
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Start the app with ...
+        2. Open ...
+        3. Click ...
+        4. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or screenshots
+      description: Paste relevant logs, screenshots, or console output. Remove secrets first.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: macOS 15, Node 22, Go 1.26, Chrome 126
