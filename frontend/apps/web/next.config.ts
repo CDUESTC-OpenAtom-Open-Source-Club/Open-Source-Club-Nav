@@ -66,6 +66,20 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=2592000" },
         ],
       },
+      {
+        // sitemap.xml — 让 CDN 缓存1小时，避免每次回源导致 Googlebot 超时
+        source: "/sitemap.xml",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" },
+        ],
+      },
+      {
+        // robots.txt — 让 CDN 缓存1小时
+        source: "/robots.txt",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" },
+        ],
+      },
     ];
   },
 };
