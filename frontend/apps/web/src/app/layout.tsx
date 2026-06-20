@@ -30,6 +30,8 @@ const inter = Inter({
   variable: "--font-inter",
 });
 
+const enableProductionIntegrations = process.env.NODE_ENV === "production";
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
@@ -140,30 +142,52 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: jsonLdToString(jsonLd) }}
         />
 
-        {/* DNS 预连接：加速第三方资源 */}
-        <link rel="preconnect" href="https://sdk.51.la" crossOrigin="anonymous" />
-        <link rel="dns-prefetch" href="https://sdk.51.la" />
+        {enableProductionIntegrations ? (
+          <>
+            {/* DNS 预连接：加速第三方资源 */}
+            <link rel="preconnect" href="https://sdk.51.la" crossOrigin="anonymous" />
+            <link rel="dns-prefetch" href="https://sdk.51.la" />
 
-        {/* 51.LA 统计：降级为 lazyOnload，不阻塞首屏渲染 */}
-        <Script
-          id="LA_COLLECT"
-          src="https://sdk.51.la/js-sdk-pro.min.js"
-          strategy="lazyOnload"
-        />
-        <Script
-          id="la-collect-init"
-          strategy="lazyOnload"
-          dangerouslySetInnerHTML={{
-            __html:
-              'LA.init({id:"3QJPple08RRBVP8s",ck:"3QJPple08RRBVP8s",autoTrack:true,hashMode:true,screenRecord:true})',
-          }}
-        />
+            {/* 51.LA 统计：降级为 lazyOnload，不阻塞首屏渲染 */}
+            <Script
+              id="LA_COLLECT"
+              src="https://sdk.51.la/js-sdk-pro.min.js"
+              strategy="lazyOnload"
+            />
+            <Script
+              id="la-collect-init"
+              strategy="lazyOnload"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  (function initLA(retries) {
+                    var sdk = window.LA;
+                    if (sdk && typeof sdk.init === "function") {
+                      sdk.init({
+                        id: "3QJPple08RRBVP8s",
+                        ck: "3QJPple08RRBVP8s",
+                        autoTrack: true,
+                        hashMode: true,
+                        screenRecord: true
+                      });
+                      return;
+                    }
+                    if (retries > 0) {
+                      window.setTimeout(function () {
+                        initLA(retries - 1);
+                      }, 500);
+                    }
+                  })(10);
+                `,
+              }}
+            />
+          </>
+        ) : null}
       </head>
       <body className={`${inter.className} min-h-full flex flex-col`}>
         {children}
         {/* Core Web Vitals 采集 + 百度自动推送（零 UI、不阻塞渲染） */}
         <WebVitalsReporter />
-        <BaiduAutoPush />
+        {enableProductionIntegrations ? <BaiduAutoPush /> : null}
       </body>
     </html>
   );

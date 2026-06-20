@@ -492,7 +492,7 @@ export default function HomePage() {
 
   const openActivityPanel = useCallback(() => {
     setMobileActivityOpen(true);
-    closeMobileLayers();
+    requestMobileMenuClose();
     if (mobileActivityScrollTimerRef.current) {
       window.clearTimeout(mobileActivityScrollTimerRef.current);
     }
@@ -501,8 +501,8 @@ export default function HomePage() {
         behavior: "smooth",
         block: "start",
       });
-    }, 1050);
-  }, [closeMobileLayers]);
+    }, 480);
+  }, [requestMobileMenuClose]);
 
   useEffect(() => {
     return () => {
@@ -817,12 +817,14 @@ export default function HomePage() {
       />
 
       <div
+        className="kcos-home-main-shell"
         style={{
           flex: 1,
           display: "flex",
           overflow: isMobileViewport ? "auto" : "hidden",
           position: "relative",
           minHeight: 0,
+          paddingTop: isMobileViewport ? 48 : 0,
         }}
       >
         <div
@@ -2038,6 +2040,17 @@ export default function HomePage() {
         }
         @media (max-width: 1200px) {
           .hidden.lg\\:flex { display: none !important; }
+          .kcos-hud-header {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            width: 100% !important;
+            flex-shrink: 0 !important;
+          }
+          .kcos-home-main-shell {
+            padding-top: 48px !important;
+          }
         }
         @media (max-width: 980px) {
           .about-layout {

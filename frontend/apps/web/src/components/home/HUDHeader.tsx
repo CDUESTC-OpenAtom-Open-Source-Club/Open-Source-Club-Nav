@@ -120,6 +120,7 @@ export default function HUDHeader({
 
   return (
     <header
+      className="kcos-hud-header"
       style={{
         height: compact ? 48 : HEADER_HEIGHT,
         background: "var(--panel-bg)",
@@ -129,9 +130,12 @@ export default function HUDHeader({
         display: "flex",
         alignItems: "center",
         padding: `0 ${HEADER_PADDING_X}`,
-        position: "sticky",
+        position: compact ? "fixed" : "sticky",
         top: 0,
+        left: compact ? 0 : undefined,
+        right: compact ? 0 : undefined,
         zIndex: 100,
+        flexShrink: 0,
       }}
     >
       <a

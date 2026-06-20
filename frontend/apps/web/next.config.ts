@@ -67,10 +67,11 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // sitemap.xml — 让 CDN 缓存1小时，避免每次回源导致 Googlebot 超时
+        // sitemap.xml — 移除 RSC Vary 头，确保 CDN 能正常缓存（Googlebot 抓取需要）
         source: "/sitemap.xml",
         headers: [
           { key: "Cache-Control", value: "public, max-age=3600, stale-while-revalidate=86400" },
+          { key: "Vary", value: "Accept-Encoding" },
         ],
       },
       {

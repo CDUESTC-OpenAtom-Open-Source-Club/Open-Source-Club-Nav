@@ -365,7 +365,7 @@ export function MobileNavigationPanel({
       enterTimerRef.current = null;
     }
     setPhase("closing");
-    closeFallbackRef.current = window.setTimeout(onClose, 1100);
+    closeFallbackRef.current = window.setTimeout(onClose, 520);
   };
 
   useEffect(() => {
@@ -479,9 +479,9 @@ export function MobileNavigationPanel({
           -webkit-backdrop-filter: blur(0);
           backdrop-filter: blur(0);
           transition:
-            background 920ms cubic-bezier(0.17, 0.9, 0.2, 1.04),
-            -webkit-backdrop-filter 920ms cubic-bezier(0.17, 0.9, 0.2, 1.04),
-            backdrop-filter 920ms cubic-bezier(0.17, 0.9, 0.2, 1.04);
+            background 620ms cubic-bezier(0.17, 0.9, 0.2, 1.04),
+            -webkit-backdrop-filter 620ms cubic-bezier(0.17, 0.9, 0.2, 1.04),
+            backdrop-filter 620ms cubic-bezier(0.17, 0.9, 0.2, 1.04);
         }
 
         .mobile-nav-overlay[data-mobile-nav-phase="open"] {
@@ -491,8 +491,17 @@ export function MobileNavigationPanel({
         }
 
         .mobile-nav-panel {
-          transition: transform 920ms cubic-bezier(0.17, 0.9, 0.2, 1.04);
+          transition: transform 620ms cubic-bezier(0.17, 0.9, 0.2, 1.04);
           will-change: transform;
+        }
+
+        .mobile-nav-overlay[data-mobile-nav-phase="closing"] {
+          transition-duration: 280ms;
+        }
+
+        .mobile-nav-panel[data-mobile-nav-phase="closing"] {
+          transition-duration: 360ms;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
         }
       `}</style>
     </div>
