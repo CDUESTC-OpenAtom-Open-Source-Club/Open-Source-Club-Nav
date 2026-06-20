@@ -155,7 +155,7 @@ export default function RootLayout({
           strategy="lazyOnload"
           dangerouslySetInnerHTML={{
             __html:
-              'LA.init({id:"3QGu1nAk7TzHyWGi",ck:"3QGu1nAk7TzHyWGi",autoTrack:true,hashMode:true})',
+              'LA.init({id:"3QJPple08RRBVP8s",ck:"3QJPple08RRBVP8s",autoTrack:true,hashMode:true})',
           }}
         />
       </head>
