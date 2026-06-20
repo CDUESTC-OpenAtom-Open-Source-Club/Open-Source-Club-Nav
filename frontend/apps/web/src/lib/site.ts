@@ -1,3 +1,10 @@
+/**
+ * 站点全局常量与 SEO 路由配置
+ *
+ * 所有与站点身份、URL、路由优先级相关的常量集中管理，
+ * 供 layout / sitemap / robots / SEO 工具复用。
+ */
+
 export const SITE_URL = "https://nav.kcos.club";
 export const SITE_NAME = "KCOS 开放原子开源社团";
 export const SITE_TITLE = "KCOS 开放原子开源社团 - 开源导航平台";
@@ -9,14 +16,69 @@ export const SITE_IMAGE_PATH = "/images/brand/club-logo-user.jpg";
 export const SITE_GITHUB_URL =
   "https://github.com/CDUESTC-OpenAtom-Open-Source-Club/Open-Source-Club-Nav";
 export const SITE_OFFICIAL_URL = "https://opensouce-club.top/";
-export const SITE_ALTERNATE_NAMES = ["OpenAtom Club Nav", "KCOS 导航", "科成开放原子开源社团"];
+export const SITE_ALTERNATE_NAMES = [
+  "OpenAtom Club Nav",
+  "KCOS 导航",
+  "科成开放原子开源社团",
+];
 
-export const SITEMAP_ROUTES = [
-  { path: "/", changeFrequency: "weekly", priority: 1 },
-  { path: "/home", changeFrequency: "weekly", priority: 0.8 },
-  { path: "/games", changeFrequency: "monthly", priority: 0.6 },
-] as const;
+// ─── SEO 路由定义 ──────────────────────────────────────────
+// 每个路由包含：路径、变更频率、优先级、是否可索引、页面标题与描述
+
+export interface SeoRoute {
+  path: string;
+  changeFrequency: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
+  priority: number;
+  indexable: boolean;
+  title: string;
+  description: string;
+}
+
+export const SEO_ROUTES: SeoRoute[] = [
+  {
+    path: "/",
+    changeFrequency: "weekly",
+    priority: 1.0,
+    indexable: true,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  {
+    path: "/games",
+    changeFrequency: "monthly",
+    priority: 0.6,
+    indexable: true,
+    title: "小游戏 | KCOS 开放原子开源社团",
+    description:
+      "KCOS 开放原子开源社团小游戏入口，提供吃豆人等站内互动玩法和社团小游戏资源导航。",
+  },
+  {
+    path: "/home",
+    changeFrequency: "weekly",
+    priority: 0.3,
+    indexable: false, // 资料区为仪表盘，不索引
+    title: "资料区 | KCOS 开放原子开源社团",
+    description: "KCOS 开放原子开源社团资料区与动态面板。",
+  },
+];
+
+// 兼容旧引用名
+export const SITEMAP_ROUTES = SEO_ROUTES;
 
 export function absoluteSiteUrl(path = "/"): string {
   return new URL(path, SITE_URL).toString();
+}
+
+/**
+ * 获取所有可索引路由（用于 sitemap）
+ */
+export function getIndexableRoutes(): SeoRoute[] {
+  return SEO_ROUTES.filter((r) => r.indexable);
+}
+
+/**
+ * 根据路径查找路由配置
+ */
+export function findRoute(path: string): SeoRoute | undefined {
+  return SEO_ROUTES.find((r) => r.path === path);
 }
