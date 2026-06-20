@@ -20,6 +20,7 @@ import {
   jsonLdToString,
 } from "@/lib/seo";
 import WebVitalsReporter from "@/components/shared/WebVitalsReporter";
+import VisitTracker from "@/components/shared/VisitTracker";
 import BaiduAutoPush from "@/components/shared/BaiduAutoPush";
 
 const inter = Inter({
@@ -136,6 +137,14 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning className={inter.variable}>
       <head>
+        {/* dev 模式：在 HTML 解析阶段同步注销残留 Service Worker，防止 SW 拦截返回旧资源 */}
+        {process.env.NODE_ENV === "development" ? (
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `if("serviceWorker" in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(x){x.unregister()})})}if(window.caches&&caches.keys){caches.keys().then(function(k){k.forEach(function(n){caches.delete(n)})})}`,
+            }}
+          />
+        ) : null}
         {/* 结构化数据 */}
         <script
           type="application/ld+json"
@@ -185,7 +194,8 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} min-h-full flex flex-col`}>
         {children}
-        {/* Core Web Vitals 采集 + 百度自动推送（零 UI、不阻塞渲染） */}
+        {/* 页面访问埋点 + Core Web Vitals 采集 + 百度自动推送（零 UI、不阻塞渲染） */}
+        <VisitTracker />
         <WebVitalsReporter />
         {enableProductionIntegrations ? <BaiduAutoPush /> : null}
       </body>

@@ -5,6 +5,7 @@ import { ExternalLink, X } from "lucide-react";
 import ErrorBoundary from "@/components/shared/ErrorBoundary";
 import { useDeviceCapability } from "@/hooks/useDeviceCapability";
 import { RESOURCE_CATEGORIES } from "@/data/resources";
+import { trackOutboundClick } from "@/lib/track-outbound";
 
 // ── 懒加载重型 3D / Canvas 组件 ──
 const GlobeCanvas = lazy(() => import("@/components/shared/GlobeCanvas"));
@@ -307,6 +308,14 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
 
   const openLink = (link) => {
     const meta = getLinkMeta(link.url);
+
+    // 点击埋点
+    trackOutboundClick({
+      targetUrl: meta.href,
+      targetLabel: link.title,
+      sourceContext: `resource_panel:${cat?.sublabel ?? "unknown"}`,
+    });
+
     if (meta.isExternal) {
       window.open(meta.href, "_blank", "noopener,noreferrer");
       return;
@@ -465,7 +474,18 @@ function HologramPanel({ category, categories, onClose, isDarkMode }) {
               onMouseEnter={() => {
                 if (!isMobile) setHoveredLink(i);
               }}
-              onClick={(e) => handleMobileCardAction(e, link, i)}
+              onClick={(e) => {
+                if (isMobile) {
+                  handleMobileCardAction(e, link, i);
+                } else {
+                  // 桌面端点击链接时记录埋点
+                  trackOutboundClick({
+                    targetUrl: linkMeta.href,
+                    targetLabel: link.title,
+                    sourceContext: `resource_panel:${cat?.sublabel ?? "unknown"}`,
+                  });
+                }
+              }}
               style={{
                 display: "flex",
                 flexDirection: "column",

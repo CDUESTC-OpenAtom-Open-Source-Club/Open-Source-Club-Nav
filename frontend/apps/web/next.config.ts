@@ -12,9 +12,14 @@ import type { NextConfig } from "next";
  */
 const nextConfig: NextConfig = {
   output: "standalone",
+  serverExternalPackages: ["three"],
   reactCompiler: true,
   poweredByHeader: false,
   compress: true,
+
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
+  },
 
   images: {
     formats: ["image/avif", "image/webp"],
@@ -30,6 +35,7 @@ const nextConfig: NextConfig = {
 
   // 安全头 & 缓存策略
   async headers() {
+    const isDev = process.env.NODE_ENV === "development";
     return [
       {
         source: "/(.*)",
@@ -39,17 +45,15 @@ const nextConfig: NextConfig = {
           { key: "X-DNS-Prefetch-Control", value: "on" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
+          // dev 模式强制禁用缓存，避免浏览器持有旧资源
+          ...(isDev ? [{ key: "Cache-Control" as const, value: "no-store, no-cache, must-revalidate" }] : []),
         ],
       },
       {
-        // 静态资源长缓存
+        // 静态资源长缓存（仅生产环境生效；dev 模式上方 no-store 覆盖）
         source: "/_next/static/(.*)",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Cache-Control", value: isDev ? "no-store, no-cache, must-revalidate" : "public, max-age=31536000, immutable" },
         ],
       },
       {

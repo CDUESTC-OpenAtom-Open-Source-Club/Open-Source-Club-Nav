@@ -2,7 +2,19 @@
 import { useEffect, useRef } from "react";
 import type { CSSProperties } from "react";
 import type { DeviceTier } from "@/hooks/useDeviceCapability";
-import * as THREE from "three";
+import {
+  WebGLRenderer,
+  Scene,
+  PerspectiveCamera,
+  SphereGeometry,
+  MeshBasicMaterial,
+  Mesh,
+  TorusGeometry,
+  BufferGeometry,
+  BufferAttribute,
+  PointsMaterial,
+  Points,
+} from "three";
 
 /**
  * GlobeCanvasProps
@@ -78,42 +90,42 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
 
     const w = size;
     const h = size;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: isHigh, alpha: true });
+    const renderer = new WebGLRenderer({ canvas, antialias: isHigh, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxDpr));
     renderer.setSize(w, h, false);
     renderer.setClearColor(0x000000, 0);
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 100);
+    const scene = new Scene();
+    const camera = new PerspectiveCamera(55, w / h, 0.1, 100);
     camera.position.z = 3.8;
 
-    const sphereGeo = new THREE.SphereGeometry(1.4, sphereSegW, sphereSegH);
+    const sphereGeo = new SphereGeometry(1.4, sphereSegW, sphereSegH);
     const initialTheme = themeRef.current;
-    const sphereMat = new THREE.MeshBasicMaterial({
+    const sphereMat = new MeshBasicMaterial({
       color: initialTheme.sphereColor, wireframe: true, transparent: true, opacity: initialTheme.sphereOpacityBase,
     });
-    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+    const sphere = new Mesh(sphereGeo, sphereMat);
     scene.add(sphere);
 
-    const outerGeo = new THREE.SphereGeometry(1.52, outerSegW, outerSegH);
-    const outerMat = new THREE.MeshBasicMaterial({
+    const outerGeo = new SphereGeometry(1.52, outerSegW, outerSegH);
+    const outerMat = new MeshBasicMaterial({
       color: initialTheme.outerColor, wireframe: true, transparent: true, opacity: initialTheme.outerOpacity,
     });
-    const outer = new THREE.Mesh(outerGeo, outerMat);
+    const outer = new Mesh(outerGeo, outerMat);
     scene.add(outer);
 
-    const ringGeo = new THREE.TorusGeometry(1.48, 0.006, 2, ringSegments);
-    const ringMat = new THREE.MeshBasicMaterial({
+    const ringGeo = new TorusGeometry(1.48, 0.006, 2, ringSegments);
+    const ringMat = new MeshBasicMaterial({
       color: initialTheme.ringColor, transparent: true, opacity: initialTheme.ringOpacityBase,
     });
-    const ring = new THREE.Mesh(ringGeo, ringMat);
+    const ring = new Mesh(ringGeo, ringMat);
     scene.add(ring);
 
-    const ring2 = new THREE.Mesh(
-      new THREE.TorusGeometry(1.56, 0.004, 2, ringSegments),
-      new THREE.MeshBasicMaterial({ color: initialTheme.sphereColor, transparent: true, opacity: initialTheme.ring2Opacity }),
+    const ring2 = new Mesh(
+      new TorusGeometry(1.56, 0.004, 2, ringSegments),
+      new MeshBasicMaterial({ color: initialTheme.sphereColor, transparent: true, opacity: initialTheme.ring2Opacity }),
     );
-    const ring2Mat = ring2.material as THREE.MeshBasicMaterial;
+    const ring2Mat = ring2.material as MeshBasicMaterial;
     ring2.rotation.x = Math.PI / 3;
     scene.add(ring2);
 
@@ -126,12 +138,12 @@ export default function GlobeCanvas({ isDarkMode = false, pulse = false, size = 
       positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
       positions[i * 3 + 2] = r * Math.cos(phi);
     }
-    const particleGeo = new THREE.BufferGeometry();
-    particleGeo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-    const particleMat = new THREE.PointsMaterial({
+    const particleGeo = new BufferGeometry();
+    particleGeo.setAttribute("position", new BufferAttribute(positions, 3));
+    const particleMat = new PointsMaterial({
       color: initialTheme.outerColor, size: 0.03, transparent: true, opacity: initialTheme.particleOpacity,
     });
-    const particles = new THREE.Points(particleGeo, particleMat);
+    const particles = new Points(particleGeo, particleMat);
     scene.add(particles);
 
     sceneRef.current = { renderer };

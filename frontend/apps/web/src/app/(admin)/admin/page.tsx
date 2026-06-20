@@ -1,9 +1,17 @@
 ﻿"use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties, FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Activity, ArrowRight, BarChart3, Clock3, Database, Eye, Gauge, LayoutDashboard, ListChecks, MousePointerClick, Radio, ServerCog, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import PortalTooltip from "@/components/shared/PortalTooltip";
+import {
+  AdminHealthSection,
+  AdminLogsSection,
+  AdminResponsiveCriticalStyles,
+  AdminUserCard,
+  AdminUsersSection,
+} from "@/components/admin/AdminResponsiveSections";
 type AdminUser = {
   id: number;
   username: string;
@@ -207,12 +215,6 @@ function formatHealthCheckedAt(value?: string | null): string {
   return String(value).replace("T", " ").slice(0, 19);
 }
 
-function healthStatusText(item: LinkHealth): string {
-  if (isHealthOk(item)) return "运行正常";
-  if (item.status_code) return `HTTP ${item.status_code}`;
-  return "连接失败";
-}
-
 function toHumanDetail(log: LinkLog): string {
   const detail = parseDetailObject(log.detail);
   if (!detail) return "-";
@@ -221,9 +223,17 @@ function toHumanDetail(log: LinkLog): string {
   if (action.includes("health")) {
     const checked = Number(detail.checked || 0);
     const failed = Number(detail.failed || 0);
+    const skipped = Number(detail.skipped || 0);
+    const total = Number(detail.total || checked + skipped);
     const reason = String(detail.reason || "");
-    const reasonText = reason === "manual_probe" ? "手动触发" : reason === "realtime_poll" ? "轮询触发" : "";
-    return `健康检测：共检测 ${checked} 项，异常 ${failed} 项${reasonText ? `（${reasonText}）` : ""}`;
+    const reasonText = reason === "manual_probe" || reason === "manual_probe_stream"
+      ? "手动触发"
+      : reason === "realtime_poll"
+        ? "轮询触发"
+        : "";
+    const totalText = total > 0 ? `${checked}/${total}` : String(checked);
+    const skippedText = skipped > 0 ? `，跳过 ${skipped} 项` : "";
+    return `健康检测：检测 ${totalText} 项，异常 ${failed} 项${skippedText}${reasonText ? `（${reasonText}）` : ""}`;
   }
 
   if (action.includes("create_link")) {
@@ -335,6 +345,19 @@ function formatBytes(bytes: number | null | undefined): string {
 function formatDateTime(value?: string | null): string {
   if (!value) return "-";
   return String(value).replace("T", " ").slice(0, 19);
+}
+
+function normalizeStatDateKey(value?: string | null): string {
+  const raw = String(value || "");
+  const directMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (directMatch) return directMatch[1];
+
+  const parsed = new Date(raw);
+  if (!Number.isFinite(parsed.getTime())) return "";
+  const yyyy = parsed.getFullYear();
+  const mm = String(parsed.getMonth() + 1).padStart(2, "0");
+  const dd = String(parsed.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 function isServiceOnline(service?: ServiceProbe | null): boolean {
@@ -510,7 +533,7 @@ export default function AdminPage() {
   const hourlyDataNote = hasDailyActivity && !hasHourlyDetail
     ? "日统计已更新，小时明细暂无事件采样"
     : "日统计与小时明细来自同一统计接口";
-  const recentLogs = useMemo(() => logs.slice(0, 5), [logs]);
+  const recentLogs = useMemo(() => logs.slice(0, 3), [logs]);
 
   const hourlyLineChart = useMemo(() => {
     const metricKeys: StatMetricKey[] = ["page_views", "unique_visitors", "link_clicks"];
@@ -615,7 +638,10 @@ export default function AdminPage() {
   }, [health]);
 
   const monthlyStats = useMemo(() => {
-    const sorted = [...stats].sort((a, b) => String(a.stat_date).localeCompare(String(b.stat_date)));
+    const sorted = stats
+      .map((item) => ({ ...item, stat_date: normalizeStatDateKey(item.stat_date) }))
+      .filter((item) => item.stat_date)
+      .sort((a, b) => a.stat_date.localeCompare(b.stat_date));
     const latestDate = sorted.length
       ? new Date(`${sorted[sorted.length - 1].stat_date}T00:00:00`)
       : new Date();
@@ -1073,10 +1099,10 @@ export default function AdminPage() {
   const runHealthCheck = useCallback(async () => {
     if (healthChecking) return;
     setHealthChecking(true);
-    setHealthProgress({ checked: 0, total: 0, failed: 0 });
+    setHealthProgress({ checked: 0, total: health.length, failed: 0 });
 
     try {
-      const res = await fetch("/api/admin/link-health?stream=1", { method: "POST" });
+      const res = await fetch("/api/admin/link-health?stream=1&force=1", { method: "POST" });
       if (!res.ok) {
         const data = await readJsonSafe<{ error?: string }>(res);
         throw new Error(data?.error || "检测失败");
@@ -1113,7 +1139,7 @@ export default function AdminPage() {
         }
       }
 
-      await loadHealth();
+      await Promise.all([loadHealth(), loadLogs().catch(() => {})]);
       const nowIso = new Date().toISOString();
       setLastAutoDetectAt(nowIso);
       if (typeof window !== "undefined") {
@@ -1124,9 +1150,9 @@ export default function AdminPage() {
     } finally {
       setHealthChecking(false);
       // 检测完成后短暂延迟再隐藏进度条（让用户看到100%状态）
-      setTimeout(() => setHealthProgress(null), 500);
+      setTimeout(() => setHealthProgress(null), 1500);
     }
-  }, [healthChecking, loadHealth]);
+  }, [health.length, healthChecking, loadHealth, loadLogs]);
 
   const checkSingleLink = async (linkId: number) => {
     if (checkingLinkId !== null) return;
@@ -1192,11 +1218,17 @@ export default function AdminPage() {
     if (activeSection !== "overview") return;
     let closed = false;
     let fallbackTimer: number | null = null;
+    let stateTimer: number | null = null;
     let stream: EventSource | null = null;
+    const setStreamStateDeferred = (state: "connecting" | "live" | "fallback") => {
+      stateTimer = window.setTimeout(() => {
+        if (!closed) setSystemStreamState(state);
+      }, 0);
+    };
 
     const startFallback = () => {
       if (fallbackTimer !== null) return;
-      setSystemStreamState("fallback");
+      setStreamStateDeferred("fallback");
       loadSystem().catch(() => {});
       fallbackTimer = window.setInterval(() => {
         loadSystem().catch(() => {});
@@ -1210,7 +1242,7 @@ export default function AdminPage() {
       };
     }
 
-    setSystemStreamState("connecting");
+    setStreamStateDeferred("connecting");
     stream = new EventSource("/api/admin/system/stream", { withCredentials: true });
 
     stream.onopen = () => {
@@ -1235,6 +1267,7 @@ export default function AdminPage() {
 
     return () => {
       closed = true;
+      if (stateTimer !== null) window.clearTimeout(stateTimer);
       stream?.close();
       if (fallbackTimer !== null) window.clearInterval(fallbackTimer);
     };
@@ -1308,6 +1341,7 @@ export default function AdminPage() {
 
   return (
     <div className="admin-shell" style={{ display: "grid", gap: 12, position: "relative", zIndex: 1 }}>
+      <AdminResponsiveCriticalStyles />
       <div className="admin-console-layout">
         <aside className="admin-console-sidebar">
           <div className="admin-console-side-title">控制台</div>
@@ -1351,22 +1385,7 @@ export default function AdminPage() {
 
         <div className="admin-console-content">
       {/* 顶部信息卡：当前登录用户与快捷操作 */}
-      <div id="overview" className="admin-card admin-console-anchor-card" style={{ padding: 14, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, background: "rgba(226,238,252,0.94)", borderColor: "#93C5FD", boxShadow: "0 14px 34px rgba(37,99,235,0.18)" }}>
-        <div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "#0F172A" }}>管理后台</div>
-          <div style={{ fontSize: 12, color: "#64748B" }}>
-            当前用户：{user.username}（{user.role === "super" ? "超级管理员" : "编辑"}）
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button type="button" onClick={() => router.push("/")} className="admin-btn-ghost">
-            返回首页
-          </button>
-          <button type="button" onClick={logout} className="admin-btn-ghost">
-            退出登录
-          </button>
-        </div>
-      </div>
+      <AdminUserCard user={user} onHome={() => router.push("/")} onLogout={logout} />
 
       {error ? (
         <div className="admin-console-error" style={{ color: "#B91C1C", fontSize: 13 }}>
@@ -1377,7 +1396,7 @@ export default function AdminPage() {
       {/* 按当前激活分区显示对应内容 */}
       {activeSection === "overview" ? (
         <div className="admin-section-transition">
-          <div className="admin-card admin-console-pagehead admin-overview-panel" style={{ padding: 16 }}>
+          <div className="admin-card admin-console-pagehead admin-overview-panel">
             <div className="admin-console-title-row">
               <span className="admin-console-icon-badge admin-console-icon-badge-soft">
                 <LayoutDashboard size={16} />
@@ -1698,6 +1717,7 @@ export default function AdminPage() {
           </div>
           <div className="admin-card admin-console-chart-card admin-console-anchor-card admin-overview-panel" style={{ padding: 12 }}>
             <div
+              className="admin-monthly-chart-layout"
               style={{
                 display: "grid",
                 gridTemplateColumns: "minmax(280px, 0.9fr) minmax(0, 1.6fr)",
@@ -1706,6 +1726,7 @@ export default function AdminPage() {
               }}
             >
               <div
+                className="admin-monthly-control-panel"
                 style={{
                   border: "1px solid #DCE8F8",
                   borderRadius: 14,
@@ -1725,7 +1746,7 @@ export default function AdminPage() {
                   <div style={{ fontSize: 12, color: "#64748B" }}>切换指标与日期区间，图表会即时响应。</div>
                 </div>
 
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div className="admin-monthly-metric-tabs" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {(Object.keys(STAT_METRIC_META) as StatMetricKey[]).map((metricKey) => {
                     const isActive = metricKey === activeStatMetric;
                     return (
@@ -1748,12 +1769,12 @@ export default function AdminPage() {
                   })}
                 </div>
 
-                <div style={{ display: "grid", gap: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <div className="admin-monthly-date-group" style={{ display: "grid", gap: 8 }}>
+                  <div className="admin-monthly-date-head" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
                     <span style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>日期区间</span>
                     <span style={{ fontSize: 11, color: "#94A3B8" }}>{monthRangeMin ? monthRangeMin.slice(0, 7) : ""}</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, alignItems: "center" }}>
+                  <div className="admin-monthly-date-inputs" style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 8, alignItems: "center" }}>
                     <input
                       type="date"
                       className="admin-input"
@@ -1774,7 +1795,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+                <div className="admin-monthly-summary-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
                   <div className="admin-overview-submetric" style={{ border: "1px solid #E2E8F0", borderRadius: 12, padding: 10, background: "#FFFFFF" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#64748B" }}>
                       <BarChart3 size={12} />
@@ -1802,7 +1823,7 @@ export default function AdminPage() {
               </div>
 
               <div
-                className="admin-console-chart-surface"
+                className="admin-console-chart-surface admin-monthly-chart-surface"
                 style={{
                   minHeight: 320,
                   border: "1px dashed #93C5FD",
@@ -1814,7 +1835,7 @@ export default function AdminPage() {
                 }}
               >
                 {filteredMonthlyStats.length ? (
-                  <div style={{ display: "grid", gap: 10 }}>
+                  <div className="admin-monthly-chart-inner" style={{ display: "grid", gap: 10 }}>
                     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
                       <div style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>
                         当前指标：{STAT_METRIC_META[activeStatMetric].label}
@@ -1856,6 +1877,7 @@ export default function AdminPage() {
                     </div>
 
                     <div
+                      className="admin-monthly-bars"
                       style={{
                         display: "flex",
                         alignItems: "flex-end",
@@ -1871,11 +1893,25 @@ export default function AdminPage() {
                       {filteredMonthlyStats.map((item, index) => {
                         const value = Number(item[activeStatMetric] || 0);
                         const barHeight = Math.max(12, Math.round((value / maxBarValue) * 180));
+                        const barPercent = Math.max(4, Math.round((value / maxBarValue) * 100));
                         const isActive = hoveredMonthlyIndex === index;
+                        const barStyle = {
+                          "--admin-monthly-bar-percent": `${barPercent}%`,
+                          width: 18,
+                          height: barHeight,
+                          borderRadius: "8px 8px 3px 3px",
+                          border: "1px solid " + STAT_METRIC_META[activeStatMetric].color + "55",
+                          background: "linear-gradient(180deg, " + STAT_METRIC_META[activeStatMetric].bg + ", " + STAT_METRIC_META[activeStatMetric].color + ")",
+                          transform: isActive ? "translateY(-3px) scale(1.02)" : "translateY(0) scale(1)",
+                          boxShadow: isActive ? "0 10px 22px rgba(37,99,235,0.18)" : "none",
+                          transition: "transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease",
+                          filter: isActive ? "saturate(1.1)" : "saturate(0.98)",
+                        } as CSSProperties;
                         return (
                           <button
                             key={item.stat_date}
                             type="button"
+                            className="admin-monthly-bar-item"
                             onMouseEnter={() => setHoveredMonthlyIndex(index)}
                             onMouseLeave={() => setHoveredMonthlyIndex(null)}
                             onFocus={() => setHoveredMonthlyIndex(index)}
@@ -1891,24 +1927,16 @@ export default function AdminPage() {
                               cursor: "pointer",
                             }}
                           >
-                            <div style={{ fontSize: 10, color: "#64748B", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", opacity: isActive ? 1 : 0.85 }}>
+                            <div className="admin-monthly-bar-value" style={{ fontSize: 10, color: "#64748B", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", opacity: isActive ? 1 : 0.85 }}>
                               {value}
                             </div>
                             <div
+                              className="admin-monthly-bar"
                               title={item.stat_date + " " + STAT_METRIC_META[activeStatMetric].label + "：" + value}
-                              style={{
-                                width: 18,
-                                height: barHeight,
-                                borderRadius: "8px 8px 3px 3px",
-                                border: "1px solid " + STAT_METRIC_META[activeStatMetric].color + "55",
-                                background: "linear-gradient(180deg, " + STAT_METRIC_META[activeStatMetric].bg + ", " + STAT_METRIC_META[activeStatMetric].color + ")",
-                                transform: isActive ? "translateY(-3px) scale(1.02)" : "translateY(0) scale(1)",
-                                boxShadow: isActive ? "0 10px 22px rgba(37,99,235,0.18)" : "none",
-                                transition: "transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease",
-                                filter: isActive ? "saturate(1.1)" : "saturate(0.98)",
-                              }}
+                              style={barStyle}
                             />
                             <div
+                              className="admin-monthly-bar-date"
                               style={{
                                 fontSize: 10,
                                 color: isActive ? "#0F172A" : "#64748B",
@@ -1936,14 +1964,14 @@ export default function AdminPage() {
 
 
             {activeSection === "links" ? (
-      <div className="admin-section-transition">
-      <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
+      <div className="admin-section-transition admin-responsive-section">
+      <div className="admin-card admin-console-pagehead">
         <div className="admin-console-pagehead-title">内容管理</div>
         <div className="admin-console-pagehead-desc">按模块管理资源矩阵、友情链接、小游戏；资源矩阵下支持智库、校园、工具三个子模块。</div>
       </div>
-      <div id="links" className="admin-card" style={{ padding: 16, display: "grid", gap: 12 }}>
+      <div id="links" className="admin-card admin-links-panel">
         {activeLinkModule === "resource_matrix" ? (
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div className="admin-links-submodule-tabs" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {(Object.keys(RESOURCE_SUB_MODULE_META) as ResourceSubModule[]).map((subKey) => {
               const isActive = subKey === activeResourceSubModule;
               return (
@@ -1962,7 +1990,7 @@ export default function AdminPage() {
           </div>
         ) : null}
 
-        <div style={{ display: "grid", gap: 8 }}>
+        <div className="admin-links-form-shell" style={{ display: "grid", gap: 8 }}>
           <form
             onSubmit={submitLink}
             className="admin-link-create-form"
@@ -1976,13 +2004,13 @@ export default function AdminPage() {
           </form>
         </div>
 
-        <div style={{ fontSize: 12, color: "#64748B" }}>
+        <div className="admin-links-module-meta" style={{ fontSize: 12, color: "#64748B" }}>
           当前模块：{NAV_MODULE_META[activeLinkModule].label}
           {activeLinkModule === "resource_matrix" ? ` / ${RESOURCE_SUB_MODULE_META[activeResourceSubModule].label}` : ""}
         </div>
 
-        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+        <div className="admin-links-table-shell" style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
+          <table className="admin-links-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
             <thead>
               <tr style={{ background: "#F8FAFD" }}>
                 {["序号", "标题", "URL", "点击次数", "创建时间", "健康状态", "操作"].map((h) => (
@@ -1997,9 +2025,9 @@ export default function AdminPage() {
                   id={`admin-link-row-${item.id}`}
                   style={focusedLinkId === item.id ? { background: "#EFF6FF" } : undefined}
                 >
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{index + 1}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
+                  <td data-label="序号" style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{index + 1}</td>
+                  <td data-label="标题" style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{item.title}</td>
+                  <td data-label="URL" style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
                     <PortalTooltip
                       trigger={item.url}
                       content={item.description || undefined}
@@ -2007,11 +2035,11 @@ export default function AdminPage() {
                       title={item.description || item.url}
                     />
                   </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" }}>
+                  <td data-label="点击次数" style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontVariantNumeric: "tabular-nums" }}>{Number(item.click_count || 0)}</td>
+                  <td data-label="创建时间" style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", whiteSpace: "nowrap" }}>
                     {item.created_at ? String(item.created_at).replace("T", " ").slice(0, 19) : "-"}
                   </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontWeight: 600 }}>
+                  <td data-label="健康状态" style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", fontWeight: 600 }}>
                     {(() => {
                       const h = healthMapByLinkId.get(item.id);
                       const isChecking = checkingLinkId === item.id;
@@ -2059,14 +2087,14 @@ export default function AdminPage() {
                       );
                     })()}
                   </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
+                  <td data-label="操作" className="admin-links-actions-cell" style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8 }}>
                     <button type="button" onClick={() => openEditLink(item)} className="admin-btn-ghost" style={{ color: "#1D4ED8", borderColor: "#93C5FD" }}>编辑</button>
                     <button type="button" onClick={() => removeLink(item.id)} className="admin-btn-ghost" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}>删除</button>
                   </td>
                 </tr>
               ))}
               {!links.length ? (
-                <tr><td colSpan={7} style={{ padding: "14px", color: "#64748B" }}>当前筛选下暂无内容</td></tr>
+                <tr className="admin-table-empty-row"><td data-label="内容" colSpan={7} style={{ padding: "14px", color: "#64748B" }}>当前筛选下暂无内容</td></tr>
               ) : null}
             </tbody>
           </table>
@@ -2109,255 +2137,41 @@ export default function AdminPage() {
       )}
 
       {activeSection === "health" ? (
-      <div className="admin-section-transition">
-      <div className="admin-card admin-console-pagehead" style={{ padding: 18, border: "1px solid #E6ECF5", background: "linear-gradient(180deg,#FFFFFF 0%,#F8FBFF 100%)" }}>
-        <div className="admin-console-pagehead-title">链接健康检测</div>
-        <div className="admin-console-pagehead-desc">逐个探测所有启用链接；下方仅展示异常对象，正常状态在内容管理中查看。</div>
-      </div>
-      <div id="health" className="admin-card" style={{ padding: 20, background: "#F3F6FA", border: "1px solid #E6ECF5", borderRadius: 12, display: "grid", gap: 16, boxShadow: "0 8px 24px rgba(15,23,42,0.04)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1.3fr 1fr 1fr 1fr", gap: 12 }}>
-          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14, boxShadow: "inset 0 0 0 1px rgba(24,144,255,0.06)" }}>
-            <div style={{ fontSize: 12, color: "#64748B", letterSpacing: 0.2 }}>健康度评估</div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: "#1890FF" }}>
-              {health.length ? `${Math.round(((health.length - failedHealth.length) / health.length) * 100)}%` : "-"}
-            </div>
-          </div>
-          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>已检测项</div>
-            <div style={{ fontSize: 22, fontWeight: 700 }}>{health.length}</div>
-          </div>
-          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>异常</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#DC2626" }}>{failedHealth.length}</div>
-          </div>
-          <div style={{ background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: 14 }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>最近探测</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: "#0F172A", whiteSpace: "nowrap" }}>{latestHealthCheckedAt}</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10, padding: "10px 12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
-            {/* 进度条看板 - 仅手动触发时显示 */}
-            {healthProgress && healthProgress.total > 0 && (
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                minWidth: 280,
-              }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", gap: 0, marginBottom: 4, height: 8 }}>
-                    <div style={{
-                      width: `${Math.min(100, (healthProgress.checked / healthProgress.total) * 100)}%`,
-                      height: 8,
-                      borderRadius: "4px 0 0 4px",
-                      background: "linear-gradient(90deg, #93C5FD, #2563EB)",
-                      transition: "width 0.15s ease",
-                    }} />
-                    <div style={{
-                      flex: 1,
-                      height: 8,
-                      borderRadius: "0 4px 4px 0",
-                      background: "#E2E8F0",
-                    }} />
-                  </div>
-                  <div style={{ fontSize: 12, color: "#475569", whiteSpace: "nowrap" }}>
-                    {Math.round((healthProgress.checked / healthProgress.total) * 100)}%
-                    · {healthProgress.checked}/{healthProgress.total}
-                    {healthProgress.failed > 0 && <span style={{ color: "#DC2626", marginLeft: 4 }}>异常 {healthProgress.failed}</span>}
-                  </div>
-                </div>
-              </div>
-            )}
-            <div style={{ display: "grid", gap: 4 }}>
-              <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>监控对象状态面板</div>
-              <div style={{ fontSize: 12, color: "#64748B" }}>
-                {autoDetectEnabled
-                  ? `自动检测已开启：每 ${autoDetectIntervalMinutes} 分钟执行一次${lastAutoDetectAt ? `，最近一次 ${lastAutoDetectAt.replace("T", " ").slice(0, 19)}` : ""}`
-                  : "自动检测未开启"}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
-              type="button"
-              onClick={openAutoDetectDialog}
-              className="admin-btn-ghost"
-              style={{ height: 34, padding: "0 14px", borderRadius: 8, borderColor: autoDetectEnabled ? "#86EFAC" : "#CBD5E1", color: autoDetectEnabled ? "#166534" : "#334155" }}
-            >
-              自动检测
-            </button>
-            <button type="button" onClick={runHealthCheck} className="admin-btn" style={{ height: 34, padding: "0 14px", borderRadius: 8 }} disabled={healthChecking}>
-              {healthChecking ? "探测中..." : "全量探测"}
-            </button>
-          </div>
-        </div>
-        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#F8FAFD" }}>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>监控对象</th>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>来源</th>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>探测状态</th>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>最近探测时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              {failedHealth.map((h) => (
-                <tr key={h.link_id} style={{ background: "#FFF1F0" }}>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A" }}>
-                    <button
-                      type="button"
-                      onClick={() => { void jumpToLinkFromHealth(h); }}
-                      className="admin-btn-ghost"
-                      style={{ padding: "2px 8px", height: "auto", borderRadius: 6 }}
-                    >
-                      {h.title || `#${h.link_id}`}
-                    </button>
-                  </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }}>
-                    {moduleLabel(h.module, h.resource_sub_module)}
-                  </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    <span style={{ color: "#DC2626", fontWeight: 700 }}>
-                      {healthStatusText(h)}
-                    </span>
-                    {h.message ? <span style={{ marginLeft: 8, fontSize: 12, color: "#64748B" }}>{h.message}</span> : null}
-                  </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155" }} title={String(h.checked_at || "")}>
-                    {formatHealthCheckedAt(h.checked_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!failedHealth.length ? (
-            <div style={{ padding: "14px", color: "#64748B", fontSize: 13, borderTop: "1px solid #F1F5F9" }}>
-              当前没有异常链接
-            </div>
-          ) : null}
-        </div>
-      </div>
-      </div>
+        <AdminHealthSection
+          health={health}
+          failedHealth={failedHealth}
+          healthProgress={healthProgress}
+          latestHealthCheckedAt={latestHealthCheckedAt}
+          autoDetectEnabled={autoDetectEnabled}
+          autoDetectIntervalMinutes={autoDetectIntervalMinutes}
+          lastAutoDetectAt={lastAutoDetectAt}
+          healthChecking={healthChecking}
+          onOpenAutoDetect={openAutoDetectDialog}
+          onRunHealthCheck={runHealthCheck}
+          onJumpToLink={jumpToLinkFromHealth}
+        />
       ) : null}
 
       {activeSection === "logs" ? (
-      <div className="admin-section-transition">
-      <div className="admin-card admin-console-pagehead" style={{ padding: 18, border: "1px solid #E6ECF5", background: "linear-gradient(180deg,#FFFFFF 0%,#F9FBFF 100%)" }}>
-        <div className="admin-console-pagehead-title">操作日志</div>
-        <div className="admin-console-pagehead-desc">按时间、操作人、动作和目标追踪后台行为。</div>
-      </div>
-      <div className="admin-card" style={{ padding: 16, background: "#F5F7FA", border: "1px solid #E6ECF5", borderRadius: 12 }}>
-        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 920 }}>
-            <thead>
-              <tr style={{ background: "#F8FAFD" }}>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>时间</th>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>操作人</th>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>角色</th>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>动作</th>
-                <th style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>对象/详情</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(logs.length ? logs : [{ id: 0, link_id: null, action: "暂无操作日志", actor_username: "-", actor_role: "-", created_at: "-" }]).map((l) => (
-                <tr key={l.id}>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#334155", whiteSpace: "nowrap" }}>
-                    {String(l.created_at || "").replace("T", " ").slice(0, 19)}
-                  </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#0F172A", fontWeight: 600 }}>
-                    {l.actor_username || "-"}
-                  </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    <span style={{ fontSize: 12, color: "#475569", background: "#F1F5F9", borderRadius: 999, padding: "2px 8px" }}>
-                      {l.actor_role || "-"}
-                    </span>
-                  </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        borderRadius: 999,
-                        padding: "2px 10px",
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: getActionTag(l.action).fg,
-                        background: getActionTag(l.action).bg,
-                      }}
-                      title={l.action || "-"}
-                    >
-                      {getActionTag(l.action).text}
-                    </span>
-                  </td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", color: "#64748B", maxWidth: 360, wordBreak: "break-all", lineHeight: 1.5 }}>
-                    {formatLogObjectAndDetail(l)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </div>
+        <AdminLogsSection
+          logs={logs}
+          getActionTag={getActionTag}
+          formatLogObjectAndDetail={formatLogObjectAndDetail}
+        />
       ) : null}
 
       {user.role === "super" && activeSection === "users" ? (
-      <div className="admin-section-transition">
-      <div className="admin-card admin-console-pagehead" style={{ padding: 16 }}>
-        <div className="admin-console-pagehead-title">用户管理</div>
-        <div className="admin-console-pagehead-desc">管理后台账号、角色权限和最近登录时间。</div>
-      </div>
-      <div id="users" className="admin-card" style={{ padding: 16, display: "grid", gap: 12 }}>
-        <form onSubmit={submitUser} style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr 140px 120px" }}>
-          <input className="admin-input" placeholder="用户名" value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} />
-          <input className="admin-input" type="password" placeholder="密码" value={userForm.password} onChange={(e) => setUserForm({ ...userForm, password: e.target.value })} />
-          <select className="admin-input" value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value as "super" | "editor" })}>
-            <option value="editor">editor</option>
-            <option value="super">super</option>
-          </select>
-          <button type="submit" className="admin-btn">创建用户</button>
-        </form>
-        <div style={{ overflowX: "auto", background: "#fff", border: "1px solid #E8EEF6", borderRadius: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: "#F8FAFD" }}>
-                {["ID", "Username", "Role", "Created At", "Last Login", "操作"].map((h) => (
-                  <th key={h} style={{ textAlign: "left", padding: "12px 14px", borderBottom: "1px solid #E8EEF6", color: "#334155", fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.id}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.username}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.role}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{String(u.created_at || "").replace("T", " ").slice(0, 19)}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9" }}>{u.last_login_at ? String(u.last_login_at).replace("T", " ").slice(0, 19) : "-"}</td>
-                  <td style={{ padding: "11px 14px", borderBottom: "1px solid #F1F5F9", display: "flex", gap: 8, alignItems: "center", minWidth: 360 }}>
-                    <button type="button" onClick={() => toggleUserRole(u)} className="admin-btn-ghost">{u.role === "super" ? "降为 editor" : "升为 super"}</button>
-                    <input
-                      className="admin-input"
-                      type="password"
-                      placeholder="新密码"
-                      value={userPasswordDrafts[u.id] || ""}
-                      onChange={(e) => setUserPasswordDrafts((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                      style={{ width: 110 }}
-                    />
-                    <button type="button" onClick={() => resetUserPassword(u)} className="admin-btn-ghost">改密</button>
-                    <button type="button" onClick={() => removeUser(u)} className="admin-btn-ghost" style={{ color: "#B91C1C", borderColor: "#FCA5A5" }}>删除</button>
-                  </td>
-                </tr>
-              ))}
-              {!users.length ? (
-                <tr><td colSpan={6} style={{ padding: "14px", color: "#64748B" }}>暂无用户数据</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </div>
+        <AdminUsersSection
+          users={users}
+          userForm={userForm}
+          onUserFormChange={setUserForm}
+          onSubmitUser={submitUser}
+          userPasswordDrafts={userPasswordDrafts}
+          setUserPasswordDrafts={setUserPasswordDrafts}
+          onToggleUserRole={toggleUserRole}
+          onResetUserPassword={resetUserPassword}
+          onRemoveUser={removeUser}
+        />
       ) : null}
         </div>
       </div>

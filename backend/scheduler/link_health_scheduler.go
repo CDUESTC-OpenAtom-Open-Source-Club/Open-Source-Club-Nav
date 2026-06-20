@@ -73,7 +73,7 @@ func runScheduledHealthCheck(db *gorm.DB) {
 	utils.Logger.Info("开始执行链接健康检测")
 
 	// 调用 handler 内部的检测函数（不使用 SSE）
-	checked, failed, skipped, total := handler.RunLinkHealthCheckInternal(db, false)
+	checked, failed, skipped, total := handler.RunLinkHealthCheckInternal(db, false, false)
 
 	duration := time.Since(start)
 	utils.Logger.Info("链接健康检测完成",

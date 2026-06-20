@@ -63,6 +63,9 @@ module.exports = {
         NEXT_TELEMETRY_DISABLED: '1',
         BACKEND_API_URL: backendApiUrl,
         NEXT_PUBLIC_BACKEND_API_URL: backendApiUrl,
+        BACKEND_API_PREFIX: process.env.BACKEND_API_PREFIX || '',
+        ADMIN_AUTH_SECRET: process.env.ADMIN_AUTH_SECRET || '',
+        ADMIN_BYPASS_LOGIN: process.env.ADMIN_BYPASS_LOGIN || '',
         GITHUB_TOKEN: process.env.GITHUB_TOKEN || '',
         NEXT_PUBLIC_GITHUB_ORG: process.env.NEXT_PUBLIC_GITHUB_ORG || process.env.GITHUB_ORG || '',
         // SEO Push 配置
@@ -71,6 +74,8 @@ module.exports = {
         GOOGLE_INDEXING_CLIENT_EMAIL: process.env.GOOGLE_INDEXING_CLIENT_EMAIL || '',
         GOOGLE_INDEXING_PRIVATE_KEY: process.env.GOOGLE_INDEXING_PRIVATE_KEY || '',
         INDEXNOW_KEY: process.env.INDEXNOW_KEY || '',
+        INDEXNOW_ENDPOINT: process.env.INDEXNOW_ENDPOINT || '',
+        INDEXNOW_KEY_LOCATION: process.env.INDEXNOW_KEY_LOCATION || '',
       },
     },
   ],

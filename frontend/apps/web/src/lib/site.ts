@@ -64,7 +64,7 @@ export const SEO_ROUTES: SeoRoute[] = [
     path: "/about",
     changeFrequency: "monthly",
     priority: 0.8,
-    indexable: true,
+    indexable: false, // 改为首页弹窗模式，不索引
     title: "关于我们 | KCOS 开放原子开源社团",
     description: "了解 KCOS 开放原子开源社团——成都理工大学工程技术学院开源社区，推动高校开源文化建设，汇集开源工具与学习资源。",
   },
@@ -72,7 +72,7 @@ export const SEO_ROUTES: SeoRoute[] = [
     path: "/resources/intelligence",
     changeFrequency: "weekly",
     priority: 0.7,
-    indexable: true,
+    indexable: false, // 改为首页弹窗模式，不索引
     title: "智库 | KCOS 开放原子开源社团",
     description: "KCOS 开放原子开源社团智库资源，汇集计算机科学自学路线、算法训练、学术论文、在线课程等学习资源。",
   },
@@ -80,7 +80,7 @@ export const SEO_ROUTES: SeoRoute[] = [
     path: "/resources/surface",
     changeFrequency: "weekly",
     priority: 0.7,
-    indexable: true,
+    indexable: false, // 改为首页弹窗模式，不索引
     title: "校园 | KCOS 开放原子开源社团",
     description: "KCOS 开放原子开源社团校园资源，汇集教务系统、图书馆、校园卡、就业信息等校园服务。",
   },
@@ -88,7 +88,7 @@ export const SEO_ROUTES: SeoRoute[] = [
     path: "/resources/armory",
     changeFrequency: "weekly",
     priority: 0.7,
-    indexable: true,
+    indexable: false, // 改为首页弹窗模式，不索引
     title: "工具 | KCOS 开放原子开源社团",
     description: "KCOS 开放原子开源社团工具资源，汇集GitHub、VS Code、Docker、设计工具、文档平台等开发利器。",
   },

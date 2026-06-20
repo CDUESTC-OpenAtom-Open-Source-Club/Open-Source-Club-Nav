@@ -639,7 +639,8 @@ type linkHealthInternalResult struct {
 // RunLinkHealthCheckInternal 执行链接健康检测核心逻辑（可被定时任务和HTTP handler调用）
 // useStream=true 时返回 SSE stream 数据（由 handler 调用）
 // useStream=false 时静默执行（由定时任务调用），返回统计数据
-func RunLinkHealthCheckInternal(db *gorm.DB, useStream bool, streamWriter ...func(string)) (checked, failed, skipped, total int) {
+// force=true 时忽略近期检测缓存，适用于后台“全量探测”
+func RunLinkHealthCheckInternal(db *gorm.DB, useStream bool, force bool, streamWriter ...func(string)) (checked, failed, skipped, total int) {
 	// 获取所有活跃的 nav_items
 	type NavItemBasic struct {
 		ID    uint
@@ -687,7 +688,7 @@ ORDER BY id ASC
 		if item.URL == "" {
 			continue
 		}
-		if healthCacheTTL > 0 && hasRecentLinkHealth(db, linkColumn, item.ID, healthCacheTTL) {
+		if !force && healthCacheTTL > 0 && hasRecentLinkHealth(db, linkColumn, item.ID, healthCacheTTL) {
 			skippedCount++
 			continue
 		}
@@ -747,6 +748,7 @@ func CheckLinkHealth(c *gin.Context) {
 
 	// 判断是否使用 SSE stream
 	useStream := c.Query("stream") == "1"
+	force := c.Query("force") == "1" || c.Query("force") == "true"
 
 	if useStream {
 		// SSE 模式：返回实时进度
@@ -762,26 +764,26 @@ func CheckLinkHealth(c *gin.Context) {
 		}
 
 		// 执行检测
-		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, true, streamWriter)
+		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, true, force, streamWriter)
 
-		// 发送完成事件
-		completeData := fmt.Sprintf(`{"checked":%d,"total":%d,"failed":%d,"skipped":%d}`,
-			checked, total, failed, skipped)
-		c.Writer.WriteString(fmt.Sprintf("event: complete\ndata: %s\n\n", completeData))
-		c.Writer.Flush()
-
-		// 记录日志
 		detailBytes, _ := json.Marshal(gin.H{
 			"checked": checked,
 			"failed":  failed,
 			"skipped": skipped,
 			"total":   total,
 			"reason":  "manual_probe_stream",
+			"force":   force,
 		})
 		logAction(db, c, "check_health", nil, string(detailBytes))
+
+		// 发送完成事件。日志先落库，避免前端收到 complete 后刷新最近操作时读不到最新记录。
+		completeData := fmt.Sprintf(`{"checked":%d,"total":%d,"failed":%d,"skipped":%d}`,
+			checked, total, failed, skipped)
+		c.Writer.WriteString(fmt.Sprintf("event: complete\ndata: %s\n\n", completeData))
+		c.Writer.Flush()
 	} else {
 		// 传统 JSON 模式
-		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, false)
+		checked, failed, skipped, total := RunLinkHealthCheckInternal(db, false, force)
 
 		detailBytes, _ := json.Marshal(gin.H{
 			"checked": checked,
@@ -789,6 +791,7 @@ func CheckLinkHealth(c *gin.Context) {
 			"skipped": skipped,
 			"total":   total,
 			"reason":  "manual_probe",
+			"force":   force,
 		})
 		logAction(db, c, "check_health", nil, string(detailBytes))
 
