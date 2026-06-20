@@ -209,7 +209,7 @@ export async function pushToGoogle(urls: string[]): Promise<PushResult> {
 // ─── IndexNow 推送 ─────────────────────────────────────────
 
 const INDEXNOW_KEY =
-  process.env.INDEXNOW_KEY ??
+  process.env.INDEXNOW_KEY ||
   "5907708b80858fe5224ecf14aa02be50c9024818ed5459018e17cbe51e37812a";
 
 /**
