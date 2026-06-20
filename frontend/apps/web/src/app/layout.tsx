@@ -1,23 +1,33 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import {
-  SITE_ALTERNATE_NAMES,
   SITE_DESCRIPTION,
-  SITE_GITHUB_URL,
   SITE_IMAGE_PATH,
   SITE_NAME,
-  SITE_OFFICIAL_URL,
   SITE_SHORT_DESCRIPTION,
   SITE_TITLE,
   SITE_URL,
   absoluteSiteUrl,
 } from "@/lib/site";
+import {
+  buildJsonLdGraph,
+  buildWebPageJsonLd,
+  buildFaqJsonLd,
+  buildBreadcrumbJsonLd,
+  SITE_FAQ,
+  jsonLdToString,
+} from "@/lib/seo";
+import WebVitalsReporter from "@/components/shared/WebVitalsReporter";
+import BaiduAutoPush from "@/components/shared/BaiduAutoPush";
 
 const inter = Inter({
   subsets: ["latin"],
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
+  preload: true,
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -101,6 +111,10 @@ export const metadata: Metadata = {
       "sogou_site_verification": "aB0gc2Byrd",
     },
   },
+  other: {
+    // 百度自动推送（轻量级，页面加载后异步触发）
+    "baidu-push": "enabled",
+  },
 };
 
 export default function RootLayout({
@@ -108,48 +122,48 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@graph": [
-      {
-        "@type": "Organization",
-        "@id": `${SITE_URL}/#organization`,
-        name: SITE_NAME,
-        alternateName: SITE_ALTERNATE_NAMES,
-        url: SITE_URL,
-        logo: {
-          "@type": "ImageObject",
-          url: absoluteSiteUrl(SITE_IMAGE_PATH),
-          width: 714,
-          height: 672,
-        },
-        sameAs: [SITE_GITHUB_URL, SITE_OFFICIAL_URL],
-      },
-      {
-        "@type": "WebSite",
-        "@id": `${SITE_URL}/#website`,
-        name: SITE_NAME,
-        alternateName: SITE_ALTERNATE_NAMES,
-        url: SITE_URL,
-        inLanguage: "zh-CN",
-        description: SITE_SHORT_DESCRIPTION,
-        publisher: {
-          "@id": `${SITE_URL}/#organization`,
-        },
-      },
-    ],
-  };
+  // 完整 JSON-LD @graph：Organization + WebSite(含搜索) + WebPage + Breadcrumb + FAQ
+  const jsonLd = buildJsonLdGraph([
+    buildWebPageJsonLd("/", SITE_TITLE, SITE_DESCRIPTION),
+    buildBreadcrumbJsonLd([
+      { name: "首页", url: SITE_URL },
+    ]),
+    buildFaqJsonLd(SITE_FAQ),
+  ]);
 
   return (
-    <html lang="zh-CN" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning className={inter.variable}>
       <head>
+        {/* 结构化数据 */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          dangerouslySetInnerHTML={{ __html: jsonLdToString(jsonLd) }}
+        />
+
+        {/* DNS 预连接：加速第三方资源 */}
+        <link rel="preconnect" href="https://sdk.51.la" crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href="https://sdk.51.la" />
+
+        {/* 51.LA 统计：降级为 lazyOnload，不阻塞首屏渲染 */}
+        <Script
+          id="LA_COLLECT"
+          src="https://sdk.51.la/js-sdk-pro.min.js"
+          strategy="lazyOnload"
+        />
+        <Script
+          id="la-collect-init"
+          strategy="lazyOnload"
+          dangerouslySetInnerHTML={{
+            __html:
+              'LA.init({id:"3QGu1nAk7TzHyWGi",ck:"3QGu1nAk7TzHyWGi",autoTrack:true,hashMode:true})',
+          }}
         />
       </head>
       <body className={`${inter.className} min-h-full flex flex-col`}>
         {children}
+        {/* Core Web Vitals 采集 + 百度自动推送（零 UI、不阻塞渲染） */}
+        <WebVitalsReporter />
+        <BaiduAutoPush />
       </body>
     </html>
   );

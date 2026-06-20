@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PacmanMiniGame } from "@/components/home/WorksCarousel";
+import ShareButtons from "@/components/shared/ShareButtons";
 import { pacmanMockLeaderboard } from "@/data/pacmanLeaderboard";
 
 const boardCardStyle = {
@@ -119,6 +120,11 @@ export default function GamesPage() {
             >
               返回社团导航主页
             </Link>
+          </div>
+
+          {/* 社交分享 */}
+          <div style={{ padding: "0 4px" }}>
+            <ShareButtons compact />
           </div>
 
           <div className="games-metrics">

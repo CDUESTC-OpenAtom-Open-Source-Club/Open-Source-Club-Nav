@@ -1,8 +1,0 @@
-# https://nav.kcos.club/robots.txt
-User-agent: *
-Allow: /
-Disallow: /admin
-Disallow: /api/
-
-# Sitemap
-Sitemap: https://nav.kcos.club/sitemap.xml
