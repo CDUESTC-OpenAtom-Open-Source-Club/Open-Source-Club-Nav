@@ -65,6 +65,12 @@ module.exports = {
         NEXT_PUBLIC_BACKEND_API_URL: backendApiUrl,
         GITHUB_TOKEN: process.env.GITHUB_TOKEN || '',
         NEXT_PUBLIC_GITHUB_ORG: process.env.NEXT_PUBLIC_GITHUB_ORG || process.env.GITHUB_ORG || '',
+        // SEO Push 配置
+        BAIDU_PUSH_SITE: process.env.BAIDU_PUSH_SITE || '',
+        BAIDU_PUSH_TOKEN: process.env.BAIDU_PUSH_TOKEN || '',
+        GOOGLE_INDEXING_CLIENT_EMAIL: process.env.GOOGLE_INDEXING_CLIENT_EMAIL || '',
+        GOOGLE_INDEXING_PRIVATE_KEY: process.env.GOOGLE_INDEXING_PRIVATE_KEY || '',
+        INDEXNOW_KEY: process.env.INDEXNOW_KEY || '',
       },
     },
   ],
