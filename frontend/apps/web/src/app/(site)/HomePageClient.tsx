@@ -520,8 +520,13 @@ export default function HomePage() {
 
     const fetchPublicLinks = async (module) => {
       try {
-        const params = new URLSearchParams({ module });
-        const res = await fetch(`${PUBLIC_LINKS_API}?${params.toString()}`);
+        const params = new URLSearchParams({
+          module,
+          _ts: String(Date.now()),
+        });
+        const res = await fetch(`${PUBLIC_LINKS_API}?${params.toString()}`, {
+          cache: "no-store",
+        });
         if (!res.ok) return [];
         const payload = await res.json().catch(() => null);
         return normalizePublicLinks(payload?.links || payload?.data || []);

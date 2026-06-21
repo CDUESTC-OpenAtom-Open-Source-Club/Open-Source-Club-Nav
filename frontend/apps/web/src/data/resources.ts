@@ -333,6 +333,7 @@ export async function fetchResourceCategories() {
         const params = new URLSearchParams({
           module: "resource_matrix",
           resource_sub_module: subModule,
+          _ts: String(Date.now()),
         });
         const response = await fetch(`/api/links?${params.toString()}`, {
           cache: "no-store",
