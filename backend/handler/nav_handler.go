@@ -65,6 +65,13 @@ func navItemsToLinkDTOs(items []model.NavItem) []gin.H {
 	return links
 }
 
+func setNoStoreCacheHeaders(c *gin.Context) {
+	c.Header("Cache-Control", "no-store, no-cache, must-revalidate")
+	c.Header("CDN-Cache-Control", "no-store")
+	c.Header("Pragma", "no-cache")
+	c.Header("Expires", "0")
+}
+
 // GetNavWithBusiness 获取导航项+关联的业务数据
 // @Summary 获取导航项及关联的业务数据
 // @Description 根据导航项ID，查询导航项信息及关联的业务表数据
@@ -126,6 +133,8 @@ func GetNavWithBusiness(c *gin.Context) {
 // @Success 200 {array} model.FriendLink "搜索结果列表"
 // @Router /api/links [get]
 func SearchNavItem(c *gin.Context) {
+	setNoStoreCacheHeaders(c)
+
 	// 1. 获取请求参数
 	keyword := strings.TrimSpace(c.Query("keyword"))
 	module := strings.TrimSpace(c.Query("module"))
