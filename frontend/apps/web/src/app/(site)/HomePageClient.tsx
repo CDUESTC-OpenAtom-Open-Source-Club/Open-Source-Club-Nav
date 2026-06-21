@@ -13,7 +13,7 @@ import {
   StartupSplash,
 } from "@/components/home";
 import { buildMobileNavSections } from "@/data/mobile-nav";
-import { RESOURCE_CATEGORIES } from "@/data/resources";
+import { RESOURCE_CATEGORIES, fetchResourceCategories } from "@/data/resources";
 import {
   ORG_DEPARTMENTS,
   MISSION_POINTS,
@@ -37,7 +37,8 @@ const THEME_COLOR_TRANSITION_MS = 1000;
 const VALID_THEME_MODES = new Set(["light", "dark", "auto"]);
 const GITHUB_USER_API = "/api/github-users";
 const PUBLIC_LINKS_API = "/api/links";
-const PUBLIC_LINK_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+const PUBLIC_LINK_REFRESH_INTERVAL_MS = 30 * 1000;
+const PUBLIC_LINK_REFRESH_SIGNAL_KEY = "kcos_public_links_refresh_at";
 const DEFAULT_THEME_MODE = "auto";
 const DEFAULT_AUTO_DARK_MODE = false;
 const getInitialThemeMode = () => {
@@ -114,6 +115,7 @@ export default function HomePage() {
   const [mobileMenuCloseSignal, setMobileMenuCloseSignal] = useState(0);
   const [mobileScrollHint, setMobileScrollHint] = useState(null);
   const [githubUserProfiles, setGithubUserProfiles] = useState({});
+  const [resourceCategories, setResourceCategories] = useState(RESOURCE_CATEGORIES);
   const [mobileFriendLinks, setMobileFriendLinks] = useState([]);
   const [mobileMiniGameLinks, setMobileMiniGameLinks] = useState([]);
   const [adminTapCount, setAdminTapCount] = useState(0);
@@ -126,7 +128,7 @@ export default function HomePage() {
   const aboutScrollRef = useRef(null);
   const aboutSectionRefs = useRef({});
   const activeCategoryParam = searchParams.get("section");
-  const activeCategory = RESOURCE_CATEGORIES.some(
+  const activeCategory = resourceCategories.some(
     (category) => category.id === activeCategoryParam,
   )
     ? activeCategoryParam
@@ -528,25 +530,44 @@ export default function HomePage() {
       }
     };
 
-    const syncMobilePublicLinks = async () => {
-      const [friendLinks, miniGameLinks] = await Promise.all([
+    const syncPublicNavigation = async () => {
+      const [nextResourceCategories, friendLinks, miniGameLinks] = await Promise.all([
+        fetchResourceCategories(),
         fetchPublicLinks("friend_links"),
         fetchPublicLinks("mini_games"),
       ]);
       if (cancelled) return;
+      setResourceCategories(nextResourceCategories);
       setMobileFriendLinks(friendLinks);
       setMobileMiniGameLinks(miniGameLinks);
     };
 
-    void syncMobilePublicLinks();
-    const timer = window.setInterval(syncMobilePublicLinks, PUBLIC_LINK_REFRESH_INTERVAL_MS);
+    const refresh = () => {
+      void syncPublicNavigation();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const handleStorage = (event) => {
+      if (event.key === PUBLIC_LINK_REFRESH_SIGNAL_KEY) refresh();
+    };
+
+    refresh();
+    const timer = window.setInterval(refresh, PUBLIC_LINK_REFRESH_INTERVAL_MS);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("storage", handleStorage);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     return () => {
       cancelled = true;
       window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", handleStorage);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, []);
 
   const mobileNavSections = buildMobileNavSections({
+    resourceCategories,
     activeCategory,
     onCategorySelect: (categoryId) => {
       handleCategorySelect(categoryId);
@@ -834,6 +855,9 @@ export default function HomePage() {
           <LeftPanel
             activeCategory={activeCategory}
             onCategorySelect={handleCategorySelect}
+            resourceCategories={resourceCategories}
+            friendLinks={mobileFriendLinks}
+            miniGameLinks={mobileMiniGameLinks}
             isDarkMode={isDarkMode}
           />
         </div>
@@ -867,6 +891,7 @@ export default function HomePage() {
           )}
           <CentralHub
             activeCategory={activeCategory}
+            resourceCategories={resourceCategories}
             parallax={parallax}
             onClosePanel={() => handleCategorySelect(null)}
             isDarkMode={isDarkMode}

@@ -46,6 +46,7 @@ export async function fetchBackend(
   };
   if (
     (method === "GET" || method === "HEAD") &&
+    options?.cache !== "no-store" &&
     options?.nextRevalidateSeconds !== undefined
   ) {
     (fetchOptions as RequestInit & { next?: { revalidate: number } }).next = {
@@ -142,6 +143,15 @@ function withPublicCache(response: Response, options?: PublicBackendCacheOptions
   const headers = new Headers(response.headers);
   headers.delete("set-cookie");
   if (!response.ok) {
+    headers.set("Cache-Control", "no-store");
+    headers.delete("CDN-Cache-Control");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+  if (options?.cache === "no-store") {
     headers.set("Cache-Control", "no-store");
     headers.delete("CDN-Cache-Control");
     return new Response(response.body, {

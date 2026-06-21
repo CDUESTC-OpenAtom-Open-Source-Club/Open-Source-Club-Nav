@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Brain,
   MapPin,
@@ -14,7 +14,6 @@ import { RESOURCE_CATEGORIES } from "@/data/resources";
 const ICON_MAP: Record<string, LucideIcon> = { Brain, MapPin, Wrench };
 
 const PANEL_WIDTH = "clamp(214px, 16vw, 252px)";
-const PUBLIC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const applyCategoryHoverStyle = (target: HTMLElement) => {
   target.style.background = "#F8FAFC";
@@ -47,6 +46,9 @@ const resetFriendLinkHoverStyle = (target: HTMLElement) => {
 type LeftPanelProps = {
   activeCategory: string | null;
   onCategorySelect: (category: string | null) => void;
+  resourceCategories?: typeof RESOURCE_CATEGORIES;
+  friendLinks?: LinkItem[];
+  miniGameLinks?: LinkItem[];
   isDarkMode?: boolean;
 };
 
@@ -58,79 +60,19 @@ type LinkItem = {
 export default function LeftPanel({
   activeCategory,
   onCategorySelect,
+  resourceCategories = RESOURCE_CATEGORIES,
+  friendLinks: publicFriendLinks = [],
+  miniGameLinks: publicMiniGameLinks = [],
   isDarkMode = false,
 }: LeftPanelProps) {
-  const [remoteFriendLinks, setRemoteFriendLinks] = useState<LinkItem[]>([]);
-  const [remoteMiniGames, setRemoteMiniGames] = useState<LinkItem[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncFriendLinks = async () => {
-      try {
-        const res = await fetch("/api/links?module=friend_links");
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
-        const list = Array.isArray(data?.links) ? data.links : [];
-        if (cancelled) return;
-        const normalized = list
-          .map((item: { title?: unknown; url?: unknown }) => ({
-            title: String(item?.title || "").trim(),
-            url: String(item?.url || "").trim(),
-          }))
-          .filter((item: LinkItem) => item.title && item.url);
-        setRemoteFriendLinks(normalized);
-      } catch {
-        // ignore network errors, keep base links
-      }
-    };
-
-    void syncFriendLinks();
-    const timer = window.setInterval(() => {
-      void syncFriendLinks();
-    }, PUBLIC_REFRESH_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncMiniGames = async () => {
-      try {
-        const res = await fetch("/api/links?module=mini_games");
-        if (!res.ok) return;
-        const data = await res.json().catch(() => null);
-        const list = Array.isArray(data?.links) ? data.links : [];
-        if (cancelled) return;
-        const normalized = list
-          .map((item: { title?: unknown; url?: unknown }) => ({
-            title: String(item?.title || "").trim(),
-            url: String(item?.url || "").trim(),
-          }))
-          .filter((item: LinkItem) => item.title);
-        setRemoteMiniGames(normalized);
-      } catch {
-        // ignore network errors
-      }
-    };
-
-    void syncMiniGames();
-    const timer = window.setInterval(() => {
-      void syncMiniGames();
-    }, PUBLIC_REFRESH_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, []);
-
-  const friendLinks = useMemo(() => {
-    // 直接使用从 API 获取的数据，不再合并硬编码数据
-    return remoteFriendLinks;
-  }, [remoteFriendLinks]);
+  const friendLinks = useMemo(
+    () => publicFriendLinks.filter((item) => item.title && item.url),
+    [publicFriendLinks],
+  );
+  const miniGames = useMemo(
+    () => publicMiniGameLinks.filter((item) => item.title),
+    [publicMiniGameLinks],
+  );
 
   return (
     <aside
@@ -177,7 +119,7 @@ export default function LeftPanel({
           padding: "0 8px",
         }}
       >
-        {RESOURCE_CATEGORIES.map((cat) => {
+        {resourceCategories.map((cat) => {
           const Icon = ICON_MAP[cat.icon];
           const isActive = activeCategory === cat.id;
           return (
@@ -374,7 +316,7 @@ export default function LeftPanel({
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {(remoteMiniGames.length > 0 ? remoteMiniGames : [{ title: "吃豆人小游戏", url: "/games" }]).map((item, idx) => (
+            {(miniGames.length > 0 ? miniGames : [{ title: "吃豆人小游戏", url: "/games" }]).map((item, idx) => (
               <a
                 key={`${item.title}-${idx}`}
                 href={item.url}

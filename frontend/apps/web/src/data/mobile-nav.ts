@@ -45,6 +45,7 @@ const describeLink = (item: ReturnType<typeof toPublicNavLink>) => {
 const isExternalHref = (url: string) => /^https?:\/\//.test(url);
 
 export function buildMobileNavSections({
+  resourceCategories = RESOURCE_CATEGORIES,
   activeCategory,
   onCategorySelect,
   onOpenAbout,
@@ -52,6 +53,7 @@ export function buildMobileNavSections({
   friendLinks = [],
   miniGameLinks = [],
 }: {
+  resourceCategories?: typeof RESOURCE_CATEGORIES;
   activeCategory: string | null;
   onCategorySelect: (categoryId: string | null) => void;
   onOpenAbout: () => void;
@@ -66,7 +68,7 @@ export function buildMobileNavSections({
     {
       id: "resources",
       label: "资源分类",
-      items: RESOURCE_CATEGORIES.map((category) => ({
+      items: resourceCategories.map((category) => ({
         id: category.id,
         label: category.label,
         description: category.sublabel,

@@ -47,6 +47,16 @@ const RESOURCE_SUB_MODULE_META: Record<ResourceSubModule, { label: string; short
   campus: { label: "校园", short: "校园" },
   tools: { label: "工具", short: "工具" },
 };
+const PUBLIC_LINK_REFRESH_SIGNAL_KEY = "kcos_public_links_refresh_at";
+
+const publishPublicLinksRefresh = () => {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(PUBLIC_LINK_REFRESH_SIGNAL_KEY, String(Date.now()));
+  } catch {
+    // Ignore storage failures; homepage still refreshes on focus and interval.
+  }
+};
 
 type StatDay = {
   stat_date: string;
@@ -964,6 +974,7 @@ export default function AdminPage() {
       });
       const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "新增链接失败");
+      publishPublicLinksRefresh();
       setLinkForm({
         title: "",
         url: "",
@@ -990,6 +1001,7 @@ export default function AdminPage() {
         const data = await readJsonSafe<{ error?: string }>(res);
         throw new Error(data?.error || "删除链接失败");
       }
+      publishPublicLinksRefresh();
       await Promise.all([
         loadLinks(),
         loadLogs().catch(() => {}),
@@ -1024,6 +1036,7 @@ export default function AdminPage() {
       });
       const data = await readJsonSafe<{ error?: string }>(res);
       if (!res.ok) throw new Error(data?.error || "编辑链接失败");
+      publishPublicLinksRefresh();
       setEditLinkId(null);
       await Promise.all([
         loadLinks(),

@@ -1,5 +1,3 @@
-import { getContentByType } from "@/services/content";
-
 // 默认资源数据（用于降级）
 const DEFAULT_RESOURCE_CATEGORIES = [
   {
@@ -274,56 +272,82 @@ const DEFAULT_RESOURCE_CATEGORIES = [
   },
 ];
 
+const RESOURCE_SUBMODULES = [
+  { subModule: "think_tank", categoryId: "intelligence", defaultTag: "Learning" },
+  { subModule: "campus", categoryId: "surface", defaultTag: "Campus" },
+  { subModule: "tools", categoryId: "armory", defaultTag: "Dev" },
+] as const;
+
+type PublicResourceLink = {
+  title?: unknown;
+  description?: unknown;
+  desc?: unknown;
+  url?: unknown;
+  link_url?: unknown;
+  active?: unknown;
+};
+
+const isActivePublicLink = (item: PublicResourceLink) =>
+  item?.active === undefined || Number(item.active) === 1;
+
+const normalizeResourceLinks = (
+  items: PublicResourceLink[],
+  defaultTag: string,
+) =>
+  (Array.isArray(items) ? items : [])
+    .filter(isActivePublicLink)
+    .map((item) => ({
+      title: String(item?.title || "").trim(),
+      desc: String(item?.description || item?.desc || "").trim() || "后台新增资源",
+      url: String(item?.url || item?.link_url || "").trim(),
+      tag: defaultTag,
+    }))
+    .filter((item) => item.title && item.url);
+
+export function mergeResourceCategoriesFromPublicLinks(
+  publicLinksBySubModule: Record<string, PublicResourceLink[]>,
+) {
+  return DEFAULT_RESOURCE_CATEGORIES.map((category) => {
+    const meta = RESOURCE_SUBMODULES.find((item) => item.categoryId === category.id);
+    if (!meta) return category;
+
+    const links = normalizeResourceLinks(
+      publicLinksBySubModule[meta.subModule] || [],
+      meta.defaultTag,
+    );
+
+    return links.length > 0
+      ? {
+          ...category,
+          links,
+        }
+      : category;
+  });
+}
+
 // 从后端获取资源分类数据
 export async function fetchResourceCategories() {
   try {
-    // 获取资源矩阵三个子分类的数据
-    const subTypes = ["think_tank", "campus", "tools"] as const;
     const responses = await Promise.all(
-      subTypes.map((subType) =>
-        getContentByType("resource", subType).then((items) => ({
-          subType,
-          items,
-        })),
-      ),
+      RESOURCE_SUBMODULES.map(async ({ subModule }) => {
+        const params = new URLSearchParams({
+          module: "resource_matrix",
+          resource_sub_module: subModule,
+        });
+        const response = await fetch(`/api/links?${params.toString()}`, {
+          cache: "no-store",
+        });
+        const payload = response.ok ? await response.json().catch(() => null) : null;
+        return {
+          subModule,
+          links: Array.isArray(payload?.links) ? payload.links : [],
+        };
+      }),
     );
 
-    // 转换为前端格式
-    const categories = DEFAULT_RESOURCE_CATEGORIES.map((category) => {
-      const mapping: Record<string, string> = {
-        intelligence: "think_tank",
-        surface: "campus",
-        armory: "tools",
-      };
-
-      const backendSubType = mapping[category.id];
-      if (!backendSubType) return category;
-
-      const response = responses.find((r) => r.subType === backendSubType);
-      const backendItems = response?.items || [];
-
-      // 转换后端数据为前端格式
-      const links = backendItems
-        .filter((item) => item.active === 1)
-        .map((item) => ({
-          title: item.title,
-          desc: item.description || "暂无描述",
-          url: item.link_url,
-          tag: category.links[0]?.tag || "Docs",
-        }));
-
-      // 如果后端有数据，使用后端数据；否则使用默认数据
-      if (links.length > 0) {
-        return {
-          ...category,
-          links: links,
-        };
-      }
-
-      return category;
-    });
-
-    return categories;
+    return mergeResourceCategoriesFromPublicLinks(
+      Object.fromEntries(responses.map((item) => [item.subModule, item.links])),
+    );
   } catch (error) {
     console.error("Failed to fetch resource categories:", error);
     return DEFAULT_RESOURCE_CATEGORIES;

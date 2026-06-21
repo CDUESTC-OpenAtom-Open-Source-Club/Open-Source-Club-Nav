@@ -12,18 +12,6 @@ const GlobeCanvas = lazy(() => import("@/components/shared/GlobeCanvas"));
 const GlobeCanvasFallback = lazy(() => import("@/components/shared/GlobeCanvasFallback"));
 const WorksCarousel = lazy(() => import("./WorksCarousel"));
 
-const RESOURCE_SUB_TO_CATEGORY_ID = {
-  think_tank: "intelligence",
-  campus: "surface",
-  tools: "armory",
-};
-
-const RESOURCE_SUB_DEFAULT_TAG = {
-  think_tank: "Learning",
-  campus: "Campus",
-  tools: "Dev",
-};
-
 const PUBLIC_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 const TAG_COLORS = {
@@ -1178,6 +1166,7 @@ export function MiniTapGame({ isDarkMode = false }) {
 
 export default function CentralHub({
   activeCategory,
+  resourceCategories = RESOURCE_CATEGORIES,
   parallax,
   onClosePanel,
   isDarkMode = false,
@@ -1186,74 +1175,9 @@ export default function CentralHub({
   const [viewportMode, setViewportMode] = useState("desktop");
   const [isShortViewport, setIsShortViewport] = useState(false);
   const [homeStats, setHomeStats] = useState(DEFAULT_HOME_STATS);
-  const [resourceCategories, setResourceCategories] = useState(RESOURCE_CATEGORIES);
 
   // 设备性能检测，决定加载全量 3D 还是降级版本
   const deviceTier = useDeviceCapability();
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const syncResourceCategories = async () => {
-      try {
-        const subModules = ["think_tank", "campus", "tools"];
-        const responses = await Promise.all(
-          subModules.map((subModule) =>
-            fetch(`/api/links?module=resource_matrix&resource_sub_module=${subModule}`)
-              .then((res) => (res.ok ? res.json() : null))
-              .catch(() => null),
-          ),
-        );
-
-        if (cancelled) return;
-
-        const remoteBySub = {
-          think_tank: Array.isArray(responses[0]?.links) ? responses[0].links : [],
-          campus: Array.isArray(responses[1]?.links) ? responses[1].links : [],
-          tools: Array.isArray(responses[2]?.links) ? responses[2].links : [],
-        };
-
-        const merged = RESOURCE_CATEGORIES.map((category) => {
-          const subModule = Object.keys(RESOURCE_SUB_TO_CATEGORY_ID).find(
-            (key) => RESOURCE_SUB_TO_CATEGORY_ID[key] === category.id,
-          );
-          if (!subModule) return category;
-
-          const remoteLinks = (remoteBySub[subModule] || [])
-            .map((item) => ({
-              title: String(item?.title || "").trim(),
-              desc: String(item?.description || "").trim() || "后台新增资源",
-              url: String(item?.url || "").trim() || "#",
-              tag: RESOURCE_SUB_DEFAULT_TAG[subModule],
-            }))
-            .filter((item) => item.title);
-
-          // 后端有真实数据时完全替换模拟数据，不再追加
-          if (remoteLinks.length > 0) {
-            return {
-              ...category,
-              links: remoteLinks,
-            };
-          }
-
-          return category;
-        });
-
-        setResourceCategories(merged);
-      } catch {
-        // ignore sync failures, keep base categories
-      }
-    };
-
-    void syncResourceCategories();
-    const timer = setInterval(() => {
-      void syncResourceCategories();
-    }, PUBLIC_REFRESH_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
