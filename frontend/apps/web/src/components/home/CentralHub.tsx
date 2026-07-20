@@ -50,7 +50,7 @@ const CLUB_OVERVIEW_ITEMS = [
   },
   {
     title: "联系方式",
-    value: "邮箱：kcos@opensouce-club.top ｜ 社团QQ群：306601226",
+    value: "邮箱：opensouce-club@kcos.club ｜ 社团QQ群：306601226",
     color: "#7C3AED",
   },
 ];

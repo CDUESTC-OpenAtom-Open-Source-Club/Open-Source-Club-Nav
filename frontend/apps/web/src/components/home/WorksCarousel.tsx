@@ -1671,7 +1671,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
               portfolioUrl: w.preview_url || null,
               club: "科成开放原子开源社团",
               recruitStatus: "",
-              contact: "kcos@opensouce-club.top",
+              contact: "opensouce-club@kcos.club",
               activities: [],
             }));
             setWorksData(mapped);
