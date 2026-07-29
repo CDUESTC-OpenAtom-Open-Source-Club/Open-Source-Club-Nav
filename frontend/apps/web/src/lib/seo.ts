@@ -230,9 +230,9 @@ export function buildShareUrls(input: ShareUrls) {
 
 export const SITE_FAQ: FaqItem[] = [
   {
-    question: "KCOS 开放原子开源社团导航平台是什么？",
+    question: "电子科技大学成都学院开放原子开源社团是什么？",
     answer:
-      "KCOS 是科成开放原子开源社团打造的导航平台，汇集开源工具、学习资源、校园服务与开发利器，助力高校开源社区建设与发展。",
+      "KCOS 是电子科技大学成都学院开放原子开源社团建设的开源社区与开源导航站，汇集开源工具、编程学习资源、校园服务与开源项目。",
   },
   {
     question: "如何在 KCOS 平台上找到需要的开源工具？",

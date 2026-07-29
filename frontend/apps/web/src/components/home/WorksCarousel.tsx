@@ -1669,7 +1669,7 @@ export default function WorksCarousel({ isDarkMode = false }) {
               preview: w.preview_url || null,
               projectUrl: w.repo_url || null,
               portfolioUrl: w.preview_url || null,
-              club: "科成开放原子开源社团",
+              club: "电子科技大学成都学院开放原子开源社团",
               recruitStatus: "",
               contact: "opensouce-club@kcos.club",
               activities: [],

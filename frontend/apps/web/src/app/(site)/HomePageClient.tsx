@@ -1017,7 +1017,7 @@ export default function HomePage() {
             style={{ color: "inherit", textDecoration: "none", cursor: "pointer", userSelect: "none" }}
             title={`连续点击 3 次可进入后台（当前 ${adminTapCount}/3）`}
           >
-            开放原子开源社团
+            电子科技大学成都学院开放原子开源社团
           </a>
           {" · "}
           <a
