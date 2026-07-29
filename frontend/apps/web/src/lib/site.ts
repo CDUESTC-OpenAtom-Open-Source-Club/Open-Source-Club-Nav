@@ -6,20 +6,46 @@
  */
 
 export const SITE_URL = "https://nav.kcos.club";
-export const SITE_NAME = "KCOS 开放原子开源社团";
-export const SITE_TITLE = "KCOS 开放原子开源社团 - 开源导航平台";
+export const SITE_NAME = "电子科技大学成都学院开放原子开源社团";
+export const SITE_TITLE = "电子科技大学成都学院开放原子开源社团 | KCOS 开源导航站";
 export const SITE_DESCRIPTION =
-  "科成开放原子开源社团导航平台，汇集开源工具、学习资源、校园服务、开发利器，助力高校开源社区建设与发展。";
+  "电子科技大学成都学院开放原子开源社团（KCOS）官方开源导航站，汇集开源工具、编程学习资源、校园服务、开源项目与开发者工具，服务成都学院师生和开源爱好者。";
 export const SITE_SHORT_DESCRIPTION =
-  "科成开放原子开源社团导航平台，汇集开源工具、学习资源、校园服务、开发利器。";
+  "电子科技大学成都学院开放原子开源社团（KCOS）官方开源导航站。";
 export const SITE_IMAGE_PATH = "/images/brand/club-logo-user.jpg";
 export const SITE_GITHUB_URL =
   "https://github.com/CDUESTC-OpenAtom-Open-Source-Club/Open-Source-Club-Nav";
 export const SITE_OFFICIAL_URL = "https://opensouce-club.top/";
 export const SITE_ALTERNATE_NAMES = [
+  "KCOS 开放原子开源社团",
   "OpenAtom Club Nav",
   "KCOS 导航",
   "科成开放原子开源社团",
+  "成都学院开放原子开源社团",
+  "电脑科技大学成都学院开放原子开源社团",
+];
+
+export const SITE_KEYWORDS = [
+  "电子科技大学成都学院",
+  "电子科技大学",
+  "成都学院",
+  "开放原子",
+  "开放原子开源社团",
+  "开源社团",
+  "高校开源社团",
+  "KCOS",
+  "科成开源社团",
+  "开源导航",
+  "开源导航站",
+  "导航站",
+  "开源社区",
+  "开源工具",
+  "开源项目",
+  "编程学习",
+  "校园服务",
+  "开发者工具",
+  "OpenAtom",
+  "Open Source Club",
 ];
 
 // ─── SEO 路由定义 ──────────────────────────────────────────
@@ -66,7 +92,7 @@ export const SEO_ROUTES: SeoRoute[] = [
     priority: 0.8,
     indexable: false, // 改为首页弹窗模式，不索引
     title: "关于我们 | KCOS 开放原子开源社团",
-    description: "了解 KCOS 开放原子开源社团——成都理工大学工程技术学院开源社区，推动高校开源文化建设，汇集开源工具与学习资源。",
+    description: "了解电子科技大学成都学院开放原子开源社团（KCOS），参与高校开源社区、开源项目与技术分享。",
   },
   {
     path: "/resources/intelligence",

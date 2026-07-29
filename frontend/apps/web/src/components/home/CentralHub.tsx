@@ -33,7 +33,7 @@ const CLUB_OVERVIEW_ITEMS = [
   {
     title: "社团介绍",
     value:
-      "科成开放原子开源社团聚焦真实项目协作，面向校内同学提供从入门到进阶的工程实践平台。",
+      "电子科技大学成都学院开放原子开源社团聚焦真实项目协作，面向校内同学提供从入门到进阶的工程实践平台。",
     color: "#0A84FF",
   },
   {
@@ -1419,7 +1419,7 @@ export default function CentralHub({
                   lineHeight: 1.1,
                 }}
               >
-                科成<span style={{ color: "#0A84FF" }}>开放原子开源社团</span>
+                电子科技大学成都学院<span style={{ color: "#0A84FF" }}>开放原子开源社团</span>
               </div>
               <div
                 style={{
