@@ -1019,6 +1019,16 @@ export default function HomePage() {
           >
             开放原子开源社团
           </a>
+          {" · "}
+          <a
+            href="https://beian.miit.gov.cn/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: 2 }}
+            title="前往工业和信息化部政务服务平台查询备案信息"
+          >
+            蜀ICP备2025177084号-3
+          </a>
         </span>
         <div
           style={{
