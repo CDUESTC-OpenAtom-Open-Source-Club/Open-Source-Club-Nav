@@ -20,7 +20,7 @@
 const SITE_URL = "https://nav.kcos.club";
 const INDEXNOW_KEY =
   process.env.INDEXNOW_KEY ??
-  "5907708b80858fe5224ecf14aa02be50c9024818ed5459018e17cbe51e37812a";
+  "kcosclubindexnowkey2026";
 const INDEXNOW_ENDPOINT =
   process.env.INDEXNOW_ENDPOINT ?? "https://api.indexnow.org/indexnow";
 const INDEXNOW_KEY_LOCATION =

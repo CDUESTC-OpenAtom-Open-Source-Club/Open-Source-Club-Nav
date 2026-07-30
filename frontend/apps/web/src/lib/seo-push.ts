@@ -210,7 +210,7 @@ export async function pushToGoogle(urls: string[]): Promise<PushResult> {
 
 const INDEXNOW_KEY =
   process.env.INDEXNOW_KEY ||
-  "5907708b80858fe5224ecf14aa02be50c9024818ed5459018e17cbe51e37812a";
+  "kcosclubindexnowkey2026";
 
 /**
  * 向 IndexNow 推送 URL（Bing/Yandex/Naver/Seznam 等联合索引）
